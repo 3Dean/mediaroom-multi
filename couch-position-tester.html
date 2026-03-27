@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Couch Position Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .button-group {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .preset {
+            background-color: #2196F3;
+        }
+        .preset:hover {
+            background-color: #0b7dda;
+        }
+        .reset {
+            background-color: #f44336;
+        }
+        .reset:hover {
+            background-color: #d32f2f;
+        }
+        .info {
+            background-color: #ff9800;
+        }
+        .info:hover {
+            background-color: #e68a00;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        #output {
+            margin-top: 20px;
+            min-height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Couch Position Tester</h1>
+    
+    <div class="button-group">
+        <h2>Information</h2>
+        <button class="info" onclick="getCouchPositions()">Get Current Positions</button>
+        <button class="info" onclick="showHelp()">Show Help</button>
+    </div>
+    
+    <div class="button-group">
+        <h2>Presets</h2>
+        <button class="preset" onclick="setPreset('facing')">Facing Each Other</button>
+        <button class="preset" onclick="setPreset('corner')">Corner Arrangement</button>
+        <button class="preset" onclick="setPreset('side-by-side')">Side by Side</button>
+        <button class="preset" onclick="setPreset('far-apart')">Far Apart</button>
+    </div>
+    
+    <div class="button-group">
+        <h2>Custom Positions</h2>
+        <h3>Left Couch</h3>
+        <div>
+            X: <input type="number" id="left-x" value="-3.7" step="0.5">
+            Y: <input type="number" id="left-y" value="0" step="0.5">
+            Z: <input type="number" id="left-z" value=".8" step="0.5">
+            <button onclick="updateLeftCouch()">Update Left Couch</button>
+        </div>
+        
+        <h3>Right Couch</h3>
+        <div>
+            X: <input type="number" id="right-x" value="2.5" step="0.5">
+            Y: <input type="number" id="right-y" value="0" step="0.5">
+            Z: <input type="number" id="right-z" value=".8" step="0.5">
+            <button onclick="updateRightCouch()">Update Right Couch</button>
+        </div>
+    </div>
+    
+    <div class="button-group">
+        <h2>Reset</h2>
+        <button class="reset" onclick="resetPositions()">Reset to Default</button>
+    </div>
+    
+    <h2>Output</h2>
+    <pre id="output">Results will appear here...</pre>
+    
+    <script>
+        // Function to log to the output area
+        function log(message) {
+            const output = document.getElementById('output');
+            output.textContent = message;
+            console.log(message);
+        }
+        
+        // Function to get current couch positions
+        function getCouchPositions() {
+            try {
+                const positions = window.opener.getCouchPositions();
+                log(JSON.stringify(positions, null, 2));
+            } catch (error) {
+                log(`Error: ${error.message}\n\nMake sure this page was opened from the main application.`);
+            }
+        }
+        
+        // Function to show help
+        function showHelp() {
+            try {
+                window.opener.couchHelp();
+                log("Help information has been logged to the main application's console.");
+            } catch (error) {
+                log(`Error: ${error.message}\n\nMake sure this page was opened from the main application.`);
+            }
+        }
+        
+        // Function to update left couch position
+        function updateLeftCouch() {
+            try {
+                const x = parseFloat(document.getElementById('left-x').value);
+                const y = parseFloat(document.getElementById('left-y').value);
+                const z = parseFloat(document.getElementById('left-z').value);
+                
+                window.opener.updateModelPosition('/models/couch_left.glb', x, y, z);
+                log(`Left couch position updated to: (${x}, ${y}, ${z})`);
+            } catch (error) {
+                log(`Error: ${error.message}\n\nMake sure this page was opened from the main application.`);
+            }
+        }
+        
+        // Function to update right couch position
+        function updateRightCouch() {
+            try {
+                const x = parseFloat(document.getElementById('right-x').value);
+                const y = parseFloat(document.getElementById('right-y').value);
+                const z = parseFloat(document.getElementById('right-z').value);
+                
+                window.opener.updateModelPosition('/models/couch_right.glb', x, y, z);
+                log(`Right couch position updated to: (${x}, ${y}, ${z})`);
+            } catch (error) {
+                log(`Error: ${error.message}\n\nMake sure this page was opened from the main application.`);
+            }
+        }
+        
+        // Function to reset positions
+        function resetPositions() {
+            try {
+                window.opener.resetCouchPositions();
+                log("Couch positions reset to default values.");
+                
+                // Update input fields to reflect default values
+                document.getElementById('left-x').value = -3.7;
+                document.getElementById('left-y').value = 0;
+                document.getElementById('left-z').value = .8;
+                
+                document.getElementById('right-x').value = 2.5;
+                document.getElementById('right-y').value = 0;
+                document.getElementById('right-z').value = .8;
+            } catch (error) {
+                log(`Error: ${error.message}\n\nMake sure this page was opened from the main application.`);
+            }
+        }
+        
+        // Function to set preset positions
+        function setPreset(preset) {
+            try {
+                switch (preset) {
+                    case 'facing':
+                        window.opener.updateModelPosition('/models/couch_left.glb', -3, 0, 0);
+                        window.opener.updateModelPosition('/models/couch_right.glb', 5.2, 0, 2);
+                        log("Couches positioned facing each other.");
+                        
+                        // Update input fields
+                        document.getElementById('left-x').value = -3;
+                        document.getElementById('left-y').value = 0;
+                        document.getElementById('left-z').value = 0;
+                        
+                        document.getElementById('right-x').value = 5.2;
+                        document.getElementById('right-y').value = 0;
+                        document.getElementById('right-z').value = 2;
+                        break;
+                        
+                    case 'corner':
+                        window.opener.updateModelPosition('/models/couch_left.glb', -2, 0, 4);
+                        window.opener.updateModelPosition('/models/couch_right.glb', 5.2, 0, 2);
+                        log("Couches positioned in corner arrangement.");
+                        
+                        // Update input fields
+                        document.getElementById('left-x').value = -2;
+                        document.getElementById('left-y').value = 0;
+                        document.getElementById('left-z').value = 4;
+                        
+                        document.getElementById('right-x').value = 5.2;
+                        document.getElementById('right-y').value = 0;
+                        document.getElementById('right-z').value = 2;
+                        break;
+                        
+                    case 'side-by-side':
+                        window.opener.updateModelPosition('/models/couch_left.glb', -2, 0, 4);
+                        window.opener.updateModelPosition('/models/couch_right.glb', 2, 0, 4);
+                        log("Couches positioned side by side.");
+                        
+                        // Update input fields
+                        document.getElementById('left-x').value = -2;
+                        document.getElementById('left-y').value = 0;
+                        document.getElementById('left-z').value = 4;
+                        
+                        document.getElementById('right-x').value = 2;
+                        document.getElementById('right-y').value = 0;
+                        document.getElementById('right-z').value = 4;
+                        break;
+                        
+                    case 'far-apart':
+                        window.opener.updateModelPosition('/models/couch_left.glb', -4, 0, -4);
+                        window.opener.updateModelPosition('/models/couch_right.glb', 4, 0, 4);
+                        log("Couches positioned far apart.");
+                        
+                        // Update input fields
+                        document.getElementById('left-x').value = -4;
+                        document.getElementById('left-y').value = 0;
+                        document.getElementById('left-z').value = -4;
+                        
+                        document.getElementById('right-x').value = 4;
+                        document.getElementById('right-y').value = 0;
+                        document.getElementById('right-z').value = 4;
+                        break;
+                }
+            } catch (error) {
+                log(`Error: ${error.message}\n\nMake sure this page was opened from the main application.`);
+            }
+        }
+        
+        // Initial message
+        log("Ready to test couch positions. Use the buttons above to interact with the main application.");
+    </script>
+</body>
+</html>

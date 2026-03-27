@@ -1,0 +1,31 @@
+{
+  "name": "musicspace",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "realtime": "node server/index.js",
+    "start": "node server/index.js"
+  },
+  "devDependencies": {
+    "@aws-amplify/backend": "^1.16.1",
+    "@aws-amplify/backend-cli": "^1.7.2",
+    "@types/three": "^0.177.0",
+    "aws-cdk-lib": "^2.189.1",
+    "constructs": "^10.4.2",
+    "esbuild": "^0.25.5",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-glsl": "^1.4.1"
+  },
+  "dependencies": {
+    "aws-amplify": "^6.15.0",
+    "gsap": "^3.13.0",
+    "three": "^0.177.0",
+    "ws": "^8.20.0"
+  }
+}
