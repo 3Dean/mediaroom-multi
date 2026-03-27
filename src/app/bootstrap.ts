@@ -55,8 +55,8 @@ export function bootstrapApp(): void {
       const nextRoomClient = new RoomClient({
         url: realtimeUrl,
         reconnect: true,
-        reconnectDelayMs: 1000,
-        maxReconnectDelayMs: 8000,
+        reconnectDelayMs: APP_CONFIG.reconnectBaseDelayMs,
+        maxReconnectDelayMs: APP_CONFIG.reconnectMaxDelayMs,
         onOpen: () => {
           roomPanel.setStatus(`Connected to ${roomSlug}.`);
           roomPanel.setMeta('Live');
@@ -345,9 +345,17 @@ function syncObjectState(
 }
 
 function getRealtimeUrl(): string {
+  const hostname = window.location.hostname;
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const port = isLocalHost
+    ? `:${APP_CONFIG.defaultRealtimePort}`
+    : window.location.port
+      ? `:${window.location.port}`
+      : '';
+
   return window.__MUSICSPACE_REALTIME_URL__
     ?? import.meta.env.VITE_REALTIME_URL
-    ?? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}:${APP_CONFIG.defaultRealtimePort}`;
+    ?? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${hostname}${port}`;
 }
 
 function getLocalPlayerTransform(): PlayerTransform | null {
