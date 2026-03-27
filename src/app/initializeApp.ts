@@ -1684,6 +1684,7 @@ function pickupObjectById(objectId: string) {
     return false;
   }
 
+  activeObjectAnimations.delete(objectId);
   heldObject = objectRoot;
   heldObjectId = objectId;
   objectRoot.visible = true;
