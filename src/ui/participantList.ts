@@ -9,8 +9,8 @@ export class ParticipantList {
     this.container = document.createElement('div');
     this.container.id = 'participant-list';
     this.container.style.position = 'absolute';
-    this.container.style.top = '160px';
-    this.container.style.right = '16px';
+    this.container.style.left = '16px';
+    this.container.style.bottom = '332px';
     this.container.style.width = '280px';
     this.container.style.maxHeight = '260px';
     this.container.style.padding = '12px';
