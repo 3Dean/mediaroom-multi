@@ -213,6 +213,10 @@ console.log('Type "seatingHelp()" in the console to see available seating positi
 
 // Add keyboard shortcut to open couch position tester (press 'P')
 window.addEventListener('keydown', (e) => {
+  if (isTypingIntoUi(e.target)) {
+    return;
+  }
+
   if (e.code === 'KeyP') {
     (window as any).openCouchTester();
     console.log('Couch position tester opened in a new window');
@@ -547,14 +551,15 @@ document.addEventListener('pointerlockchange', () => {
     } else {
         renderer.domElement.style.cursor = "auto";
         // Reset movement state when pointer is unlocked
-        moveState.forward = false;
-        moveState.backward = false;
-        moveState.left = false;
-        moveState.right = false;
+        resetMovementState();
     }
 });
 // ESC key shows cursor
 window.addEventListener('keydown', (e) => {
+    if (isTypingIntoUi(e.target)) {
+        return;
+    }
+
     if (e.code === 'Escape') renderer.domElement.style.cursor = 'auto';
 });
 
@@ -1332,6 +1337,10 @@ document.body.appendChild(debugDisplay);
 
 // Add debug display toggle functionality (press 'I' to toggle)
 window.addEventListener('keydown', (e) => {
+  if (isTypingIntoUi(e.target)) {
+    return;
+  }
+
   if (e.code === 'KeyI') {
     debugDisplay.style.display = debugDisplay.style.display === 'none' ? 'block' : 'none';
     console.log(`Debug display ${debugDisplay.style.display === 'none' ? 'hidden' : 'shown'}`);
