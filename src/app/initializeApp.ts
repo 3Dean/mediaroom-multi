@@ -93,7 +93,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x888888);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(-0.84, 1.64, 0.45); // Set initial camera position
+camera.position.set(0, 4, -4); // Set lobby startup camera position before room join
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
