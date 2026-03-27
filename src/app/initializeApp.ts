@@ -1702,10 +1702,11 @@ window.addEventListener('mousedown', (event) => {
   let actionTaken = false;
 
   if (heldObject && heldObjectId) {
-    const dropTransform = getObjectDropTransform(heldObjectId);
+    const releasingObjectId = heldObjectId;
+    const dropTransform = getObjectDropTransform(releasingObjectId);
     startObjectReleaseAnimation(dropTransform);
     if (window.__musicspaceRequestObjectRelease) {
-      window.__musicspaceRequestObjectRelease(heldObjectId, dropTransform);
+      window.__musicspaceRequestObjectRelease(releasingObjectId, dropTransform);
     }
     actionTaken = true;
   } else {
