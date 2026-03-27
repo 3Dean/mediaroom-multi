@@ -768,6 +768,7 @@ for (let i = 0; i < EMIT_COUNT; i++) {
 
 // GLTF Loader
 const loader = new GLTFLoader(manager);
+loadDropAnchors();
 
 // Vapor effect material
 let vaporEffectMaterial: THREE.ShaderMaterial | null = null;
@@ -885,12 +886,160 @@ const raycaster = new THREE.Raycaster();
 const pickupDistance = 3;
 let hoveredObject: THREE.Mesh | null = null;
 const mouseForHover = new THREE.Vector2(); // For hover detection based on mouse/touch position
+const objectDropTypeAliases: Record<string, string> = {
+  coffee: 'mug',
+};
+type DropAnchor = {
+  anchorId: string;
+  objectType: string;
+  position: THREE.Vector3;
+  yaw: number;
+};
+type ObjectReleaseAnimation = {
+  objectId: string;
+  objectRoot: THREE.Object3D;
+  startTime: number;
+  durationMs: number;
+  startPosition: THREE.Vector3;
+  endPosition: THREE.Vector3;
+  startQuaternion: THREE.Quaternion;
+  endQuaternion: THREE.Quaternion;
+};
+const dropAnchorMap = new Map<string, DropAnchor[]>();
+const activeObjectAnimations = new Map<string, ObjectReleaseAnimation>();
+const releaseAnimationDurationMs = 220;
 
 // Define positions for couch models
 const modelPositions: { [key: string]: THREE.Vector3 } = {
   '/models/couch_left.glb': new THREE.Vector3(-3.7, 0, .8),  // Adjust these values as needed
   '/models/couch_right.glb': new THREE.Vector3(2.5, 0, .8)   // Adjust these values as needed
 };
+
+function getDropObjectType(objectId: string) {
+  return objectDropTypeAliases[objectId] ?? objectId;
+}
+
+function registerDropAnchor(anchor: DropAnchor) {
+  const anchors = dropAnchorMap.get(anchor.objectType) ?? [];
+  anchors.push(anchor);
+  anchors.sort((left, right) => left.anchorId.localeCompare(right.anchorId));
+  dropAnchorMap.set(anchor.objectType, anchors);
+}
+
+function findBestDropAnchor(objectId: string): DropAnchor | null {
+  const objectType = getDropObjectType(objectId);
+  const anchors: DropAnchor[] = dropAnchorMap.get(objectType) ?? dropAnchorMap.get('any') ?? [];
+  if (anchors.length === 0) {
+    return null;
+  }
+
+  const cameraDirection = new THREE.Vector3();
+  camera.getWorldDirection(cameraDirection);
+  const origin = camera.position.clone();
+  let bestAnchor: DropAnchor | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  anchors.forEach((anchor) => {
+    const toAnchor = anchor.position.clone().sub(origin);
+    const distance = toAnchor.length();
+    if (distance > pickupDistance * 2) {
+      return;
+    }
+
+    const directionToAnchor = toAnchor.clone().normalize();
+    const facingScore = cameraDirection.dot(directionToAnchor);
+    if (facingScore < 0.1) {
+      return;
+    }
+
+    const score = distance - facingScore * 1.25;
+    if (score < bestScore) {
+      bestScore = score;
+      bestAnchor = anchor;
+    }
+  });
+
+  return bestAnchor;
+}
+
+function loadDropAnchors() {
+  loader.load('/models/drop_anchors.glb', (gltf: any) => {
+    gltf.scene.updateMatrixWorld(true);
+    gltf.scene.traverse((child: THREE.Object3D) => {
+      const match = child.name.match(/^drop_([a-z0-9]+)_(\d+)$/i);
+      if (!match) {
+        return;
+      }
+
+      const worldPosition = new THREE.Vector3();
+      const worldQuaternion = new THREE.Quaternion();
+      child.getWorldPosition(worldPosition);
+      child.getWorldQuaternion(worldQuaternion);
+      const euler = new THREE.Euler().setFromQuaternion(worldQuaternion, 'YXZ');
+
+      registerDropAnchor({
+        anchorId: child.name,
+        objectType: match[1].toLowerCase(),
+        position: worldPosition.clone(),
+        yaw: euler.y,
+      });
+    });
+  });
+}
+
+function startObjectReleaseAnimation(snapshot: { objectId: string; ownerSessionId: string | null; position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } | null }) {
+  const objectRoot = pickableObjectMap.get(snapshot.objectId);
+  if (!objectRoot) {
+    return;
+  }
+
+  const startPosition = new THREE.Vector3();
+  const startQuaternion = new THREE.Quaternion();
+  objectRoot.updateMatrixWorld(true);
+  objectRoot.getWorldPosition(startPosition);
+  objectRoot.getWorldQuaternion(startQuaternion);
+
+  if (objectRoot.parent !== scene) {
+    objectRoot.parent?.remove(objectRoot);
+    scene.add(objectRoot);
+  }
+
+  objectRoot.visible = true;
+  objectRoot.position.copy(startPosition);
+  objectRoot.quaternion.copy(startQuaternion);
+
+  const endQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, snapshot.rotation?.yaw ?? 0, 0, 'YXZ'));
+  activeObjectAnimations.set(snapshot.objectId, {
+    objectId: snapshot.objectId,
+    objectRoot,
+    startTime: performance.now(),
+    durationMs: releaseAnimationDurationMs,
+    startPosition,
+    endPosition: new THREE.Vector3(snapshot.position.x, snapshot.position.y, snapshot.position.z),
+    startQuaternion,
+    endQuaternion,
+  });
+
+  if (heldObjectId === snapshot.objectId) {
+    heldObject = null;
+    heldObjectId = null;
+  }
+}
+
+function updateObjectReleaseAnimations(now: number) {
+  activeObjectAnimations.forEach((animation, objectId) => {
+    const progress = Math.min((now - animation.startTime) / animation.durationMs, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    animation.objectRoot.position.lerpVectors(animation.startPosition, animation.endPosition, eased);
+    animation.objectRoot.quaternion.copy(animation.startQuaternion).slerp(animation.endQuaternion, eased);
+
+    if (progress >= 1) {
+      animation.objectRoot.position.copy(animation.endPosition);
+      animation.objectRoot.quaternion.copy(animation.endQuaternion);
+      activeObjectAnimations.delete(objectId);
+    }
+  });
+}
 
 // Function to create sitting position models at couch and chair locations
 function createSittingPositions() {
@@ -1437,10 +1586,27 @@ loader.load('/models/tvscreen.glb', (gltf: any) => {
 });
 
 function getObjectDropTransform(objectId: string) {
+  const preferredAnchor = findBestDropAnchor(objectId);
+  if (preferredAnchor) {
+    return {
+      objectId,
+      ownerSessionId: null,
+      position: {
+        x: preferredAnchor.position.x,
+        y: preferredAnchor.position.y,
+        z: preferredAnchor.position.z,
+      },
+      rotation: {
+        yaw: preferredAnchor.yaw,
+        pitch: 0,
+      },
+    };
+  }
+
   const dropRaycaster = new THREE.Raycaster();
   const cameraDirection = new THREE.Vector3();
   camera.getWorldDirection(cameraDirection);
-  dropRaycaster.set(controls.object.position, cameraDirection);
+  dropRaycaster.set(camera.position, cameraDirection);
 
   const intersectsNavmesh = dropRaycaster.intersectObjects(collidableMeshList, false);
   let dropPosition: THREE.Vector3;
@@ -1450,9 +1616,9 @@ function getObjectDropTransform(objectId: string) {
     dropPosition.y += 0.1;
   } else {
     const forwardVector = new THREE.Vector3(0, 0, -1);
-    forwardVector.applyQuaternion(controls.object.quaternion);
-    dropPosition = controls.object.position.clone().add(forwardVector.multiplyScalar(pickupDistance * 0.75));
-    dropPosition.y = controls.object.position.y - standingHeight + 0.01;
+    forwardVector.applyQuaternion(camera.quaternion);
+    dropPosition = camera.position.clone().add(forwardVector.multiplyScalar(pickupDistance * 0.75));
+    dropPosition.y = camera.position.y - standingHeight + 0.01;
   }
 
   return {
@@ -1464,7 +1630,7 @@ function getObjectDropTransform(objectId: string) {
       z: dropPosition.z,
     },
     rotation: {
-      yaw: controls.object.rotation.y,
+      yaw: camera.rotation.y,
       pitch: 0,
     },
   };
@@ -1476,11 +1642,21 @@ function applyObjectSnapshot(snapshot: { objectId: string; ownerSessionId: strin
     return;
   }
 
+  const activeAnimation = activeObjectAnimations.get(snapshot.objectId);
   if (snapshot.ownerSessionId) {
+    if (activeAnimation) {
+      activeObjectAnimations.delete(snapshot.objectId);
+    }
     if (heldObjectId === snapshot.objectId) {
       return;
     }
     objectRoot.visible = false;
+    return;
+  }
+
+  if (activeAnimation) {
+    activeAnimation.endPosition.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+    activeAnimation.endQuaternion.setFromEuler(new THREE.Euler(0, snapshot.rotation?.yaw ?? 0, 0, 'YXZ'));
     return;
   }
 
@@ -1526,10 +1702,9 @@ window.addEventListener('mousedown', (event) => {
 
   if (heldObject && heldObjectId) {
     const dropTransform = getObjectDropTransform(heldObjectId);
+    startObjectReleaseAnimation(dropTransform);
     if (window.__musicspaceRequestObjectRelease) {
       window.__musicspaceRequestObjectRelease(heldObjectId, dropTransform);
-    } else {
-      applyObjectSnapshot(dropTransform);
     }
     actionTaken = true;
   } else {
@@ -1648,6 +1823,7 @@ const delta = clock.getDelta();
 if (heldObject) {
  heldObject.rotation.y += delta * spinSpeed;
 }
+updateObjectReleaseAnimations(performance.now());
   // Update original color cycling point lights
   pointLights.forEach((light, i) => {
     hues[i] += 0.002; // control speed here
