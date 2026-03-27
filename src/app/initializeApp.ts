@@ -863,6 +863,7 @@ const pickableObjectMap = new Map<string, THREE.Object3D>();
 let heldObject: THREE.Object3D | null = null; // Can now be a Group/Scene (GLB root)
 let heldObjectId: string | null = null;
 const spinSpeed = 1.0; // radians per second
+const heldObjectOffset = new THREE.Vector3(0.32, -0.28, -0.9);
 const raycaster = new THREE.Raycaster();
 const pickupDistance = 3;
 let hoveredObject: THREE.Mesh | null = null;
@@ -1463,7 +1464,7 @@ function applyObjectSnapshot(snapshot: { objectId: string; ownerSessionId: strin
   }
 
   if (heldObjectId === snapshot.objectId && heldObject) {
-    controls.object.remove(heldObject);
+    heldObject.parent?.remove(heldObject);
     scene.add(heldObject);
     heldObject = null;
     heldObjectId = null;
@@ -1492,8 +1493,8 @@ function pickupObjectById(objectId: string) {
   if (heldObject.parent) {
     heldObject.parent.remove(heldObject);
   }
-  controls.object.add(heldObject);
-  heldObject.position.set(0, -0.2, -pickupDistance * 0.25);
+  camera.add(heldObject);
+  heldObject.position.copy(heldObjectOffset);
   heldObject.rotation.set(0, 0, 0);
   return true;
 }
