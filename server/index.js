@@ -1,4 +1,7 @@
+import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { extname, join, normalize } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 
 const HOST = process.env.REALTIME_HOST ?? '0.0.0.0';
@@ -11,7 +14,24 @@ const MAX_DISPLAY_NAME_LENGTH = Number(process.env.REALTIME_MAX_DISPLAY_NAME_LEN
 const MAX_ROOM_ID_LENGTH = Number(process.env.REALTIME_MAX_ROOM_ID_LENGTH ?? 64);
 const MAX_OBJECT_ID_LENGTH = Number(process.env.REALTIME_MAX_OBJECT_ID_LENGTH ?? 64);
 const MAX_SEAT_ID_LENGTH = Number(process.env.REALTIME_MAX_SEAT_ID_LENGTH ?? 64);
-const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.REALTIME_ALLOWED_ORIGINS);
+const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.REALTIME_ALLOWED_ORIGINS ?? process.env.RENDER_EXTERNAL_URL ?? '');
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const DIST_DIR = join(__dirname, '..', 'dist');
+const INDEX_FILE = join(DIST_DIR, 'index.html');
+const HAS_DIST = existsSync(INDEX_FILE);
+const MIME_TYPES = {
+  '.css': 'text/css; charset=utf-8',
+  '.glb': 'model/gltf-binary',
+  '.html': 'text/html; charset=utf-8',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.mp4': 'video/mp4',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+};
 
 const roomParticipants = new Map();
 const roomSockets = new Map();
@@ -30,11 +50,17 @@ const server = createServer((request, response) => {
       roomCount: roomParticipants.size,
       maxRoomSize: MAX_ROOM_SIZE,
       allowedOrigins: ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS,
+      servingDist: HAS_DIST,
     }));
     return;
   }
 
-  response.writeHead(200, { 'Content-Type': 'text/plain' });
+  if (HAS_DIST) {
+    serveStaticAsset(request, response);
+    return;
+  }
+
+  response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
   response.end('musicspace realtime server');
 });
 
@@ -83,6 +109,7 @@ const heartbeat = setInterval(() => {
 wss.on('close', () => clearInterval(heartbeat));
 server.listen(PORT, HOST, () => {
   console.log(`[realtime] listening on ws://${HOST}:${PORT}`);
+  console.log(`[realtime] servingDist=${HAS_DIST}`);
   console.log(`[realtime] maxRoomSize=${MAX_ROOM_SIZE} maxChatLength=${MAX_CHAT_LENGTH} chatRate=${CHAT_MAX_MESSAGES}/${CHAT_WINDOW_MS}ms`);
   console.log(`[realtime] allowedOrigins=${ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS.join(',')}`);
 });
@@ -507,4 +534,54 @@ function isOriginAllowed(origin) {
     return true;
   }
   return ALLOWED_ORIGINS.includes(origin);
+}
+
+function serveStaticAsset(request, response) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    response.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Method Not Allowed');
+    return;
+  }
+
+  const url = new URL(request.url ?? '/', 'http://localhost');
+  const pathname = decodeURIComponent(url.pathname);
+  const requestedPath = pathname === '/' ? '/index.html' : pathname;
+  const filePath = resolveDistPath(requestedPath);
+
+  if (filePath) {
+    sendFile(response, filePath, request.method === 'HEAD');
+    return;
+  }
+
+  sendFile(response, INDEX_FILE, request.method === 'HEAD');
+}
+
+function resolveDistPath(requestPath) {
+  const normalizedPath = normalize(requestPath).replace(/^([.][.][/\\])+/, '');
+  const candidate = join(DIST_DIR, normalizedPath);
+
+  if (!candidate.startsWith(DIST_DIR) || !existsSync(candidate)) {
+    return null;
+  }
+
+  const stats = statSync(candidate);
+  if (stats.isDirectory()) {
+    const nestedIndex = join(candidate, 'index.html');
+    return existsSync(nestedIndex) ? nestedIndex : null;
+  }
+
+  return stats.isFile() ? candidate : null;
+}
+
+function sendFile(response, filePath, headOnly = false) {
+  const extension = extname(filePath).toLowerCase();
+  const contentType = MIME_TYPES[extension] ?? 'application/octet-stream';
+
+  response.writeHead(200, { 'Content-Type': contentType });
+  if (headOnly) {
+    response.end();
+    return;
+  }
+
+  createReadStream(filePath).pipe(response);
 }

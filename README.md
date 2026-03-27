@@ -58,7 +58,7 @@ Server:
 - `REALTIME_CHAT_MAX_MESSAGES`
 - `REALTIME_MAX_DISPLAY_NAME_LENGTH`
 
-If `REALTIME_ALLOWED_ORIGINS` is empty, the websocket server accepts all origins. For production, set it explicitly to your frontend origin.
+If `REALTIME_ALLOWED_ORIGINS` is empty, the websocket server accepts all origins locally. On Render, the server falls back to `RENDER_EXTERNAL_URL` automatically so the deployed app can use same-origin websocket connections without extra configuration.
 
 ## Health check
 
@@ -74,22 +74,22 @@ Example:
 node -e "fetch('http://127.0.0.1:8787/health').then(r=>r.text()).then(console.log)"
 ```
 
-## Deployment
+## Render deployment
 
-A production deploy needs two running services:
+This repo is now prepared for a single Render web service deployment. The service:
 
-- the Vite-built static frontend
-- the Node realtime server from `server/index.js`
+- builds the Vite frontend with `npm run build`
+- serves the built `dist` files from the Node server
+- hosts the websocket multiplayer backend on the same origin
 
-Recommended sequence:
+The included [`render.yaml`](./render.yaml) uses:
 
-1. Deploy the static frontend.
-2. Deploy the realtime server with `npm start`.
-3. Set `VITE_REALTIME_URL` on the frontend to the deployed websocket URL.
-4. Set `REALTIME_ALLOWED_ORIGINS` on the server to the deployed frontend origin.
-5. Verify `GET /health` and then test two live browser sessions.
+- `buildCommand: npm install && npm run build`
+- `startCommand: npm start`
 
-A more detailed deployment checklist is in `DEPLOYMENT.md`.
+That means you do not need a separate static host and websocket host for the first production deploy.
+
+Detailed steps are in `DEPLOYMENT.md`.
 
 ## Current limitations
 
@@ -100,8 +100,7 @@ A more detailed deployment checklist is in `DEPLOYMENT.md`.
 
 ## Recommended next steps
 
-- manual two-browser QA pass for all interactions
-- deploy the realtime server to a stable host
+- deploy to Render and run a real two-browser QA pass
 - add moderation/admin controls
 - add room creation persistence and room listing UX
 - add analytics/logging if this moves beyond local evaluation

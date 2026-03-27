@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: mediaroom-multi
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: REALTIME_HOST
+        value: 0.0.0.0
+      - key: REALTIME_MAX_ROOM_SIZE
+        value: 8
+      - key: REALTIME_MAX_CHAT_LENGTH
+        value: 280
+      - key: REALTIME_CHAT_WINDOW_MS
+        value: 10000
+      - key: REALTIME_CHAT_MAX_MESSAGES
+        value: 5
+      - key: REALTIME_MAX_DISPLAY_NAME_LENGTH
+        value: 32
