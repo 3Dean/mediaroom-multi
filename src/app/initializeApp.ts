@@ -1534,9 +1534,8 @@ window.__musicspaceGetObjectState = () => ({
   hoveredObjectId: (hoveredObject?.userData.objectId as string | undefined) ?? null,
   heldObjectId,
 });
+window.__musicspaceOccupyObject = pickupObjectById;
 window.__musicspaceApplyObjectSnapshot = applyObjectSnapshot;
-window.__musicspaceRequestObjectClaim = window.__musicspaceRequestObjectClaim;
-window.__musicspaceRequestObjectRelease = window.__musicspaceRequestObjectRelease;
 
 // WASD movement + collision
 const moveState = { forward: false, backward: false, left: false, right: false };
@@ -1762,6 +1761,7 @@ animate();
 //updateNowPlaying();
 //setInterval(updateNowPlaying, 30000);
 } // End of initializeApp function
+
 
 
 

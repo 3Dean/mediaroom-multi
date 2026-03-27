@@ -349,9 +349,12 @@ function syncObjectState(
   const heldObjectId = heldObject?.objectId ?? null;
 
   if (heldObjectId && objectState.getAppliedObjectId() !== heldObjectId) {
-    objectState.setAppliedObjectId(heldObjectId);
-    objectState.setPendingObjectId(null);
-    roomPanel.setStatus(`Object confirmed: ${heldObjectId}.`);
+    const didOccupy = window.__musicspaceOccupyObject?.(heldObjectId) ?? false;
+    if (didOccupy) {
+      objectState.setAppliedObjectId(heldObjectId);
+      objectState.setPendingObjectId(null);
+      roomPanel.setStatus(`Object confirmed: ${heldObjectId}.`);
+    }
   }
 
   const pendingObjectId = objectState.getPendingObjectId();
