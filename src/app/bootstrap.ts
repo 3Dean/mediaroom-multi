@@ -7,6 +7,7 @@ import { applyServerMessage } from '../room/roomPresence';
 import { RoomSessionStore } from '../room/roomSession';
 import { RoomStateStore } from '../room/roomState';
 import type { ChatMessage } from '../types/chat';
+import type { ServerMessage } from '../types/network';
 import type { PlayerTransform } from '../types/player';
 import { ChatPanel } from '../ui/chatPanel';
 import { ParticipantList } from '../ui/participantList';
@@ -110,6 +111,7 @@ export function bootstrapApp(): void {
         },
         onMessage: (message) => {
           applyServerMessage(roomState, message);
+          applyInitialSpawnTransform(message);
           syncSeatState(session.sessionId, roomPanel, () => {
             pendingSeatRequestId = null;
             appliedSeatId = null;
@@ -279,6 +281,19 @@ function initializeSidebarLayout(): HTMLElement {
   });
 
   return panels;
+}
+
+function applyInitialSpawnTransform(message: ServerMessage): void {
+  if (message.type !== 'room.joined') {
+    return;
+  }
+
+  const selfParticipant = message.participants.find((participant) => participant.sessionId === message.selfSessionId);
+  if (!selfParticipant) {
+    return;
+  }
+
+  window.__musicspaceApplyLocalPlayerTransform?.(selfParticipant.transform);
 }
 
 function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remotePlayerManager: RemotePlayerManager | null): void {

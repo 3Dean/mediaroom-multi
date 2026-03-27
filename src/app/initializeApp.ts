@@ -159,6 +159,17 @@ renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
 
 // Keep the old function for backward compatibility
 (window as any).resetCouchPositions = (window as any).resetSeatingPositions;
+(window as any).__musicspaceApplyLocalPlayerTransform = (transform: { position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } }) => {
+  controls.object.position.set(transform.position.x, transform.position.y, transform.position.z);
+  controls.object.rotation.set(0, transform.rotation.yaw, 0);
+  camera.rotation.x = transform.rotation.pitch;
+  moveState.forward = false;
+  moveState.backward = false;
+  moveState.left = false;
+  moveState.right = false;
+  velocity.x = 0;
+  velocity.z = 0;
+};
 
 // Help function to explain available functions
 (window as any).seatingHelp = () => {
@@ -1761,6 +1772,7 @@ animate();
 //updateNowPlaying();
 //setInterval(updateNowPlaying, 30000);
 } // End of initializeApp function
+
 
 
 

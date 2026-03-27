@@ -1,7 +1,8 @@
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Euler, Quaternion, Vector3 } from 'three';
 import { WebSocketServer } from 'ws';
 
 const HOST = process.env.REALTIME_HOST?.trim() || null;
@@ -14,11 +15,13 @@ const MAX_DISPLAY_NAME_LENGTH = Number(process.env.REALTIME_MAX_DISPLAY_NAME_LEN
 const MAX_ROOM_ID_LENGTH = Number(process.env.REALTIME_MAX_ROOM_ID_LENGTH ?? 64);
 const MAX_OBJECT_ID_LENGTH = Number(process.env.REALTIME_MAX_OBJECT_ID_LENGTH ?? 64);
 const MAX_SEAT_ID_LENGTH = Number(process.env.REALTIME_MAX_SEAT_ID_LENGTH ?? 64);
+const DEFAULT_EYE_HEIGHT = 1.6;
 const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.REALTIME_ALLOWED_ORIGINS ?? process.env.RENDER_EXTERNAL_URL ?? '');
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const DIST_DIR = join(__dirname, '..', 'dist');
 const INDEX_FILE = join(DIST_DIR, 'index.html');
 const HAS_DIST = existsSync(INDEX_FILE);
+const SPAWN_POINTS = loadSpawnPoints();
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.glb': 'model/gltf-binary',
@@ -51,6 +54,7 @@ const server = createServer((request, response) => {
       maxRoomSize: MAX_ROOM_SIZE,
       allowedOrigins: ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS,
       servingDist: HAS_DIST,
+      spawnPoints: SPAWN_POINTS.length,
     }));
     return;
   }
@@ -120,6 +124,7 @@ if (HOST) {
 function logServerStart() {
   console.log(`[realtime] listening on port ${PORT}${HOST ? ` host=${HOST}` : ''}`);
   console.log(`[realtime] servingDist=${HAS_DIST}`);
+  console.log(`[realtime] spawnPoints=${SPAWN_POINTS.length}`);
   console.log(`[realtime] maxRoomSize=${MAX_ROOM_SIZE} maxChatLength=${MAX_CHAT_LENGTH} chatRate=${CHAT_MAX_MESSAGES}/${CHAT_WINDOW_MS}ms`);
   console.log(`[realtime] allowedOrigins=${ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS.join(',')}`);
 }
@@ -184,15 +189,17 @@ function handleRoomJoin(socket, message) {
   const sockets = ensureRoomSockets(roomId);
   const seats = ensureRoomSeats(roomId);
   const objects = ensureRoomObjects(roomId);
+  const spawn = selectSpawnPoint(participants);
   const participant = {
     sessionId,
     userId,
     displayName,
     roomId,
-    transform: { position: { x: 0, y: 1.6, z: 0 }, rotation: { yaw: 0, pitch: 0 } },
+    transform: spawn.transform,
     isSitting: false,
     seatId: null,
     heldObjectId: null,
+    spawnId: spawn.spawnId,
     updatedAt: Date.now(),
   };
 
@@ -212,6 +219,19 @@ function handleRoomJoin(socket, message) {
     serverTime: Date.now(),
   });
   broadcast(roomId, { type: 'participant.joined', participant }, sessionId);
+}
+
+function selectSpawnPoint(participants) {
+  if (SPAWN_POINTS.length === 0) {
+    return {
+      spawnId: 'default',
+      transform: { position: { x: 0, y: DEFAULT_EYE_HEIGHT, z: 0 }, rotation: { yaw: 0, pitch: 0 } },
+    };
+  }
+
+  const usedSpawnIds = new Set(Array.from(participants.values()).map((participant) => participant.spawnId).filter(Boolean));
+  const availableSpawn = SPAWN_POINTS.find((spawn) => !usedSpawnIds.has(spawn.spawnId)) ?? SPAWN_POINTS[participants.size % SPAWN_POINTS.length];
+  return availableSpawn;
 }
 
 function handlePresenceUpdate(socket, message) {
@@ -545,6 +565,71 @@ function isOriginAllowed(origin) {
     return true;
   }
   return ALLOWED_ORIGINS.includes(origin);
+}
+
+function loadSpawnPoints() {
+  const spawnFilePath = join(__dirname, '..', 'public', 'models', 'spawn_points.glb');
+  if (!existsSync(spawnFilePath)) {
+    return [];
+  }
+
+  try {
+    const buffer = readFileSync(spawnFilePath);
+    const magic = buffer.toString('utf8', 0, 4);
+    if (magic !== 'glTF') {
+      throw new Error('Invalid GLB header');
+    }
+
+    const jsonChunkLength = buffer.readUInt32LE(12);
+    const jsonChunkType = buffer.readUInt32LE(16);
+    if (jsonChunkType !== 0x4e4f534a) {
+      throw new Error('GLB JSON chunk missing');
+    }
+
+    const jsonText = buffer.toString('utf8', 20, 20 + jsonChunkLength).replace(/\0+$/, '');
+    const gltf = JSON.parse(jsonText);
+    const sceneIndex = Number.isInteger(gltf.scene) ? gltf.scene : 0;
+    const scene = gltf.scenes?.[sceneIndex];
+    const rootNodes = scene?.nodes ?? [];
+    const nodes = gltf.nodes ?? [];
+    const spawnPoints = [];
+
+    const walk = (nodeIndex, parentPosition, parentQuaternion) => {
+      const node = nodes[nodeIndex];
+      if (!node) {
+        return;
+      }
+
+      const localPosition = new Vector3(...(node.translation ?? [0, 0, 0]));
+      const localQuaternion = new Quaternion(...(node.rotation ?? [0, 0, 0, 1]));
+      const worldPosition = localPosition.clone().applyQuaternion(parentQuaternion).add(parentPosition);
+      const worldQuaternion = parentQuaternion.clone().multiply(localQuaternion);
+
+      if (typeof node.name === 'string' && node.name.toLowerCase().startsWith('spawn_')) {
+        const euler = new Euler().setFromQuaternion(worldQuaternion, 'YXZ');
+        spawnPoints.push({
+          spawnId: node.name,
+          transform: {
+            position: { x: worldPosition.x, y: worldPosition.y + DEFAULT_EYE_HEIGHT, z: worldPosition.z },
+            rotation: { yaw: euler.y, pitch: euler.x },
+          },
+        });
+      }
+
+      for (const childIndex of node.children ?? []) {
+        walk(childIndex, worldPosition, worldQuaternion);
+      }
+    };
+
+    for (const nodeIndex of rootNodes) {
+      walk(nodeIndex, new Vector3(), new Quaternion());
+    }
+
+    return spawnPoints.sort((a, b) => a.spawnId.localeCompare(b.spawnId));
+  } catch (error) {
+    console.error('[realtime] failed to load spawn points', error);
+    return [];
+  }
 }
 
 function serveStaticAsset(request, response) {

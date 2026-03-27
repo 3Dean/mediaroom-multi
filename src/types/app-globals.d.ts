@@ -35,6 +35,7 @@ declare global {
     __musicspaceRequestObjectClaim?: (objectId: string) => void;
     __musicspaceRequestObjectRelease?: (objectId: string, transform: RemoteObjectSnapshot) => void;
     __musicspaceApplyObjectSnapshot?: (snapshot: RemoteObjectSnapshot) => void;
+    __musicspaceApplyLocalPlayerTransform?: (transform: { position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } }) => void;
   }
 }
 
