@@ -4,7 +4,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 
-const HOST = process.env.REALTIME_HOST ?? '0.0.0.0';
+const HOST = process.env.REALTIME_HOST?.trim() || null;
 const PORT = Number(process.env.REALTIME_PORT ?? process.env.PORT ?? 8787);
 const MAX_ROOM_SIZE = Number(process.env.REALTIME_MAX_ROOM_SIZE ?? 8);
 const MAX_CHAT_LENGTH = Number(process.env.REALTIME_MAX_CHAT_LENGTH ?? 280);
@@ -45,7 +45,7 @@ const server = createServer((request, response) => {
     response.writeHead(200, { 'Content-Type': 'application/json' });
     response.end(JSON.stringify({
       ok: true,
-      host: HOST,
+      host: HOST ?? 'default',
       port: PORT,
       roomCount: roomParticipants.size,
       maxRoomSize: MAX_ROOM_SIZE,
@@ -107,12 +107,23 @@ const heartbeat = setInterval(() => {
 }, 15000);
 
 wss.on('close', () => clearInterval(heartbeat));
-server.listen(PORT, HOST, () => {
-  console.log(`[realtime] listening on ws://${HOST}:${PORT}`);
+if (HOST) {
+  server.listen(PORT, HOST, () => {
+    logServerStart();
+  });
+} else {
+  server.listen(PORT, () => {
+    logServerStart();
+  });
+}
+
+function logServerStart() {
+  console.log(`[realtime] listening on port ${PORT}${HOST ? ` host=${HOST}` : ''}`);
   console.log(`[realtime] servingDist=${HAS_DIST}`);
   console.log(`[realtime] maxRoomSize=${MAX_ROOM_SIZE} maxChatLength=${MAX_CHAT_LENGTH} chatRate=${CHAT_MAX_MESSAGES}/${CHAT_WINDOW_MS}ms`);
   console.log(`[realtime] allowedOrigins=${ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS.join(',')}`);
-});
+}
+
 
 function handleClientMessage(socket, message) {
   if (!message || typeof message.type !== 'string') {
@@ -557,7 +568,7 @@ function serveStaticAsset(request, response) {
 }
 
 function resolveDistPath(requestPath) {
-  const normalizedPath = normalize(requestPath).replace(/^([.][.][/\\])+/, '');
+  const normalizedPath = normalize(requestPath).replace(/^([.][.][\/])+/, '').replace(/^([\/])+/, '');
   const candidate = join(DIST_DIR, normalizedPath);
 
   if (!candidate.startsWith(DIST_DIR) || !existsSync(candidate)) {
