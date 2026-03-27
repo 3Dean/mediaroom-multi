@@ -11,20 +11,7 @@ export class ChatPanel {
     this.onSend = onSend;
     this.container = document.createElement('div');
     this.container.id = 'chat-panel';
-    this.container.style.position = 'absolute';
-    this.container.style.bottom = '16px';
-    this.container.style.left = '16px';
-    this.container.style.width = '280px';
-    this.container.style.maxHeight = '300px';
-    this.container.style.display = 'flex';
-    this.container.style.flexDirection = 'column';
-    this.container.style.gap = '8px';
-    this.container.style.padding = '12px';
-    this.container.style.background = 'rgba(0, 0, 0, 0.68)';
-    this.container.style.border = '1px solid rgba(255, 255, 255, 0.14)';
-    this.container.style.borderRadius = '10px';
-    this.container.style.pointerEvents = 'auto';
-    this.container.style.zIndex = '10000';
+    this.container.className = 'musicspace-panel';
 
     const title = document.createElement('div');
     title.textContent = 'Room Chat';
@@ -37,7 +24,7 @@ export class ChatPanel {
     this.log.style.flexDirection = 'column';
     this.log.style.gap = '6px';
     this.log.style.minHeight = '140px';
-    this.log.style.maxHeight = '180px';
+    this.log.style.maxHeight = '220px';
     this.log.style.overflowY = 'auto';
 
     this.form = document.createElement('form');

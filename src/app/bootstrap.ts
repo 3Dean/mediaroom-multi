@@ -17,6 +17,7 @@ const sessionStore = new RoomSessionStore();
 
 export function bootstrapApp(): void {
   window.addEventListener('DOMContentLoaded', async () => {
+    const sidebarPanels = initializeSidebarLayout();
     initializeApp();
 
     const currentUser = await getAuthenticatedUser();
@@ -235,9 +236,9 @@ export function bootstrapApp(): void {
       roomPanel.setStatus('Stored message locally. Start the realtime server to broadcast chat.');
     });
 
-    roomPanel.mount();
-    chatPanel.mount();
-    participantList.mount();
+    roomPanel.mount(sidebarPanels);
+    participantList.mount(sidebarPanels);
+    chatPanel.mount(sidebarPanels);
     syncRoomUi(chatPanel, participantList, remotePlayerManager);
     roomPanel.setMeta('Idle');
     participantList.setConnectionStatus('Idle');
@@ -255,6 +256,29 @@ export function bootstrapApp(): void {
       }
     });
   });
+}
+
+function initializeSidebarLayout(): HTMLElement {
+  const sidebar = document.getElementById('musicspace-sidebar');
+  const toggle = document.getElementById('musicspace-sidebar-toggle') as HTMLButtonElement | null;
+  const panels = document.getElementById('musicspace-panels');
+
+  if (!sidebar || !toggle || !panels) {
+    throw new Error('Sidebar UI shell is missing from the DOM.');
+  }
+
+  const applyState = (isOpen: boolean) => {
+    sidebar.classList.toggle('is-open', isOpen);
+    toggle.setAttribute('aria-expanded', String(isOpen));
+    toggle.textContent = isOpen ? 'Hide UI' : 'Show UI';
+  };
+
+  applyState(true);
+  toggle.addEventListener('click', () => {
+    applyState(!sidebar.classList.contains('is-open'));
+  });
+
+  return panels;
 }
 
 function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remotePlayerManager: RemotePlayerManager | null): void {

@@ -18,16 +18,7 @@ export class RoomPanel {
     this.onJoin = onJoin;
     this.container = document.createElement('div');
     this.container.id = 'room-panel';
-    this.container.style.position = 'absolute';
-    this.container.style.top = '16px';
-    this.container.style.right = '16px';
-    this.container.style.width = '280px';
-    this.container.style.padding = '14px';
-    this.container.style.background = 'rgba(0, 0, 0, 0.72)';
-    this.container.style.border = '1px solid rgba(255, 255, 255, 0.14)';
-    this.container.style.borderRadius = '10px';
-    this.container.style.pointerEvents = 'auto';
-    this.container.style.zIndex = '10000';
+    this.container.className = 'musicspace-panel';
 
     const title = document.createElement('div');
     title.textContent = 'Room Session';
