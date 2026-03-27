@@ -1555,8 +1555,37 @@ const velocity = new THREE.Vector3();
 const direction = new THREE.Vector3();
 const clock = new THREE.Clock();
 
+function resetMovementState() {
+  moveState.forward = false;
+  moveState.backward = false;
+  moveState.left = false;
+  moveState.right = false;
+  velocity.x = 0;
+  velocity.z = 0;
+}
+
+function isTypingIntoUi(target?: EventTarget | null) {
+  const element = target instanceof HTMLElement ? target : document.activeElement;
+  if (!(element instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = element.tagName;
+  return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || element.isContentEditable;
+}
+
+document.addEventListener('focusin', (event) => {
+  if (isTypingIntoUi(event.target)) {
+    resetMovementState();
+  }
+});
+
  // WASD movement + collision (global listener for key events)
  window.addEventListener('keydown', (e) => {
+   if (isTypingIntoUi(e.target)) {
+     return;
+   }
+
    // Handle sitting/standing with E and W keys
    if (e.code === 'KeyE' && nearSittingPosition && !isSitting) {
      requestSeatClaim();
@@ -1579,6 +1608,10 @@ if (e.code === 'KeyW' && isSitting) {
  });
  
  window.addEventListener('keyup', (e) => {
+   if (isTypingIntoUi(e.target)) {
+     return;
+   }
+
    if (!isSitting) {
      if (e.code === 'KeyW') moveState.forward = false;
      if (e.code === 'KeyS') moveState.backward = false;
