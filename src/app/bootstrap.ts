@@ -293,7 +293,12 @@ function applyInitialSpawnTransform(message: ServerMessage): void {
     return;
   }
 
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
+
   window.__musicspaceApplyLocalPlayerTransform?.(selfParticipant.transform);
+  window.renderer?.domElement?.focus();
 }
 
 function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remotePlayerManager: RemotePlayerManager | null): void {
@@ -402,13 +407,13 @@ function getRealtimeUrl(): string {
 
 function getLocalPlayerTransform(): PlayerTransform | null {
   const camera = window.camera;
-  if (!camera || !camera.parent) {
+  if (!camera) {
     return null;
   }
 
   return {
-    position: { x: camera.parent.position.x, y: camera.parent.position.y, z: camera.parent.position.z },
-    rotation: { yaw: camera.parent.rotation.y, pitch: camera.rotation.x },
+    position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+    rotation: { yaw: camera.rotation.y, pitch: camera.rotation.x },
   };
 }
 
