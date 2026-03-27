@@ -93,7 +93,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x888888);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 4, -4); // Set lobby startup camera position before room join
+camera.position.set(0, 0, 0); // Keep camera at local FPS origin
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -528,6 +528,7 @@ camera.rotation.order = 'YXZ';
 controls.object.rotation.order = 'YXZ';
 
 scene.add(controls.object);
+controls.object.position.set(0, 4, 4); // Lobby startup position before joining a room
 
 // Ensure renderer canvas regains focus when pointer lock is active
 document.addEventListener('pointerlockchange', () => {
