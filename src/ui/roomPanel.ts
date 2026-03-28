@@ -1,4 +1,16 @@
-import { APP_CONFIG, STORAGE_KEYS } from '../app/config';
+import { STORAGE_KEYS } from '../app/config';
+
+const ROOM_ADJECTIVES = ['amber', 'brisk', 'crimson', 'electric', 'golden', 'hidden', 'ivory', 'lunar', 'neon', 'quiet', 'silver', 'velvet'];
+const ROOM_MODIFIERS = ['aurora', 'breeze', 'echo', 'forest', 'harbor', 'meadow', 'midnight', 'signal', 'solar', 'violet', 'whisper', 'willow'];
+const ROOM_NOUNS = ['alcove', 'cabin', 'groove', 'hideout', 'lagoon', 'lounge', 'parlor', 'retreat', 'river', 'studio', 'temple', 'voyage'];
+
+function pickRandomWord(words: string[]) {
+  return words[Math.floor(Math.random() * words.length)];
+}
+
+function generateRoomSlug() {
+  return [pickRandomWord(ROOM_ADJECTIVES), pickRandomWord(ROOM_MODIFIERS), pickRandomWord(ROOM_NOUNS)].join('-');
+}
 
 type RoomPanelValues = {
   roomSlug: string;
@@ -17,9 +29,11 @@ export class RoomPanel {
   private readonly statusLabel: HTMLDivElement;
   private readonly metaLabel: HTMLDivElement;
   private readonly onJoin: (values: RoomPanelValues) => void;
+  private readonly generatedRoomSlug: string;
 
   constructor(onJoin: (values: RoomPanelValues) => void, options: RoomPanelOptions = {}) {
     this.onJoin = onJoin;
+    this.generatedRoomSlug = generateRoomSlug();
     this.container = document.createElement('div');
     this.container.id = 'room-panel';
     this.container.className = 'musicspace-panel';
@@ -38,7 +52,7 @@ export class RoomPanel {
     this.roomInput = document.createElement('input');
     this.roomInput.type = 'text';
     this.roomInput.placeholder = 'Room slug';
-    this.roomInput.value = options.initialRoomSlug?.trim() || localStorage.getItem(STORAGE_KEYS.lastRoomSlug) || APP_CONFIG.defaultRoomSlug;
+    this.roomInput.value = options.initialRoomSlug?.trim() || this.generatedRoomSlug;
 
     this.nameInput = document.createElement('input');
     this.nameInput.type = 'text';
@@ -47,7 +61,7 @@ export class RoomPanel {
 
     const joinButton = document.createElement('button');
     joinButton.type = 'submit';
-    joinButton.textContent = 'Join Room';
+    joinButton.textContent = 'Enter Room';
 
     this.statusLabel = document.createElement('div');
     this.statusLabel.style.color = '#c8c8c8';
@@ -63,7 +77,7 @@ export class RoomPanel {
     this.form.addEventListener('submit', (event) => {
       event.preventDefault();
       const values = {
-        roomSlug: this.roomInput.value.trim() || APP_CONFIG.defaultRoomSlug,
+        roomSlug: this.roomInput.value.trim() || this.generatedRoomSlug,
         displayName: this.nameInput.value.trim() || 'Guest',
       };
 

@@ -140,7 +140,7 @@ export function bootstrapApp(): void {
     window.__musicspaceRequestSeatClaim = (seatId: string) => {
       const activeSession = sessionStore.getCurrentSession();
       if (!activeSession) {
-        roomPanel.setStatus('Join a room before taking a seat.');
+        roomPanel.setStatus('Enter a room before taking a seat.');
         return;
       }
 
@@ -211,7 +211,7 @@ export function bootstrapApp(): void {
     const chatPanel = new ChatPanel((body) => {
       const activeSession = sessionStore.getCurrentSession();
       if (!activeSession) {
-        roomPanel.setStatus('Join a room before sending chat.');
+        roomPanel.setStatus('Enter a room before sending chat.');
         return;
       }
 
@@ -248,9 +248,9 @@ export function bootstrapApp(): void {
     participantList.setConnectionStatus('Idle');
 
     if (currentUser?.signInDetails?.loginId) {
-      roomPanel.setStatus(`Signed in as ${currentUser.signInDetails.loginId}. Join a room to start a live session.`);
+      roomPanel.setStatus(`Signed in as ${currentUser.signInDetails.loginId}. Enter a room to create it or join it if it already exists.`);
     } else {
-      roomPanel.setStatus('Guest mode active. Join a room and the local ws server will create a live session.');
+      roomPanel.setStatus('Guest mode active. Enter a room name to create it or join it if it already exists.');
     }
 
     window.addEventListener('beforeunload', () => {
