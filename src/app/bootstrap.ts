@@ -22,6 +22,7 @@ export function bootstrapApp(): void {
     initializeApp();
 
     const currentUser = await getAuthenticatedUser();
+    const initialRoomSlug = getRoomSlugFromUrl();
     const remotePlayerManager = window.scene ? new RemotePlayerManager(window.scene) : null;
     const participantList = new ParticipantList();
     let roomClient: RoomClient | null = null;
@@ -33,6 +34,7 @@ export function bootstrapApp(): void {
     let appliedObjectId: string | null = null;
 
     const roomPanel = new RoomPanel(({ roomSlug, displayName }) => {
+      updateRoomSlugInUrl(roomSlug);
       const session = sessionStore.createSession(roomSlug, displayName, currentUser?.userId);
       roomState.reset(session.roomId);
       pendingSeatRequestId = null;
@@ -133,7 +135,7 @@ export function bootstrapApp(): void {
 
       roomClient = nextRoomClient;
       nextRoomClient.connect();
-    });
+    }, { initialRoomSlug });
 
     window.__musicspaceRequestSeatClaim = (seatId: string) => {
       const activeSession = sessionStore.getCurrentSession();
@@ -461,3 +463,16 @@ function stopRealtimeLoops(presenceTimer: number | null, heartbeatTimer: number 
   }
 }
 
+
+
+function getRoomSlugFromUrl(): string | undefined {
+  const params = new URLSearchParams(window.location.search);
+  const roomSlug = params.get('room')?.trim();
+  return roomSlug || undefined;
+}
+
+function updateRoomSlugInUrl(roomSlug: string): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set('room', roomSlug);
+  window.history.replaceState({}, '', url);
+}

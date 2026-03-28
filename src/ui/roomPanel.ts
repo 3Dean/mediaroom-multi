@@ -5,6 +5,10 @@ type RoomPanelValues = {
   displayName: string;
 };
 
+type RoomPanelOptions = {
+  initialRoomSlug?: string;
+};
+
 export class RoomPanel {
   private readonly container: HTMLDivElement;
   private readonly form: HTMLFormElement;
@@ -14,7 +18,7 @@ export class RoomPanel {
   private readonly metaLabel: HTMLDivElement;
   private readonly onJoin: (values: RoomPanelValues) => void;
 
-  constructor(onJoin: (values: RoomPanelValues) => void) {
+  constructor(onJoin: (values: RoomPanelValues) => void, options: RoomPanelOptions = {}) {
     this.onJoin = onJoin;
     this.container = document.createElement('div');
     this.container.id = 'room-panel';
@@ -34,7 +38,7 @@ export class RoomPanel {
     this.roomInput = document.createElement('input');
     this.roomInput.type = 'text';
     this.roomInput.placeholder = 'Room slug';
-    this.roomInput.value = localStorage.getItem(STORAGE_KEYS.lastRoomSlug) ?? APP_CONFIG.defaultRoomSlug;
+    this.roomInput.value = options.initialRoomSlug?.trim() || localStorage.getItem(STORAGE_KEYS.lastRoomSlug) || APP_CONFIG.defaultRoomSlug;
 
     this.nameInput = document.createElement('input');
     this.nameInput.type = 'text';
