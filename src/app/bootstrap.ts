@@ -272,7 +272,7 @@ function initializeSidebarLayout(): HTMLElement {
   const applyState = (isOpen: boolean) => {
     sidebar.classList.toggle('is-open', isOpen);
     toggle.setAttribute('aria-expanded', String(isOpen));
-    toggle.textContent = isOpen ? 'Hide UI' : 'Show UI';
+    toggle.textContent = isOpen ? 'Hide' : 'Show';
   };
 
   applyState(true);
