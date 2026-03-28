@@ -90,7 +90,46 @@ let tvScreenObject: THREE.Object3D | null = null; // Reference to TV screen for 
 
 // Scene + Camera + Renderer
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x888888);
+const backgroundTextureLoader = new THREE.TextureLoader();
+type BackgroundConfig = {
+  path: string;
+  rotationDegrees: number;
+};
+const defaultBackgroundConfig: BackgroundConfig = {
+  path: '/images/equirectangular-jpg_15126925.jpg',
+  rotationDegrees: 0,
+};
+const moodBackgroundConfigs: Record<string, BackgroundConfig> = {
+  beat: { path: '/images/equirectangular-beat.jpg', rotationDegrees: 8 },
+  chill: { path: '/images/equirectangular-chill.jpg', rotationDegrees: -75 },
+  dark: { path: '/images/equirectangular-dark.jpg', rotationDegrees: 0 },
+  defcon: { path: '/images/equirectangular-defcon.jpg', rotationDegrees: 200 },
+  drone: { path: '/images/equirectangular-drone.jpg', rotationDegrees: 0 },
+  dubstep: { path: '/images/equirectangular-dubstep.jpg', rotationDegrees: -60 },
+  indie: { path: '/images/equirectangular-indie.jpg', rotationDegrees: -124 },
+  jazz: { path: '/images/equirectangular-jazz.jpg', rotationDegrees: 15 },
+  metal: { path: '/images/equirectangular-metal.jpg', rotationDegrees: 20 },
+  space: { path: '/images/equirectangular-space.jpg', rotationDegrees: 0 },
+};
+const backgroundTextureCache = new Map<string, THREE.Texture>();
+
+function applyMoodBackground(mood: string) {
+  const config = moodBackgroundConfigs[mood] ?? defaultBackgroundConfig;
+  (scene as any).backgroundRotation = new THREE.Euler(0, THREE.MathUtils.degToRad(config.rotationDegrees), 0);
+
+  const cachedTexture = backgroundTextureCache.get(config.path);
+  if (cachedTexture) {
+    scene.background = cachedTexture;
+    return;
+  }
+
+  backgroundTextureLoader.load(config.path, (texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    backgroundTextureCache.set(config.path, texture);
+    scene.background = texture;
+  });
+}
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 0, 0); // Keep camera at local FPS origin
@@ -428,6 +467,7 @@ playButton.addEventListener('click', function() {
 
 let selectedStationIndex = 0;
 audioElement.src = somaStations[selectedStationIndex].stream;
+applyMoodBackground(somaStations[selectedStationIndex].mood);
 
 stationSelect.addEventListener('change', () => {
   selectedStationIndex = parseInt(stationSelect.value);
@@ -442,6 +482,7 @@ stationSelect.addEventListener('change', () => {
   }
     // 🔁 Change mood textures based on selected station
   switchMoodTextures(selected.mood);
+  applyMoodBackground(selected.mood);
   //updateNowPlaying(); // Refresh song info
 });
 
@@ -864,7 +905,6 @@ const staticModelUrls = [
   '/models/soundboard.glb',
   '/models/speakers.glb',
   '/models/vinylrecord.glb',
-  '/models/sphereenv.glb',
   '/models/structure_floor.glb',
   '/models/structure_wall001.glb',
   '/models/structure_wall002.glb',
