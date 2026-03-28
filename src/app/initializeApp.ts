@@ -215,8 +215,6 @@ renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
   console.log(`
 Available seating position functions:
 
-Use "P" on the keyboard to toggle the couch position tester window.
-
 1. updateModelPosition(modelUrl, x, y, z)
    - Updates the position of a model
    - Example: updateModelPosition('/models/couch_left.glb', -3, 0, 3)
@@ -244,23 +242,6 @@ are still available for backward compatibility.
 
 // Log a message to let users know about the help function
 console.log('Type "seatingHelp()" in the console to see available seating position functions');
-
-// Function to open the couch position tester
-(window as any).openCouchTester = () => {
-  window.open('couch-position-tester.html', 'couchTester', 'width=850,height=700');
-};
-
-// Add keyboard shortcut to open couch position tester (press 'P')
-window.addEventListener('keydown', (e) => {
-  if (isTypingIntoUi(e.target)) {
-    return;
-  }
-
-  if (e.code === 'KeyP') {
-    (window as any).openCouchTester();
-    console.log('Couch position tester opened in a new window');
-  }
-});
 
 // Lights
 const hemi = new THREE.HemisphereLight(0xfff3e6, 0x444444, 1.2);
@@ -693,10 +674,6 @@ renderer.domElement.addEventListener('click', () => {
             }
         }
     });
-
-    // Hide mouse-specific hints if any
-    const couchTesterHintElement = document.querySelector('div[style*="Press P to open couch position tester"]');
-    if (couchTesterHintElement) (couchTesterHintElement as HTMLElement).style.display = 'none';
 } else {
     // Desktop click-and-drag view controls
     controls.disconnect(); // Disconnect PointerLockControls' default mouse listeners
@@ -1536,32 +1513,6 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Create a hint for the couch position tester
-const couchTesterHint = document.createElement('div');
-couchTesterHint.style.position = 'absolute';
-couchTesterHint.style.bottom = '10px';
-couchTesterHint.style.right = '10px';
-couchTesterHint.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-couchTesterHint.style.color = 'white';
-couchTesterHint.style.padding = '10px';
-couchTesterHint.style.borderRadius = '5px';
-couchTesterHint.style.fontFamily = 'Arial, sans-serif';
-couchTesterHint.style.fontSize = '14px';
-couchTesterHint.style.pointerEvents = 'none'; // Prevent interaction with the hint
-couchTesterHint.style.zIndex = '1000';
-couchTesterHint.textContent = 'Press P to open couch position tester';
-document.body.appendChild(couchTesterHint);
-
-// Hide the hint after 10 seconds
-setTimeout(() => {
-  couchTesterHint.style.opacity = '0';
-  couchTesterHint.style.transition = 'opacity 1s ease-out';
-  
-  // Remove from DOM after fade out
-  setTimeout(() => {
-    couchTesterHint.remove();
-  }, 1000);
-}, 10000);
 
 // Function to update debug display
 function updateDebugDisplay() {
