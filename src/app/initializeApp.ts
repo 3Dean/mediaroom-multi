@@ -114,7 +114,7 @@ const moodBackgroundConfigs: Record<string, BackgroundConfig> = {
   indie: { path: '/images/equirectangular-indie.jpg', rotationDegrees: -124 },
   jazz: { path: '/images/equirectangular-jazz.jpg', rotationDegrees: 15 },
   metal: { path: '/images/equirectangular-metal.jpg', rotationDegrees: 20 },
-  space: { path: '/images/equirectangular-space.jpg', rotationDegrees: 0 },
+  space: { path: '/images/equirectangular-space.jpg', rotationDegrees: -110 },
 };
 const backgroundTextureCache = new Map<string, THREE.Texture>();
 
@@ -151,7 +151,7 @@ const defaultTvVisualizerPreset: TvVisualizerPreset = {
 const tvVisualizerPresets: Record<string, TvVisualizerPreset> = {
   beat: { symmetrySlices: 6, fieldScale: 2.9, secondaryScale: 4.2, detailScale: 1.35, motionSpeed: 1.05, bassWarpScale: 1.2, shimmerScale: 1.05, paletteDrift: 1.05, bloomStrength: 1.08, scanlineStrength: 1.05, warmBias: 1.1, magentaBias: 1.05, coolBias: 0.95 },
   chill: { symmetrySlices: 4, fieldScale: 1.9, secondaryScale: 2.6, detailScale: 0.82, motionSpeed: 0.78, bassWarpScale: 0.78, shimmerScale: 0.72, paletteDrift: 0.86, bloomStrength: 0.92, scanlineStrength: 0.78, warmBias: 1.28, magentaBias: 0.9, coolBias: 0.72 },
-  dark: { symmetrySlices: 5, fieldScale: 2.5, secondaryScale: 3.8, detailScale: 1.05, motionSpeed: 0.9, bassWarpScale: 0.92, shimmerScale: 0.88, paletteDrift: 0.9, bloomStrength: 0.96, scanlineStrength: 1.1, warmBias: 0.82, magentaBias: 1.22, coolBias: 0.92 },
+  dark: { symmetrySlices: 5, fieldScale: 2.5, secondaryScale: 3.8, detailScale: 1.05, motionSpeed: 0.9, bassWarpScale: 0.92, shimmerScale: 0.88, paletteDrift: 0.9, bloomStrength: 0.96, scanlineStrength: 1.1, warmBias: 0.22, magentaBias: 1.22, coolBias: 2.92 },
   defcon: { symmetrySlices: 8, fieldScale: 3.1, secondaryScale: 4.6, detailScale: 1.42, motionSpeed: 1.18, bassWarpScale: 1.08, shimmerScale: 1.18, paletteDrift: 1.18, bloomStrength: 1.02, scanlineStrength: 1.18, warmBias: 0.95, magentaBias: 1.02, coolBias: 1.18 },
   drone: { symmetrySlices: 3, fieldScale: 1.55, secondaryScale: 2.15, detailScale: 0.68, motionSpeed: 0.58, bassWarpScale: 0.55, shimmerScale: 0.48, paletteDrift: 0.68, bloomStrength: 0.88, scanlineStrength: 0.68, warmBias: 0.62, magentaBias: 1.05, coolBias: 1.24 },
   dubstep: { symmetrySlices: 7, fieldScale: 3.2, secondaryScale: 4.8, detailScale: 1.55, motionSpeed: 1.22, bassWarpScale: 1.42, shimmerScale: 1.28, paletteDrift: 1.16, bloomStrength: 1.24, scanlineStrength: 1.08, warmBias: 1.14, magentaBias: 1.18, coolBias: 1.02 },
