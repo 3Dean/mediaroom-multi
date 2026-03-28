@@ -32,7 +32,7 @@ declare global {
     __musicspaceRequestSeatClaim?: (seatId: string) => void;
     __musicspaceRequestSeatRelease?: (seatId: string) => void;
     __musicspaceGetObjectState?: () => { hoveredObjectId: string | null; heldObjectId: string | null };
-    __musicspaceRequestObjectClaim?: (objectId: string) => void;
+    __musicspaceRequestObjectClaim?: (objectId: string) => boolean;
     __musicspaceRequestObjectRelease?: (objectId: string, transform: { objectId: string; ownerSessionId: string | null; position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } | null }) => void;
     __musicspaceApplyObjectSnapshot?: (snapshot: { objectId: string; ownerSessionId: string | null; position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } | null }) => void;
   }
@@ -101,7 +101,7 @@ type BackgroundConfig = {
   rotationDegrees: number;
 };
 const defaultBackgroundConfig: BackgroundConfig = {
-  path: '/images/equirectangular-jpg_15126925.jpg',
+  path: '/images/equirectangular-chill.jpg',
   rotationDegrees: 0,
 };
 const moodBackgroundConfigs: Record<string, BackgroundConfig> = {
@@ -1133,6 +1133,7 @@ const raycaster = new THREE.Raycaster();
 const pickupDistance = 3;
 let hoveredObject: THREE.Mesh | null = null;
 const mouseForHover = new THREE.Vector2(); // For hover detection based on mouse/touch position
+
 const objectDropTypeAliases: Record<string, string> = {
   coffee: 'mug',
 };
@@ -1930,8 +1931,12 @@ window.addEventListener('mousedown', (event) => {
       if (hoveredObject && hoveredObject.userData.pickableGLBRoot) {
         const objectId = hoveredObject.userData.objectId as string | undefined;
         if (objectId && window.__musicspaceRequestObjectClaim) {
-          window.__musicspaceRequestObjectClaim(objectId);
-          actionTaken = true;
+          const requestSent = window.__musicspaceRequestObjectClaim(objectId);
+          if (requestSent) {
+            actionTaken = true;
+          } else {
+            actionTaken = pickupObjectById(objectId);
+          }
         } else if (objectId) {
           actionTaken = pickupObjectById(objectId);
         }

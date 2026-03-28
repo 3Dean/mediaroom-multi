@@ -178,12 +178,13 @@ export function bootstrapApp(): void {
     window.__musicspaceRequestObjectClaim = (objectId: string) => {
       const activeSession = sessionStore.getCurrentSession();
       if (!activeSession || !roomClient?.isConnected()) {
-        return;
+        return false;
       }
 
       pendingObjectId = objectId;
       roomClient.send({ type: 'object.claim', roomId: activeSession.roomId, sessionId: activeSession.sessionId, objectId });
       roomPanel.setStatus(`Requesting ${objectId}...`);
+      return true;
     };
 
     window.__musicspaceRequestObjectRelease = (objectId, transform) => {
