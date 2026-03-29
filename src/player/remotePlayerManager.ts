@@ -5,8 +5,10 @@ import type { PlayerPresence } from '../types/player';
 const BODY_COLOR = 0xff7f50;
 const SELF_COLOR = 0x66ccff;
 const AVATAR_TARGET_HEIGHT = 1.75;
-const AVATAR_STYLE_TRANSFORMS: Record<string, { scale: { x: number; y: number; z: number }; offsetY?: number }> = {
-  pulse: { scale: { x: 0.8, y: 0.8, z: 0.8 }, offsetY: 0.8 },
+const AVATAR_STYLE_TRANSFORMS: Record<string, { modelPath: string; scale: { x: number; y: number; z: number }; offsetY?: number }> = {
+  observer: { modelPath: '/models/avatar_observer.glb', scale: { x: 0.7, y: 0.7, z: 0.7 }, offsetY: 0.3 },
+  pulse: { modelPath: '/models/avatar_pulse.glb', scale: { x: 0.8, y: 0.8, z: 0.8 }, offsetY: 0.9 },
+  signal: { modelPath: '/models/avatar_signal.glb', scale: { x: 0.7, y: 0.7, z: 0.7 }, offsetY: 0.3 },
 };
 const loader = new GLTFLoader();
 const avatarTemplateCache = new Map<string, Promise<THREE.Group | null>>();
@@ -98,8 +100,9 @@ export class RemotePlayerManager {
     const fallback = createFallbackAvatar(participant.sessionId === selfSessionId ? SELF_COLOR : BODY_COLOR);
     group.add(fallback);
 
-    if (desiredStyle === 'pulse') {
-      loadAvatarTemplate('/models/avatar_pulse.glb').then((template) => {
+    const transform = desiredStyle ? AVATAR_STYLE_TRANSFORMS[desiredStyle] : null;
+    if (transform) {
+      loadAvatarTemplate(transform.modelPath).then((template) => {
         if (!template || group.userData.avatarStyle !== desiredStyle) {
           return;
         }
@@ -111,15 +114,12 @@ export class RemotePlayerManager {
 
         const clone = template.clone(true);
         clone.name = 'avatar-visual';
-        const transform = AVATAR_STYLE_TRANSFORMS[desiredStyle];
-        if (transform) {
-          clone.scale.set(
-            clone.scale.x * transform.scale.x,
-            clone.scale.y * transform.scale.y,
-            clone.scale.z * transform.scale.z,
-          );
-          clone.position.y += transform.offsetY ?? 0;
-        }
+        clone.scale.set(
+          clone.scale.x * transform.scale.x,
+          clone.scale.y * transform.scale.y,
+          clone.scale.z * transform.scale.z,
+        );
+        clone.position.y += transform.offsetY ?? 0;
         group.add(clone);
       }).catch(() => {
         // Keep fallback capsule if avatar model fails to load.
