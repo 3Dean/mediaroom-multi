@@ -98,11 +98,17 @@ export class RoomPanel {
 
   applyPreferenceDefaults(values: Partial<RoomPanelValues>): void {
     if (values.displayName !== undefined) {
-      this.nameInput.value = values.displayName;
+      const nextDisplayName = values.displayName.trim();
+      if (nextDisplayName) {
+        this.nameInput.value = nextDisplayName;
+      }
     }
 
     if (values.roomSlug !== undefined && !this.hasUrlRoom) {
-      this.roomInput.value = values.roomSlug.trim() || this.generatedRoomSlug;
+      const nextRoomSlug = values.roomSlug.trim();
+      if (nextRoomSlug) {
+        this.roomInput.value = nextRoomSlug;
+      }
     }
   }
 

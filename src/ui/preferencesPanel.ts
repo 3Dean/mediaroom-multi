@@ -107,7 +107,7 @@ export class PreferencesPanel {
 
     this.noteLabel = document.createElement('div');
     this.noteLabel.className = 'preferences-note';
-    this.noteLabel.textContent = 'Local-only for now. Avatar and scene media can sync later.';
+    this.noteLabel.textContent = 'Local-only for now. Leave default name or room blank to keep using the live join form values.';
 
     this.volumeInput.addEventListener('input', () => {
       this.volumeValue.textContent = `${Math.round(Number(this.volumeInput.value) * 100)}%`;
