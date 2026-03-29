@@ -19,6 +19,7 @@ type RoomPanelValues = {
 
 type RoomPanelOptions = {
   initialRoomSlug?: string;
+  initialDisplayName?: string;
 };
 
 export class RoomPanel {
@@ -30,10 +31,12 @@ export class RoomPanel {
   private readonly metaLabel: HTMLDivElement;
   private readonly onJoin: (values: RoomPanelValues) => void;
   private readonly generatedRoomSlug: string;
+  private readonly hasUrlRoom: boolean;
 
   constructor(onJoin: (values: RoomPanelValues) => void, options: RoomPanelOptions = {}) {
     this.onJoin = onJoin;
     this.generatedRoomSlug = generateRoomSlug();
+    this.hasUrlRoom = !!options.initialRoomSlug?.trim();
     this.container = document.createElement('div');
     this.container.id = 'room-panel';
     this.container.className = 'musicspace-panel';
@@ -57,7 +60,7 @@ export class RoomPanel {
     this.nameInput = document.createElement('input');
     this.nameInput.type = 'text';
     this.nameInput.placeholder = 'Display name';
-    this.nameInput.value = localStorage.getItem(STORAGE_KEYS.displayName) ?? '';
+    this.nameInput.value = options.initialDisplayName?.trim() || localStorage.getItem(STORAGE_KEYS.displayName) || '';
 
     const joinButton = document.createElement('button');
     joinButton.type = 'submit';
@@ -91,6 +94,16 @@ export class RoomPanel {
 
   mount(parent: HTMLElement = document.body): void {
     parent.appendChild(this.container);
+  }
+
+  applyPreferenceDefaults(values: Partial<RoomPanelValues>): void {
+    if (values.displayName !== undefined) {
+      this.nameInput.value = values.displayName;
+    }
+
+    if (values.roomSlug !== undefined && !this.hasUrlRoom) {
+      this.roomInput.value = values.roomSlug.trim() || this.generatedRoomSlug;
+    }
   }
 
   setStatus(message: string): void {

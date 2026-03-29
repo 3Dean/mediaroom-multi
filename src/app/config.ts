@@ -11,4 +11,5 @@ export const APP_CONFIG = {
 export const STORAGE_KEYS = {
   lastRoomSlug: 'musicspace:last-room-slug',
   displayName: 'musicspace:display-name',
+  preferences: 'musicspace:preferences-v1',
 } as const;

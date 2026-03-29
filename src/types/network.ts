@@ -8,6 +8,7 @@ export type RoomJoinMessage = {
   sessionId: string;
   displayName: string;
   userId?: string;
+  avatarStyle?: string | null;
   token?: string;
 };
 

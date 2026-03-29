@@ -7,6 +7,7 @@ export type ActiveRoomSession = {
   sessionId: string;
   userId: string;
   displayName: string;
+  avatarStyle: string | null;
 };
 
 export class RoomSessionStore {
@@ -16,13 +17,14 @@ export class RoomSessionStore {
     return this.currentSession;
   }
 
-  createSession(roomSlug: string, displayName: string, userId?: string): ActiveRoomSession {
+  createSession(roomSlug: string, displayName: string, userId?: string, avatarStyle?: string | null): ActiveRoomSession {
     const session = {
       roomId: roomSlug,
       roomSlug,
       sessionId: createSessionId('room'),
       userId: userId ?? displayName,
       displayName,
+      avatarStyle: avatarStyle ?? null,
     };
 
     this.currentSession = session;

@@ -174,6 +174,7 @@ function handleRoomJoin(socket, message) {
   const sessionId = normalizeToken(message.sessionId, 128);
   const displayName = normalizeDisplayName(message.displayName);
   const userId = normalizeToken(message.userId ?? message.sessionId, 128);
+  const avatarStyle = normalizeToken(message.avatarStyle ?? '', 64);
 
   if (!roomId || !sessionId || !displayName || !userId) {
     send(socket, { type: 'error', code: 'invalid_join', message: 'roomId, sessionId, userId, and displayName are required.' });
@@ -199,6 +200,7 @@ function handleRoomJoin(socket, message) {
     isSitting: false,
     seatId: null,
     heldObjectId: null,
+    avatarStyle: avatarStyle ?? null,
     spawnId: spawn.spawnId,
     updatedAt: Date.now(),
   };

@@ -198,6 +198,40 @@ button:focus-visible {
   max-height: 220px;
 }
 
+#preferences-panel {
+  padding: 14px;
+}
+
+.preferences-field {
+  display: grid;
+  gap: 6px;
+  color: #d7d7d7;
+  font-size: 12px;
+}
+
+.preferences-field input,
+.preferences-field select,
+.preferences-range {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.preferences-note {
+  color: #aeb6c2;
+  font-size: 12px;
+}
+
+.preferences-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.preferences-actions button:last-child {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
 #audioControls {
   position: relative !important;
   top: auto !important;

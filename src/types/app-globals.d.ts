@@ -18,6 +18,17 @@ type RemoteObjectSnapshot = {
   rotation: { yaw: number; pitch: number } | null;
 };
 
+type StationOptionSnapshot = {
+  label: string;
+  mood: string;
+};
+
+type LivePreferencesSnapshot = {
+  preferredStationMood?: string | null;
+  defaultVolume?: number;
+  backgroundOverrideMood?: string | null;
+};
+
 declare global {
   interface Window {
     scene?: THREE.Scene;
@@ -36,6 +47,9 @@ declare global {
     __musicspaceRequestObjectRelease?: (objectId: string, transform: RemoteObjectSnapshot) => void;
     __musicspaceApplyObjectSnapshot?: (snapshot: RemoteObjectSnapshot) => void;
     __musicspaceApplyLocalPlayerTransform?: (transform: { position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } }) => void;
+    __musicspaceGetLocalPlayerTransform?: () => { position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } } | null;
+    __musicspaceGetStationOptions?: () => StationOptionSnapshot[];
+    __musicspaceApplyPreferences?: (preferences: LivePreferencesSnapshot) => void;
   }
 }
 

@@ -28,6 +28,7 @@ export type PlayerPresence = {
   isSitting: boolean;
   seatId: string | null;
   heldObjectId: string | null;
+  avatarStyle?: string | null;
   spawnId?: string | null;
   updatedAt: number;
 };

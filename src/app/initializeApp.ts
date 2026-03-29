@@ -35,6 +35,8 @@ declare global {
     __musicspaceRequestObjectClaim?: (objectId: string) => boolean;
     __musicspaceRequestObjectRelease?: (objectId: string, transform: { objectId: string; ownerSessionId: string | null; position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } | null }) => void;
     __musicspaceApplyObjectSnapshot?: (snapshot: { objectId: string; ownerSessionId: string | null; position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } | null }) => void;
+    __musicspaceGetStationOptions?: () => Array<{ label: string; mood: string }> ;
+    __musicspaceApplyPreferences?: (preferences: { preferredStationMood?: string | null; defaultVolume?: number; backgroundOverrideMood?: string | null }) => void;
   }
 }
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
@@ -42,6 +44,7 @@ import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockCont
 let controls: any;
 import { addVaporToCoffee } from '../addingVapor.js'; // Import the vapor function
 import { animateFlowers, initializeWindEffectOnModel } from '../wind'; // Import wind animation
+import { loadPreferences } from '../preferences/preferencesStore';
 //import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 //import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 //import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
@@ -72,6 +75,7 @@ let previousMouseY = 0;
 
 export function initializeApp() {
   console.log(`isTouchDevice: ${isTouchDevice}`); // Diagnostic log
+  const initialPreferences = loadPreferences();
 
 let pointLights: THREE.PointLight[] = [];
 let hues: number[] = [];
@@ -182,8 +186,15 @@ function applyTvVisualizerPreset(mood: string) {
   tvVisualizerMaterial.uniforms.uCoolBias.value = preset.coolBias;
 }
 
+let activeBackgroundOverrideMood = initialPreferences.visuals.backgroundOverrideMood;
+
+function resolveBackgroundMood(mood: string) {
+  return activeBackgroundOverrideMood ?? mood;
+}
+
 function applyMoodBackground(mood: string) {
-  const config = moodBackgroundConfigs[mood] ?? defaultBackgroundConfig;
+  const effectiveMood = resolveBackgroundMood(mood);
+  const config = moodBackgroundConfigs[effectiveMood] ?? defaultBackgroundConfig;
   (scene as any).backgroundRotation = new THREE.Euler(0, THREE.MathUtils.degToRad(config.rotationDegrees), 0);
 
   const cachedTexture = backgroundTextureCache.get(config.path);
@@ -277,6 +288,23 @@ renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
   moveState.right = false;
   velocity.x = 0;
   velocity.z = 0;
+};
+(window as any).__musicspaceGetLocalPlayerTransform = () => {
+  if (!controls?.object) {
+    return null;
+  }
+
+  return {
+    position: {
+      x: controls.object.position.x,
+      y: controls.object.position.y,
+      z: controls.object.position.z,
+    },
+    rotation: {
+      yaw: controls.object.rotation.y,
+      pitch: camera.rotation.x,
+    },
+  };
 };
 
 // Help function to explain available functions
@@ -399,6 +427,7 @@ const somaStations = [
 
 // Dropdown to select station
 const stationSelect = document.createElement('select');
+window.__musicspaceGetStationOptions = () => somaStations.map((station) => ({ label: station.name, mood: station.mood }));
 stationSelect.style.padding = '6px';
 stationSelect.style.borderRadius = '4px';
 stationSelect.style.cursor = 'pointer';
@@ -420,7 +449,7 @@ volumeSlider.type = 'range';
 volumeSlider.min = '0';
 volumeSlider.max = '1';
 volumeSlider.step = '0.1';
-volumeSlider.value = '0.5';
+volumeSlider.value = String(initialPreferences.audio.defaultVolume);
 volumeSlider.style.width = '100px';
 // volumeSlider.style.accentColor = '#007bff'; // Removed to rely on CSS for thumb
 volumeSlider.style.cursor = 'pointer';
@@ -677,12 +706,17 @@ playButton.addEventListener('click', function() {
     }
 });
 
-let selectedStationIndex = 0;
+const preferredStationIndex = somaStations.findIndex((station) => station.mood === initialPreferences.audio.preferredStationMood);
+let selectedStationIndex = preferredStationIndex >= 0 ? preferredStationIndex : 0;
+stationSelect.value = String(selectedStationIndex);
 audioElement.src = somaStations[selectedStationIndex].stream;
+audioElement.volume = initialPreferences.audio.defaultVolume;
+volumeLabel.textContent = `Volume: ${Math.round(initialPreferences.audio.defaultVolume * 100)}%`;
 applyMoodBackground(somaStations[selectedStationIndex].mood);
 
-stationSelect.addEventListener('change', () => {
-  selectedStationIndex = parseInt(stationSelect.value);
+function applyStationSelection(nextIndex: number) {
+  selectedStationIndex = Math.max(0, Math.min(somaStations.length - 1, nextIndex));
+  stationSelect.value = String(selectedStationIndex);
   const selected = somaStations[selectedStationIndex];
 
   audioElement.src = selected.stream;
@@ -692,12 +726,41 @@ stationSelect.addEventListener('change', () => {
     playButton.textContent = 'Pause';
     playButton.style.backgroundColor = '#dc3545';
   }
-    // 🔁 Change mood textures based on selected station
+
   switchMoodTextures(selected.mood);
   applyMoodBackground(selected.mood);
   applyTvVisualizerPreset(selected.mood);
+}
+
+stationSelect.addEventListener('change', () => {
+  applyStationSelection(parseInt(stationSelect.value, 10));
   //updateNowPlaying(); // Refresh song info
 });
+
+window.__musicspaceApplyPreferences = (preferences) => {
+  if (preferences.backgroundOverrideMood !== undefined) {
+    activeBackgroundOverrideMood = preferences.backgroundOverrideMood ?? null;
+    applyMoodBackground(somaStations[selectedStationIndex].mood);
+  }
+
+  if (preferences.preferredStationMood !== undefined) {
+    if (!preferences.preferredStationMood) {
+      applyStationSelection(0);
+    } else {
+      const nextIndex = somaStations.findIndex((station) => station.mood === preferences.preferredStationMood);
+      if (nextIndex >= 0) {
+        applyStationSelection(nextIndex);
+      }
+    }
+  }
+
+  if (preferences.defaultVolume !== undefined) {
+    const nextVolume = Math.min(1, Math.max(0, preferences.defaultVolume));
+    volumeSlider.value = String(nextVolume);
+    audioElement.volume = nextVolume;
+    volumeLabel.textContent = `Volume: ${Math.round(nextVolume * 100)}%`;
+  }
+};
 
 // Volume slider event listener - using 'input' for continuous update
 volumeSlider.addEventListener('input', function() {
@@ -1133,6 +1196,40 @@ const raycaster = new THREE.Raycaster();
 const pickupDistance = 3;
 let hoveredObject: THREE.Mesh | null = null;
 const mouseForHover = new THREE.Vector2(); // For hover detection based on mouse/touch position
+
+function clearMeshHighlight(mesh: THREE.Mesh | null) {
+  if (!mesh) {
+    return;
+  }
+
+  const material = mesh.material as THREE.MeshStandardMaterial;
+  material.emissive.setHex(0x000000);
+  material.emissiveIntensity = 0;
+}
+
+function clearObjectRootHighlight(objectRoot: THREE.Object3D) {
+  objectRoot.traverse((child: THREE.Object3D) => {
+    if ((child as THREE.Mesh).isMesh) {
+      clearMeshHighlight(child as THREE.Mesh);
+    }
+  });
+}
+
+function getClickedPickableObjectId(): string | null {
+  raycaster.setFromCamera(mouseForHover, camera);
+  const hits = raycaster.intersectObjects<THREE.Mesh>(interactiveObjects, true);
+  const hit = hits[0];
+  if (!hit || hit.distance > pickupDistance) {
+    return null;
+  }
+
+  const intersectedMesh = hit.object as THREE.Mesh;
+  if (!intersectedMesh.userData.pickableGLBRoot) {
+    return null;
+  }
+
+  return (intersectedMesh.userData.objectId as string | undefined) ?? null;
+}
 
 const objectDropTypeAliases: Record<string, string> = {
   coffee: 'mug',
@@ -1902,6 +1999,11 @@ function pickupObjectById(objectId: string) {
   }
 
   activeObjectAnimations.delete(objectId);
+  clearObjectRootHighlight(objectRoot);
+  if (hoveredObject?.userData.objectId === objectId) {
+    clearMeshHighlight(hoveredObject);
+    hoveredObject = null;
+  }
   heldObject = objectRoot;
   heldObjectId = objectId;
   objectRoot.visible = true;
@@ -1919,13 +2021,16 @@ window.addEventListener('mousedown', (event) => {
   let actionTaken = false;
 
   if (heldObject && heldObjectId) {
-    const releasingObjectId = heldObjectId;
-    const dropTransform = getObjectDropTransform(releasingObjectId);
-    startObjectReleaseAnimation(dropTransform);
-    if (window.__musicspaceRequestObjectRelease) {
-      window.__musicspaceRequestObjectRelease(releasingObjectId, dropTransform);
+    const clickedObjectId = getClickedPickableObjectId();
+    if (clickedObjectId !== heldObjectId) {
+      const releasingObjectId = heldObjectId;
+      const dropTransform = getObjectDropTransform(releasingObjectId);
+      startObjectReleaseAnimation(dropTransform);
+      if (window.__musicspaceRequestObjectRelease) {
+        window.__musicspaceRequestObjectRelease(releasingObjectId, dropTransform);
+      }
+      actionTaken = true;
     }
-    actionTaken = true;
   } else {
     if (event.target === renderer.domElement && !(event.target as HTMLElement).closest('#audioControls')) {
       if (hoveredObject && hoveredObject.userData.pickableGLBRoot) {
@@ -2096,10 +2201,15 @@ if (tvVisualizerMaterial) {
     // Ensure we are highlighting a mesh that is part of a pickable GLB root
     if (intersectedMesh.userData.pickableGLBRoot) {
       const pickablePart = intersectedMesh; // The mesh itself is what gets the emissive color
-      if (pickablePart !== hoveredObject) {
+      const hoveredObjectId = pickablePart.userData.objectId as string | undefined;
+      if (hoveredObjectId === heldObjectId) {
         if (hoveredObject) {
-          const prevMat = hoveredObject.material as THREE.MeshStandardMaterial;
-          prevMat.emissive.setHex(0x000000); // Reset previous hovered
+          clearMeshHighlight(hoveredObject);
+          hoveredObject = null;
+        }
+      } else if (pickablePart !== hoveredObject) {
+        if (hoveredObject) {
+          clearMeshHighlight(hoveredObject);
         }
         hoveredObject = pickablePart;
         const mat = hoveredObject.material as THREE.MeshStandardMaterial;
@@ -2107,13 +2217,11 @@ if (tvVisualizerMaterial) {
         mat.emissiveIntensity = 0.5;
       }
     } else if (hoveredObject) { // If hovering over something not pickable, or too far
-      const prevMat = hoveredObject.material as THREE.MeshStandardMaterial;
-      prevMat.emissive.setHex(0x000000);
+      clearMeshHighlight(hoveredObject);
       hoveredObject = null;
     }
   } else if (hoveredObject) { // No hits or hit is too far
-    const prevMat = hoveredObject.material as THREE.MeshStandardMaterial;
-    prevMat.emissive.setHex(0x000000);
+    clearMeshHighlight(hoveredObject);
     hoveredObject = null;
   }
 

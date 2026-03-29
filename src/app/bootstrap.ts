@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { APP_CONFIG } from './config';
 import { initializeApp } from './initializeApp';
 import { getAuthenticatedUser } from '../backend/authClient';
@@ -11,7 +12,10 @@ import type { ServerMessage } from '../types/network';
 import type { PlayerTransform } from '../types/player';
 import { ChatPanel } from '../ui/chatPanel';
 import { ParticipantList } from '../ui/participantList';
+import { PreferencesPanel } from '../ui/preferencesPanel';
 import { RoomPanel } from '../ui/roomPanel';
+import { loadPreferences, resetPreferences, savePreferences } from '../preferences/preferencesStore';
+import type { UserPreferences } from '../preferences/preferencesModel';
 
 const roomState = new RoomStateStore();
 const sessionStore = new RoomSessionStore();
@@ -22,7 +26,8 @@ export function bootstrapApp(): void {
     initializeApp();
 
     const currentUser = await getAuthenticatedUser();
-    const initialRoomSlug = getRoomSlugFromUrl();
+    let preferences = loadPreferences();
+    const initialRoomSlug = getRoomSlugFromUrl() ?? (preferences.room.defaultRoomSlug || undefined);
     const remotePlayerManager = window.scene ? new RemotePlayerManager(window.scene) : null;
     const participantList = new ParticipantList();
     let roomClient: RoomClient | null = null;
@@ -35,7 +40,7 @@ export function bootstrapApp(): void {
 
     const roomPanel = new RoomPanel(({ roomSlug, displayName }) => {
       updateRoomSlugInUrl(roomSlug);
-      const session = sessionStore.createSession(roomSlug, displayName, currentUser?.userId);
+      const session = sessionStore.createSession(roomSlug, displayName, currentUser?.userId, preferences.profile.avatarPresetId);
       roomState.reset(session.roomId);
       pendingSeatRequestId = null;
       appliedSeatId = null;
@@ -71,6 +76,7 @@ export function bootstrapApp(): void {
             sessionId: session.sessionId,
             displayName: session.displayName,
             userId: session.userId,
+            avatarStyle: session.avatarStyle,
           });
 
           startRealtimeLoops(
@@ -135,7 +141,10 @@ export function bootstrapApp(): void {
 
       roomClient = nextRoomClient;
       nextRoomClient.connect();
-    }, { initialRoomSlug });
+    }, {
+      initialRoomSlug,
+      initialDisplayName: preferences.profile.displayName || undefined,
+    });
 
     window.__musicspaceRequestSeatClaim = (seatId: string) => {
       const activeSession = sessionStore.getCurrentSession();
@@ -209,6 +218,39 @@ export function bootstrapApp(): void {
       });
     };
 
+    const stationOptions = window.__musicspaceGetStationOptions?.() ?? [];
+    const preferencesPanel = new PreferencesPanel({
+      initialPreferences: preferences,
+      stationOptions,
+      onSave: (nextPreferences: UserPreferences) => {
+        preferences = nextPreferences;
+        savePreferences(nextPreferences);
+        roomPanel.applyPreferenceDefaults({
+          roomSlug: nextPreferences.room.defaultRoomSlug,
+          displayName: nextPreferences.profile.displayName,
+        });
+        window.__musicspaceApplyPreferences?.({
+          preferredStationMood: nextPreferences.audio.preferredStationMood,
+          defaultVolume: nextPreferences.audio.defaultVolume,
+          backgroundOverrideMood: nextPreferences.visuals.backgroundOverrideMood,
+        });
+      },
+      onReset: () => {
+        const reset = resetPreferences();
+        preferences = reset;
+        roomPanel.applyPreferenceDefaults({
+          roomSlug: reset.room.defaultRoomSlug,
+          displayName: reset.profile.displayName,
+        });
+        window.__musicspaceApplyPreferences?.({
+          preferredStationMood: reset.audio.preferredStationMood,
+          defaultVolume: reset.audio.defaultVolume,
+          backgroundOverrideMood: reset.visuals.backgroundOverrideMood,
+        });
+        return reset;
+      },
+    });
+
     const chatPanel = new ChatPanel((body) => {
       const activeSession = sessionStore.getCurrentSession();
       if (!activeSession) {
@@ -244,6 +286,7 @@ export function bootstrapApp(): void {
     roomPanel.mount(sidebarPanels);
     participantList.mount(sidebarPanels);
     chatPanel.mount(sidebarPanels);
+    preferencesPanel.mount(sidebarPanels);
     syncRoomUi(chatPanel, participantList, remotePlayerManager);
     roomPanel.setMeta('Idle');
     participantList.setConnectionStatus('Idle');
@@ -396,8 +439,11 @@ function syncObjectState(
 
 function getRealtimeUrl(): string {
   const hostname = window.location.hostname;
-  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
-  const port = isLocalHost
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1';
+  const isPrivateIpv4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(hostname);
+  const isDevHost = import.meta.env.DEV || isLoopback || isPrivateIpv4;
+  const port = isDevHost
     ? `:${APP_CONFIG.defaultRealtimePort}`
     : window.location.port
       ? `:${window.location.port}`
@@ -405,17 +451,25 @@ function getRealtimeUrl(): string {
 
   return window.__MUSICSPACE_REALTIME_URL__
     ?? import.meta.env.VITE_REALTIME_URL
-    ?? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${hostname}${port}`;
+    ?? `${protocol}://${hostname}${port}`;
 }
 
 function getLocalPlayerTransform(): PlayerTransform | null {
+  const transform = window.__musicspaceGetLocalPlayerTransform?.();
+  if (transform) {
+    return transform;
+  }
+
   const camera = window.camera;
   if (!camera) {
     return null;
   }
 
+  const worldPosition = new THREE.Vector3();
+  camera.getWorldPosition(worldPosition);
+
   return {
-    position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+    position: { x: worldPosition.x, y: worldPosition.y, z: worldPosition.z },
     rotation: { yaw: camera.rotation.y, pitch: camera.rotation.x },
   };
 }
