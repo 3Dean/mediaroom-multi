@@ -294,7 +294,7 @@ export function bootstrapApp(): void {
     if (currentUser?.signInDetails?.loginId) {
       roomPanel.setStatus(`Signed in as ${currentUser.signInDetails.loginId}. Enter a room to create it or join it if it already exists.`);
     } else {
-      roomPanel.setStatus('Guest mode active. Enter a room name to create it or join it if it already exists.');
+      roomPanel.setStatus('Enter a room name to create it or join it if it already exists.');
     }
 
     window.addEventListener('beforeunload', () => {
@@ -318,7 +318,7 @@ function initializeSidebarLayout(): HTMLElement {
   const applyState = (isOpen: boolean) => {
     sidebar.classList.toggle('is-open', isOpen);
     toggle.setAttribute('aria-expanded', String(isOpen));
-    toggle.textContent = isOpen ? 'Hide' : 'Show';
+    toggle.textContent = isOpen ? '< Hide' : 'Show >';
   };
 
   applyState(true);
