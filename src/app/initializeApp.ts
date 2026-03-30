@@ -977,7 +977,7 @@ function isPointInsideElement(element: HTMLElement | null, clientX: number, clie
 }
 
 function isSidebarUiTarget(target: EventTarget | null) {
-    return target instanceof HTMLElement && !!target.closest('#musicspace-sidebar, #musicspace-sidebar-toggle, #audioControls');
+    return target instanceof HTMLElement && !!target.closest('#musicspace-sidebar, #musicspace-sidebar-toggle, #audioControls, #interactionButton, #closeButton');
 }
 
 function updateMobileJoystickVisual(deltaX: number, deltaY: number) {
@@ -1830,7 +1830,7 @@ interactionPrompt.style.fontFamily = 'Arial, sans-serif';
 interactionPrompt.style.fontSize = '16px';
 interactionPrompt.style.cursor = 'pointer'; // Add pointer cursor
 interactionPrompt.style.display = 'none';
-interactionPrompt.style.zIndex = '1001'; // Ensure it's above other elements like debug
+interactionPrompt.style.zIndex = '10020'; // Keep above mobile controls and sidebar overlays
 // interactionPrompt.style.pointerEvents = 'none'; // Removed, button needs pointer events
 document.body.appendChild(interactionPrompt);
 
@@ -1848,7 +1848,7 @@ closeButton.style.border = '1px solid #fff';
 closeButton.style.borderRadius = '5px';
 closeButton.style.cursor = 'pointer';
 closeButton.style.display = 'none';
-closeButton.style.zIndex = '1001';
+closeButton.style.zIndex = '10020';
 document.body.appendChild(closeButton);
 
 function performStandAction() {
@@ -1889,22 +1889,30 @@ function requestSeatRelease() {
   performStandAction();
 }
 
-// Close button click handler to stand up
-closeButton.addEventListener('click', (event: MouseEvent) => {
+function handleCloseButtonPress(event: Event) {
   event.stopPropagation();
+  event.preventDefault();
   if (isSitting) {
     requestSeatRelease();
     console.log('Standing via close button', controls.object.position);
   }
-});
+}
+
+// Close button click handler to stand up
+closeButton.addEventListener('click', handleCloseButtonPress);
+closeButton.addEventListener('touchend', handleCloseButtonPress, { passive: false });
+
+function handleInteractionButtonPress(event: Event) {
+  if (nearSittingPosition && !isSitting) {
+    requestSeatClaim();
+  }
+  event.stopPropagation();
+  event.preventDefault();
+}
 
  // Add event listener to the interaction button
- interactionPrompt.addEventListener('click', (event) => {
-   if (nearSittingPosition && !isSitting) {
-     requestSeatClaim();
-   }
-   event.stopPropagation();
- });
+ interactionPrompt.addEventListener('click', handleInteractionButtonPress);
+ interactionPrompt.addEventListener('touchend', handleInteractionButtonPress, { passive: false });
 
 // Function to handle the sitting action
 function triggerSitAction(targetSeatId?: string) {
