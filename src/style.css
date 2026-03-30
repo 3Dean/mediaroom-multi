@@ -202,6 +202,29 @@ button:focus-visible {
   padding: 14px;
 }
 
+.preferences-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.preferences-toggle {
+  padding: 6px 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.preferences-content {
+  display: grid;
+  gap: 10px;
+}
+
+#preferences-panel.is-collapsed .preferences-content {
+  display: none;
+}
+
 .preferences-field {
   display: grid;
   gap: 6px;
@@ -322,6 +345,17 @@ button:focus-visible {
   }
 
   #chat-panel {
-    min-height: 180px;
+    flex: 0 0 auto;
+    min-height: 148px;
+  }
+
+  #chat-panel > div:nth-child(2) {
+    min-height: 92px !important;
+    max-height: 120px !important;
+  }
+
+  .preferences-toggle {
+    padding: 5px 9px;
   }
 }
+

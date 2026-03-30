@@ -43,6 +43,9 @@ export class PreferencesPanel {
   private readonly backgroundSelect: HTMLSelectElement;
   private readonly avatarSelect: HTMLSelectElement;
   private readonly noteLabel: HTMLDivElement;
+  private readonly content: HTMLDivElement;
+  private readonly toggleButton: HTMLButtonElement;
+  private collapsed = false;
   private readonly onSave: (preferences: UserPreferences) => void;
   private readonly onReset: () => UserPreferences;
 
@@ -53,12 +56,23 @@ export class PreferencesPanel {
     this.container.id = 'preferences-panel';
     this.container.className = 'musicspace-panel';
 
+    const header = document.createElement('div');
+    header.className = 'preferences-header';
+
     const title = document.createElement('div');
     title.textContent = 'Preferences';
     title.style.color = '#fff';
     title.style.fontWeight = '700';
     title.style.fontSize = '14px';
-    title.style.marginBottom = '6px';
+
+    this.toggleButton = document.createElement('button');
+    this.toggleButton.type = 'button';
+    this.toggleButton.className = 'preferences-toggle';
+    this.toggleButton.addEventListener('click', () => {
+      this.setCollapsed(!this.collapsed);
+    });
+
+    header.append(title, this.toggleButton);
 
     const form = document.createElement('form');
     form.style.display = 'grid';
@@ -147,12 +161,24 @@ export class PreferencesPanel {
       this.noteLabel.textContent = 'Preferences saved locally.';
     });
 
-    this.container.append(title, form, this.noteLabel);
+    this.content = document.createElement('div');
+    this.content.className = 'preferences-content';
+    this.content.append(form, this.noteLabel);
+
+    this.container.append(header, this.content);
     this.setValues(options.initialPreferences);
+    this.setCollapsed(window.matchMedia('(max-width: 768px), (pointer: coarse)').matches);
   }
 
   mount(parent: HTMLElement = document.body): void {
     parent.appendChild(this.container);
+  }
+
+  private setCollapsed(collapsed: boolean): void {
+    this.collapsed = collapsed;
+    this.container.classList.toggle('is-collapsed', collapsed);
+    this.toggleButton.textContent = collapsed ? 'Show' : 'Hide';
+    this.toggleButton.setAttribute('aria-expanded', String(!collapsed));
   }
 
   setValues(preferences: UserPreferences): void {
