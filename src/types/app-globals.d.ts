@@ -29,6 +29,12 @@ type LivePreferencesSnapshot = {
   backgroundOverrideMood?: string | null;
 };
 
+type RemoteParticipantSnapshot = {
+  sessionId: string;
+  position: { x: number; y: number; z: number };
+  isSitting: boolean;
+};
+
 declare global {
   interface Window {
     scene?: THREE.Scene;
@@ -50,6 +56,7 @@ declare global {
     __musicspaceGetLocalPlayerTransform?: () => { position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } } | null;
     __musicspaceGetStationOptions?: () => StationOptionSnapshot[];
     __musicspaceApplyPreferences?: (preferences: LivePreferencesSnapshot) => void;
+    __musicspaceGetRemoteParticipants?: () => RemoteParticipantSnapshot[];
   }
 }
 

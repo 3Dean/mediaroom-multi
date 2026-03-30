@@ -1130,6 +1130,9 @@ let standingPosition = new THREE.Vector3(); // Stores the full (x,y,z) position 
 let standingHeight = 1.6; // Default standing height - this is effectively eye height
 const sittingEyeHeight = 1.0; // Eye height when sitting
 const proximityDistance = 2.01; // Increased from 2 to make detection easier
+const avatarSeparationRadius = 0.9;
+const avatarSeparationStrength = 0.85;
+const seatedAvatarSeparationScale = 0.2;
 
 // Debug information
 console.log("Couch interaction system initialized");
@@ -1560,6 +1563,47 @@ function createSittingPositions() {
 }
 
 // Function to update model position
+function applyRemoteAvatarSeparation() {
+  if (!window.__musicspaceGetRemoteParticipants) {
+    return;
+  }
+
+  const localPosition = controls.object.position;
+  const remoteParticipants = window.__musicspaceGetRemoteParticipants();
+  let offsetX = 0;
+  let offsetZ = 0;
+
+  remoteParticipants.forEach((participant) => {
+    const dx = localPosition.x - participant.position.x;
+    const dz = localPosition.z - participant.position.z;
+    const distanceSq = dx * dx + dz * dz;
+    if (distanceSq <= 0.0001) {
+      return;
+    }
+
+    const separationScale = participant.isSitting ? seatedAvatarSeparationScale : 1;
+    const minDistance = avatarSeparationRadius * separationScale;
+    if (minDistance <= 0) {
+      return;
+    }
+
+    const distance = Math.sqrt(distanceSq);
+    if (distance >= minDistance) {
+      return;
+    }
+
+    const overlap = minDistance - distance;
+    const push = (overlap / distance) * avatarSeparationStrength;
+    offsetX += dx * push;
+    offsetZ += dz * push;
+  });
+
+  if (offsetX !== 0 || offsetZ !== 0) {
+    controls.object.position.x += offsetX;
+    controls.object.position.z += offsetZ;
+  }
+}
+
 function updateModelPosition(modelUrl: string, position: THREE.Vector3) {
   // Update the position in the modelPositions object
   modelPositions[modelUrl] = position;
@@ -2376,6 +2420,8 @@ if (tvVisualizerMaterial) {
     } else {
       controls.object.position.copy(oldPos);
     }
+
+    applyRemoteAvatarSeparation();
     
     // Check for proximity AND facing to sitting positions
     let isNearAnySittingPosition = false;

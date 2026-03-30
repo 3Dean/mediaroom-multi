@@ -353,6 +353,13 @@ function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remo
   chatPanel.setMessages(snapshot.messages.slice(-APP_CONFIG.chatHistoryLimit));
   participantList.setParticipants(participants, snapshot.selfSessionId);
   Object.values(snapshot.objects).forEach((object) => window.__musicspaceApplyObjectSnapshot?.(object));
+  window.__musicspaceGetRemoteParticipants = () => participants
+    .filter((participant) => participant.sessionId !== snapshot.selfSessionId)
+    .map((participant) => ({
+      sessionId: participant.sessionId,
+      position: participant.transform.position,
+      isSitting: participant.isSitting,
+    }));
   remotePlayerManager?.sync(participants, snapshot.selfSessionId);
 }
 
