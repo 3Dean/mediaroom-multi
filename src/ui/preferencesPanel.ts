@@ -27,7 +27,7 @@ const BACKGROUND_OPTIONS = [
 ];
 
 const AVATAR_OPTIONS = [
-  { value: '', label: 'Default Placeholder' },
+  { value: '', label: 'Default Avatar' },
   { value: 'observer', label: 'Observer' },
   { value: 'pulse', label: 'Pulse' },
   { value: 'signal', label: 'Signal' },
@@ -102,7 +102,7 @@ export class PreferencesPanel {
 
     const avatarNote = document.createElement('div');
     avatarNote.className = 'preferences-note';
-    avatarNote.textContent = 'Stored now for future avatar support.';
+    avatarNote.textContent = 'Save your avatar preset, then re-enter the room so other users can see the change.';
 
     const actions = document.createElement('div');
     actions.className = 'preferences-actions';

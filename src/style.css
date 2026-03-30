@@ -322,6 +322,80 @@ button:focus-visible {
   pointer-events: auto !important;
 }
 
+#mobile-controls-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9000;
+}
+
+#mobile-move-zone,
+#mobile-look-zone {
+  position: absolute;
+  bottom: 18px;
+  width: 132px;
+  height: 132px;
+  border-radius: 22px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+#mobile-move-zone {
+  left: 18px;
+}
+
+#mobile-look-zone {
+  right: 18px;
+}
+
+.mobile-control-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.mobile-joystick-base,
+.mobile-look-pad {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+}
+
+.mobile-joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  transform: translate(0px, 0px);
+  margin-left: -18px;
+  margin-top: -18px;
+  background: rgba(255, 255, 255, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+body.mouse #mobile-controls-layer {
+  display: none;
+}
+
 @media (max-width: 768px), (pointer: coarse) {
   #musicspace-sidebar {
     top: 12px;
@@ -356,6 +430,27 @@ button:focus-visible {
 
   .preferences-toggle {
     padding: 5px 9px;
+  }
+
+  #mobile-move-zone,
+  #mobile-look-zone {
+    bottom: 14px;
+    width: 120px;
+    height: 120px;
+  }
+
+  #mobile-move-zone {
+    left: 14px;
+  }
+
+  #mobile-look-zone {
+    right: 14px;
+  }
+
+  .mobile-joystick-base,
+  .mobile-look-pad {
+    width: 76px;
+    height: 76px;
   }
 }
 

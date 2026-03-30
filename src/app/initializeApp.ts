@@ -58,12 +58,19 @@ document.body.classList.add(isTouchDevice ? 'touch' : 'mouse');
 let touchLookPreviousX = 0;
 let touchLookPreviousY = 0;
 let lookingTouchId: number | null = null;
-const lookSensitivity = 0.002; // Adjust as needed
+const desktopLookSensitivity = 0.002; // Adjust as needed
+const mobileLookSensitivity = 0.0032;
+const mobileMoveSpeedScale = 0.58;
 
 let touchMoveStartX = 0;
 let touchMoveStartY = 0;
 let movingTouchId: number | null = null;
-const touchMoveThreshold = 20; // Min pixels to drag before movement starts
+const mobileJoystickRadius = 42;
+const moveTouchVector = { x: 0, y: 0 };
+let mobileControlLayer: HTMLDivElement | null = null;
+let mobileMoveZone: HTMLDivElement | null = null;
+let mobileJoystickKnob: HTMLDivElement | null = null;
+let mobileLookZone: HTMLDivElement | null = null;
 // const touchMoveSensitivity = 0.05; // This variable was declared but not used.
 
 // --- END TOUCH CONTROL VARIABLES ---
@@ -86,6 +93,9 @@ let tvBassLevel = 0;
 let tvMidLevel = 0;
 let tvHighLevel = 0;
 let tvEnergyLevel = 0;
+let reactiveSignalTime = 0;
+let analyserSilentFor = 0;
+let usingSyntheticReactiveSignal = false;
 
  // Expose function to reposition TV screen at runtime
 ;(window as any).updateTvScreenPosition = (x: number, y: number, z: number) => {
@@ -233,6 +243,22 @@ if (appDiv) {
 renderer.domElement.tabIndex = 0;
 renderer.domElement.style.outline = 'none';
 
+if (isTouchDevice) {
+  mobileControlLayer = document.createElement('div');
+  mobileControlLayer.id = 'mobile-controls-layer';
+
+  mobileMoveZone = document.createElement('div');
+  mobileMoveZone.id = 'mobile-move-zone';
+  mobileMoveZone.innerHTML = '<div class="mobile-control-label">Move</div><div class="mobile-joystick-base"><div class="mobile-joystick-knob"></div></div>';
+  mobileJoystickKnob = mobileMoveZone.querySelector('.mobile-joystick-knob') as HTMLDivElement | null;
+
+  mobileLookZone = document.createElement('div');
+  mobileLookZone.id = 'mobile-look-zone';
+  mobileLookZone.innerHTML = '<div class="mobile-control-label">Look</div><div class="mobile-look-pad"></div>';
+
+  mobileControlLayer.append(mobileMoveZone, mobileLookZone);
+  document.body.appendChild(mobileControlLayer);
+}
 
 // Listen for pointer move to update hover detection coordinates
 renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
@@ -502,17 +528,71 @@ function averageFrequencyRange(data: Uint8Array, startRatio: number, endRatio: n
   return count > 0 ? total / count / 255 : 0;
 }
 
-function updateTvVisualizerAudioLevels() {
-  const data = audioAnalyser.getFrequencyData();
-  const bass = averageFrequencyRange(data, 0.0, 0.14);
-  const mid = averageFrequencyRange(data, 0.14, 0.48);
-  const high = averageFrequencyRange(data, 0.48, 1.0);
-  const energy = audioAnalyser.getAverageFrequency() / 255;
+type ReactiveLevels = {
+  bass: number;
+  mid: number;
+  high: number;
+  energy: number;
+};
 
-  tvBassLevel = THREE.MathUtils.lerp(tvBassLevel, bass, 0.14);
-  tvMidLevel = THREE.MathUtils.lerp(tvMidLevel, mid, 0.12);
-  tvHighLevel = THREE.MathUtils.lerp(tvHighLevel, high, 0.18);
-  tvEnergyLevel = THREE.MathUtils.lerp(tvEnergyLevel, energy, 0.1);
+function getSyntheticReactiveLevels(delta: number, mood: string): ReactiveLevels {
+  reactiveSignalTime += delta;
+
+  const moodTempoScale: Record<string, number> = {
+    beat: 1.08,
+    chill: 0.72,
+    dark: 0.82,
+    defcon: 1.05,
+    drone: 0.56,
+    dubstep: 1.18,
+    indie: 0.84,
+    jazz: 0.78,
+    metal: 1.1,
+    space: 0.68,
+  };
+
+  const tempo = moodTempoScale[mood] ?? 0.88;
+  const t = reactiveSignalTime * tempo;
+  const pulse = Math.pow(Math.max(0, Math.sin(t * 2.15) * 0.5 + 0.5), 4.0);
+  const slowNoise = 0.5 + 0.5 * Math.sin(t * 0.47 + Math.sin(t * 0.13) * 1.9);
+  const midWave = 0.5 + 0.5 * Math.sin(t * 1.31 + Math.cos(t * 0.37) * 1.2);
+  const shimmer = 0.5 + 0.5 * Math.sin(t * 4.9 + Math.sin(t * 1.7) * 0.9);
+  const accent = Math.pow(Math.max(0, Math.sin(t * 3.35 + 1.1) * 0.5 + 0.5), 6.0);
+
+  const bass = THREE.MathUtils.clamp(0.16 + pulse * 0.72 + slowNoise * 0.22, 0, 1);
+  const mid = THREE.MathUtils.clamp(0.18 + midWave * 0.54 + slowNoise * 0.16 + accent * 0.18, 0, 1);
+  const high = THREE.MathUtils.clamp(0.14 + shimmer * 0.48 + accent * 0.24, 0, 1);
+  const energy = THREE.MathUtils.clamp(bass * 0.46 + mid * 0.32 + high * 0.22, 0, 1);
+
+  return { bass, mid, high, energy };
+}
+
+function updateTvVisualizerAudioLevels(delta: number) {
+  const data = audioAnalyser.getFrequencyData();
+  const analyserLevels = {
+    bass: averageFrequencyRange(data, 0.0, 0.14),
+    mid: averageFrequencyRange(data, 0.14, 0.48),
+    high: averageFrequencyRange(data, 0.48, 1.0),
+    energy: audioAnalyser.getAverageFrequency() / 255,
+  };
+  const analyserStrength = Math.max(analyserLevels.bass, analyserLevels.mid, analyserLevels.high, analyserLevels.energy);
+  const hasActivePlayback = isPlaying && !audioElement.paused && !!audioElement.currentSrc;
+
+  if (hasActivePlayback && analyserStrength < 0.02) {
+    analyserSilentFor += delta;
+  } else {
+    analyserSilentFor = 0;
+  }
+
+  usingSyntheticReactiveSignal = hasActivePlayback && analyserSilentFor > 1.2;
+  const activeLevels = usingSyntheticReactiveSignal
+    ? getSyntheticReactiveLevels(delta, somaStations[selectedStationIndex]?.mood ?? 'chill')
+    : analyserLevels;
+
+  tvBassLevel = THREE.MathUtils.lerp(tvBassLevel, activeLevels.bass, 0.14);
+  tvMidLevel = THREE.MathUtils.lerp(tvMidLevel, activeLevels.mid, 0.12);
+  tvHighLevel = THREE.MathUtils.lerp(tvHighLevel, activeLevels.high, 0.18);
+  tvEnergyLevel = THREE.MathUtils.lerp(tvEnergyLevel, activeLevels.energy, 0.1);
 
   if (!tvVisualizerMaterial) {
     return;
@@ -887,84 +967,109 @@ renderer.domElement.addEventListener('click', () => {
     // For touch devices, this click listener might not be relevant if touch events are primary.
 });
 
+function isPointInsideElement(element: HTMLElement | null, clientX: number, clientY: number) {
+    if (!element) {
+        return false;
+    }
+
+    const rect = element.getBoundingClientRect();
+    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+}
+
+function isSidebarUiTarget(target: EventTarget | null) {
+    return target instanceof HTMLElement && !!target.closest('#musicspace-sidebar, #musicspace-sidebar-toggle, #audioControls');
+}
+
+function updateMobileJoystickVisual(deltaX: number, deltaY: number) {
+    if (!mobileJoystickKnob) {
+        return;
+    }
+
+    const distance = Math.hypot(deltaX, deltaY);
+    const clampedDistance = Math.min(distance, mobileJoystickRadius);
+    const angle = Math.atan2(deltaY, deltaX);
+    const x = Math.cos(angle) * clampedDistance;
+    const y = Math.sin(angle) * clampedDistance;
+    mobileJoystickKnob.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+    moveTouchVector.x = x / mobileJoystickRadius;
+    moveTouchVector.y = -y / mobileJoystickRadius;
+}
+
+function resetMobileMoveTouch() {
+    moveTouchVector.x = 0;
+    moveTouchVector.y = 0;
+    if (mobileJoystickKnob) {
+        mobileJoystickKnob.style.transform = 'translate(0px, 0px)';
+    }
+}
+
  if (isTouchDevice) {
     controls.disconnect(); // Disconnect PointerLockControls' own event listeners for mouse/pointerlock
     console.log("Touch device detected. Disconnected PointerLockControls listeners and initializing touch controls.");
-    
-    // Add custom touch listeners
-    renderer.domElement.addEventListener('touchstart', (event: TouchEvent) => {
-        // event.preventDefault(); 
+    resetMobileMoveTouch();
+
+    window.addEventListener('touchstart', (event: TouchEvent) => {
         for (let i = 0; i < event.changedTouches.length; i++) {
             const touch = event.changedTouches[i];
-            if (touch.clientX < window.innerWidth / 2 && movingTouchId === null) { // Left half for movement
+            if (isSidebarUiTarget(touch.target)) {
+                continue;
+            }
+
+            if (movingTouchId === null && isPointInsideElement(mobileMoveZone, touch.clientX, touch.clientY)) {
                 movingTouchId = touch.identifier;
-                touchMoveStartX = touch.clientX;
-                touchMoveStartY = touch.clientY;
-            } else if (touch.clientX >= window.innerWidth / 2 && lookingTouchId === null) { // Right half for looking
+                const rect = mobileMoveZone?.getBoundingClientRect();
+                touchMoveStartX = rect ? rect.left + rect.width / 2 : touch.clientX;
+                touchMoveStartY = rect ? rect.top + rect.height / 2 : touch.clientY;
+                updateMobileJoystickVisual(touch.clientX - touchMoveStartX, touch.clientY - touchMoveStartY);
+                event.preventDefault();
+            } else if (lookingTouchId === null && isPointInsideElement(mobileLookZone, touch.clientX, touch.clientY)) {
                 lookingTouchId = touch.identifier;
-                // touchLookStartX = touch.clientX; // Redundant, touchLookPreviousX is used
-                // touchLookStartY = touch.clientY; // Redundant, touchLookPreviousY is used
                 touchLookPreviousX = touch.clientX;
                 touchLookPreviousY = touch.clientY;
+                event.preventDefault();
             }
         }
-    });
+    }, { passive: false });
 
-    renderer.domElement.addEventListener('touchmove', (event: TouchEvent) => {
-        // event.preventDefault();
+    window.addEventListener('touchmove', (event: TouchEvent) => {
         for (let i = 0; i < event.changedTouches.length; i++) {
             const touch = event.changedTouches[i];
             if (touch.identifier === movingTouchId) {
                 const deltaX = touch.clientX - touchMoveStartX;
                 const deltaY = touch.clientY - touchMoveStartY;
-
-                // Forward/Backward (based on vertical drag)
-                if (Math.abs(deltaY) > touchMoveThreshold) {
-                    if (deltaY < -touchMoveThreshold) moveState.forward = true; else moveState.forward = false;
-                    if (deltaY > touchMoveThreshold) moveState.backward = true; else moveState.backward = false;
-                } else {
-                    moveState.forward = false;
-                    moveState.backward = false;
-                }
-
-                // Left/Right strafe (based on horizontal drag)
-                if (Math.abs(deltaX) > touchMoveThreshold) {
-                    if (deltaX < -touchMoveThreshold) moveState.left = true; else moveState.left = false;
-                    if (deltaX > touchMoveThreshold) moveState.right = true; else moveState.right = false;
-                } else {
-                    moveState.left = false;
-                    moveState.right = false;
-                }
+                updateMobileJoystickVisual(deltaX, deltaY);
+                event.preventDefault();
             } else if (touch.identifier === lookingTouchId) {
                 const deltaX = touch.clientX - touchLookPreviousX;
                 const deltaY = touch.clientY - touchLookPreviousY;
-
-                // Yaw (left/right) - Rotate the controls.object (which camera is parented to)
-                controls.object.rotation.y -= deltaX * lookSensitivity;
-
-                // Pitch (up/down) - Rotate the camera itself
-                camera.rotation.x -= deltaY * lookSensitivity;
-                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x)); // Clamp pitch
-
+                controls.object.rotation.y -= deltaX * mobileLookSensitivity;
+                camera.rotation.x -= deltaY * mobileLookSensitivity;
+                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
                 touchLookPreviousX = touch.clientX;
                 touchLookPreviousY = touch.clientY;
+                event.preventDefault();
             }
+        }
+    }, { passive: false });
+
+    const releaseTouch = (touch: Touch) => {
+        if (touch.identifier === movingTouchId) {
+            movingTouchId = null;
+            resetMobileMoveTouch();
+        } else if (touch.identifier === lookingTouchId) {
+            lookingTouchId = null;
+        }
+    };
+
+    window.addEventListener('touchend', (event: TouchEvent) => {
+        for (let i = 0; i < event.changedTouches.length; i++) {
+            releaseTouch(event.changedTouches[i]);
         }
     });
 
-    renderer.domElement.addEventListener('touchend', (event: TouchEvent) => {
-        // event.preventDefault();
+    window.addEventListener('touchcancel', (event: TouchEvent) => {
         for (let i = 0; i < event.changedTouches.length; i++) {
-            const touch = event.changedTouches[i];
-            if (touch.identifier === movingTouchId) {
-                movingTouchId = null;
-                moveState.forward = false;
-                moveState.backward = false;
-                moveState.left = false;
-                moveState.right = false;
-            } else if (touch.identifier === lookingTouchId) {
-                lookingTouchId = null;
-            }
+            releaseTouch(event.changedTouches[i]);
         }
     });
 } else {
@@ -987,10 +1092,10 @@ renderer.domElement.addEventListener('click', () => {
             const deltaY = event.clientY - previousMouseY;
 
             // Yaw (left/right) - Rotate the controls.object (which camera is parented to)
-            controls.object.rotation.y -= deltaX * lookSensitivity;
+            controls.object.rotation.y -= deltaX * desktopLookSensitivity;
 
             // Pitch (up/down) - Rotate the camera itself
-            camera.rotation.x -= deltaY * lookSensitivity;
+            camera.rotation.x -= deltaY * desktopLookSensitivity;
             camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x)); // Clamp pitch
 
             previousMouseX = event.clientX;
@@ -1090,8 +1195,7 @@ const mixingBoardMeshes: THREE.Mesh[] = [];
 // Animation timing
 let emitFrame = 0;
 let emitAccumulator = 0;
-const EMIT_FPS = 3;
-const EMIT_INTERVAL = 1 / EMIT_FPS;
+const EMIT_BASE_FPS = 3;
 const emitClock = new THREE.Clock();
 
 // Custom rotations for specific models (in radians)
@@ -2072,6 +2176,7 @@ function resetMovementState() {
   moveState.backward = false;
   moveState.left = false;
   moveState.right = false;
+  resetMobileMoveTouch();
   velocity.x = 0;
   velocity.z = 0;
 }
@@ -2152,7 +2257,7 @@ if (heldObject) {
  heldObject.rotation.y += delta * spinSpeed;
 }
 updateObjectReleaseAnimations(performance.now());
-updateTvVisualizerAudioLevels();
+updateTvVisualizerAudioLevels(delta);
 if (tvVisualizerMaterial) {
   tvVisualizerMaterial.uniforms.uTime.value += delta;
   tvVisualizerMaterial.uniforms.uResolution.value.set(renderer.domElement.width, renderer.domElement.height);
@@ -2228,14 +2333,16 @@ if (tvVisualizerMaterial) {
   // Animate emissive map
   if (mixingBoardMeshes.length > 0) {
     emitAccumulator += emitClock.getDelta();
-    if (emitAccumulator >= EMIT_INTERVAL) {
+    const emitFps = EMIT_BASE_FPS * (0.72 + tvEnergyLevel * 2.2 + tvBassLevel * 0.95 + tvHighLevel * 0.4);
+    const emitInterval = 1 / Math.max(emitFps, 0.6);
+    while (emitAccumulator >= emitInterval) {
       emitFrame = (emitFrame + 1) % emitTextures.length;
       mixingBoardMeshes.forEach(mesh => {
         const mat = mesh.material as THREE.MeshStandardMaterial;
         mat.emissiveMap = emitTextures[emitFrame];
         mat.needsUpdate = true;
       });
-      emitAccumulator -= EMIT_INTERVAL;
+      emitAccumulator -= emitInterval;
     }
   }
 
@@ -2245,13 +2352,16 @@ if (tvVisualizerMaterial) {
     velocity.x -= velocity.x * 10.0 * delta;
     velocity.z -= velocity.z * 10.0 * delta;
 
-    direction.x = Number(moveState.right) - Number(moveState.left);
-    direction.z = Number(moveState.forward) - Number(moveState.backward);
-    direction.normalize();
+    direction.x = isTouchDevice ? moveTouchVector.x : Number(moveState.right) - Number(moveState.left);
+    direction.z = isTouchDevice ? moveTouchVector.y : Number(moveState.forward) - Number(moveState.backward);
+    const inputStrength = isTouchDevice ? Math.min(1, Math.hypot(moveTouchVector.x, moveTouchVector.y)) : Math.min(1, direction.length());
+    if (direction.lengthSq() > 1) {
+      direction.normalize();
+    }
 
-    const speed = 40.0;
-    velocity.x += direction.x * speed * delta;
-    velocity.z += direction.z * speed * delta;
+    const speed = 40.0 * (isTouchDevice ? mobileMoveSpeedScale : 1);
+    velocity.x += direction.x * speed * inputStrength * delta;
+    velocity.z += direction.z * speed * inputStrength * delta;
 
     const oldPos = controls.object.position.clone();
     controls.moveRight(velocity.x * delta);

@@ -5,6 +5,7 @@ import type { PlayerPresence } from '../types/player';
 const BODY_COLOR = 0xff7f50;
 const SELF_COLOR = 0x66ccff;
 const AVATAR_TARGET_HEIGHT = 1.75;
+const DEFAULT_AVATAR_TRANSFORM = { modelPath: '/models/avatar_default.glb', scale: { x: 1, y: 1, z: 1 }, offsetY: 0 };
 const AVATAR_STYLE_TRANSFORMS: Record<string, { modelPath: string; scale: { x: number; y: number; z: number }; offsetY?: number }> = {
   observer: { modelPath: '/models/avatar_observer.glb', scale: { x: 0.7, y: 0.7, z: 0.7 }, offsetY: 0.3 },
   pulse: { modelPath: '/models/avatar_pulse.glb', scale: { x: 0.8, y: 0.8, z: 0.8 }, offsetY: 0.9 },
@@ -100,7 +101,7 @@ export class RemotePlayerManager {
     const fallback = createFallbackAvatar(participant.sessionId === selfSessionId ? SELF_COLOR : BODY_COLOR);
     group.add(fallback);
 
-    const transform = desiredStyle ? AVATAR_STYLE_TRANSFORMS[desiredStyle] : null;
+    const transform = desiredStyle ? AVATAR_STYLE_TRANSFORMS[desiredStyle] ?? DEFAULT_AVATAR_TRANSFORM : DEFAULT_AVATAR_TRANSFORM;
     if (transform) {
       loadAvatarTemplate(transform.modelPath).then((template) => {
         if (!template || group.userData.avatarStyle !== desiredStyle) {
