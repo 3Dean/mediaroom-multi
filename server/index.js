@@ -5,6 +5,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { WebSocketServer } from 'ws';
+import { canUseBackendPersistence, loadAuthorityFromBackend, loadFallbackAuthorityStore, normalizeAuthority as normalizeRoomAuthority, persistFallbackAuthorityStore, saveAuthorityToBackend } from './roomAuthorityRepository.js';
 
 const HOST = process.env.REALTIME_HOST?.trim() || null;
 const PORT = Number(process.env.REALTIME_PORT ?? process.env.PORT ?? 8787);
@@ -18,7 +19,6 @@ const MAX_OBJECT_ID_LENGTH = Number(process.env.REALTIME_MAX_OBJECT_ID_LENGTH ??
 const MAX_SEAT_ID_LENGTH = Number(process.env.REALTIME_MAX_SEAT_ID_LENGTH ?? 64);
 const DEFAULT_EYE_HEIGHT = 1.6;
 const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.REALTIME_ALLOWED_ORIGINS ?? process.env.RENDER_EXTERNAL_URL ?? '');
-const AUTHORITY_STORE_PATH = fileURLToPath(new URL('./data/room-authority-store.json', import.meta.url));
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const AMPLIFY_OUTPUTS_PATH = join(__dirname, '..', 'amplify_outputs.json');
 const AMPLIFY_OUTPUTS = loadAmplifyOutputs();
@@ -49,7 +49,7 @@ const roomMessages = new Map();
 const roomSeats = new Map();
 const roomObjects = new Map();
 const chatRateLimits = new Map();
-const roomAuthorities = new Map(Object.entries(loadAuthorityStore()).map(([roomId, authority]) => [roomId, normalizeAuthority(authority)]));
+const roomAuthorities = new Map(Object.entries(loadFallbackAuthorityStore()).map(([roomId, authority]) => [roomId, normalizeRoomAuthority(authority)]));
 const jwksCache = new Map();
 
 const server = createServer((request, response) => {
@@ -65,6 +65,7 @@ const server = createServer((request, response) => {
       servingDist: HAS_DIST,
       spawnPoints: SPAWN_POINTS.length,
       authorityRooms: roomAuthorities.size,
+      authorityPersistence: canUseBackendPersistence() ? 'backend+fallback' : 'fallback-only',
       cognitoIssuer: COGNITO_ISSUER || null,
     }));
     return;
@@ -177,13 +178,13 @@ async function handleClientMessage(socket, message) {
       handleAdminKick(socket, message);
       return;
     case 'admin.setRole':
-      handleAdminSetRole(socket, message);
+      await handleAdminSetRole(socket, message);
       return;
     case 'admin.setMute':
-      handleAdminSetMute(socket, message);
+      await handleAdminSetMute(socket, message);
       return;
     case 'admin.setRoomLock':
-      handleAdminSetRoomLock(socket, message);
+      await handleAdminSetRoomLock(socket, message);
       return;
     case 'ping':
       send(socket, { type: 'pong', ts: message.ts });
@@ -216,10 +217,12 @@ async function handleRoomJoin(socket, message) {
     return;
   }
 
-  const authority = ensureRoomAuthority(roomId);
+  const authority = await hydrateRoomAuthority(roomId);
   if (!authority.ownerUserId && authResult.userId) {
     authority.ownerUserId = authResult.userId;
-    persistAuthorityStore();
+    await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
+  } else if (authority.ownerUserId && !authority.roomRecordId && authResult.userId) {
+    await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
   }
 
   const selfRole = resolveRole(userId, authority);
@@ -505,7 +508,7 @@ function handleAdminKick(socket, message) {
   pushSystemNotice(roomId, `${target.displayName} was removed by ${actor.displayName}.`);
 }
 
-function handleAdminSetRole(socket, message) {
+async function handleAdminSetRole(socket, message) {
   const roomId = getSocketRoomId(socket, message.roomId);
   const sessionId = getSocketSessionId(socket, message.sessionId);
   const targetUserId = normalizeToken(message.targetUserId, 128);
@@ -538,12 +541,12 @@ function handleAdminSetRole(socket, message) {
     nextAdmins.delete(targetUserId);
   }
   authority.adminUserIds = Array.from(nextAdmins);
-  persistAuthorityStore();
+  await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
   broadcastAuthorityUpdate(roomId);
   pushSystemNotice(roomId, `${actor.displayName} ${role === 'admin' ? 'granted' : 'removed'} admin access.`);
 }
 
-function handleAdminSetMute(socket, message) {
+async function handleAdminSetMute(socket, message) {
   const roomId = getSocketRoomId(socket, message.roomId);
   const sessionId = getSocketSessionId(socket, message.sessionId);
   const targetUserId = normalizeToken(message.targetUserId, 128);
@@ -570,7 +573,7 @@ function handleAdminSetMute(socket, message) {
     nextMuted.delete(targetUserId);
   }
   authority.mutedUserIds = Array.from(nextMuted);
-  persistAuthorityStore();
+  await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
   broadcastAuthorityUpdate(roomId);
 
   const affectedParticipant = Array.from(roomParticipants.get(roomId)?.values() ?? []).find((participant) => participant.userId === targetUserId);
@@ -579,7 +582,7 @@ function handleAdminSetMute(socket, message) {
   pushSystemNotice(roomId, `${targetLabel} was ${message.muted ? 'muted' : 'unmuted'} by ${actorLabel}.`);
 }
 
-function handleAdminSetRoomLock(socket, message) {
+async function handleAdminSetRoomLock(socket, message) {
   const roomId = getSocketRoomId(socket, message.roomId);
   const sessionId = getSocketSessionId(socket, message.sessionId);
   if (!roomId || !sessionId || typeof message.locked !== 'boolean') {
@@ -599,7 +602,7 @@ function handleAdminSetRoomLock(socket, message) {
 
   const authority = ensureRoomAuthority(roomId);
   authority.isLocked = message.locked;
-  persistAuthorityStore();
+  await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
   broadcastAuthorityUpdate(roomId);
   pushSystemNotice(roomId, `${actor.displayName} ${message.locked ? 'locked' : 'unlocked'} the room.`);
 }
@@ -672,10 +675,43 @@ function ensureRoomAuthority(roomId) {
     return existing;
   }
 
-  const created = normalizeAuthority(null);
+  const created = normalizeRoomAuthority(null);
   roomAuthorities.set(roomId, created);
-  persistAuthorityStore();
+  persistFallbackAuthorityStore(roomAuthorities);
   return created;
+}
+
+async function hydrateRoomAuthority(roomId) {
+  try {
+    const persisted = await loadAuthorityFromBackend(roomId);
+    if (persisted) {
+      roomAuthorities.set(roomId, persisted);
+      persistFallbackAuthorityStore(roomAuthorities);
+      return persisted;
+    }
+  } catch (error) {
+    console.error('[realtime] failed to hydrate room authority from backend', error);
+  }
+
+  return ensureRoomAuthority(roomId);
+}
+
+async function persistRoomAuthority(roomId, options = {}) {
+  const authority = ensureRoomAuthority(roomId);
+  persistFallbackAuthorityStore(roomAuthorities);
+
+  try {
+    const persisted = await saveAuthorityToBackend(roomId, authority, options);
+    if (persisted) {
+      roomAuthorities.set(roomId, persisted);
+      persistFallbackAuthorityStore(roomAuthorities);
+      return persisted;
+    }
+  } catch (error) {
+    console.error('[realtime] failed to persist room authority to backend', error);
+  }
+
+  return authority;
 }
 
 function ensureSeatState(seats, seatId) {
@@ -890,39 +926,8 @@ function loadAmplifyOutputs() {
     return {};
   }
 }
-function loadAuthorityStore() {
-  try {
-    if (!existsSync(AUTHORITY_STORE_PATH)) {
-      return {};
-    }
-    const parsed = JSON.parse(readFileSync(AUTHORITY_STORE_PATH, 'utf8'));
-    return typeof parsed?.rooms === 'object' && parsed.rooms ? parsed.rooms : {};
-  } catch (error) {
-    console.error('[realtime] failed to load authority store', error);
-    return {};
-  }
-}
-
-function persistAuthorityStore() {
-  try {
-    mkdirSync(join(AUTHORITY_STORE_PATH, '..'), { recursive: true });
-  } catch {}
-
-  const rooms = Object.fromEntries(Array.from(roomAuthorities.entries()).map(([roomId, authority]) => [roomId, serializeAuthority(authority)]));
-  writeFileSync(AUTHORITY_STORE_PATH, JSON.stringify({ version: 1, rooms }, null, 2), 'utf8');
-}
-
-function normalizeAuthority(value) {
-  return {
-    ownerUserId: typeof value?.ownerUserId === 'string' ? value.ownerUserId : null,
-    adminUserIds: Array.isArray(value?.adminUserIds) ? value.adminUserIds.filter((entry) => typeof entry === 'string') : [],
-    mutedUserIds: Array.isArray(value?.mutedUserIds) ? value.mutedUserIds.filter((entry) => typeof entry === 'string') : [],
-    isLocked: Boolean(value?.isLocked),
-  };
-}
-
 function serializeAuthority(authority) {
-  return normalizeAuthority(authority);
+  return normalizeRoomAuthority(authority);
 }
 
 function resolveRole(userId, authority) {
@@ -1081,5 +1086,11 @@ function deriveCognitoIssuer(userPoolId) {
   const [region] = userPoolId.split('_');
   return `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
 }
+
+
+
+
+
+
 
 

@@ -62,6 +62,10 @@ Server:
 - `REALTIME_COGNITO_USER_POOL_ID`
 - `REALTIME_COGNITO_CLIENT_ID`
 - `REALTIME_COGNITO_ISSUER` (optional override)
+- `AWS_REGION`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_SESSION_TOKEN` (optional)
 
 If `REALTIME_ALLOWED_ORIGINS` is empty, the websocket server accepts all origins locally. On Render, the server falls back to `RENDER_EXTERNAL_URL` automatically so the deployed app can use same-origin websocket connections without extra configuration.
 
@@ -73,7 +77,7 @@ To enable verified room ownership/admin controls, the realtime server must be ab
 - the owner can lock or unlock the room
 - muted users are blocked from sending chat messages server-side
 
-Room authority is currently persisted by the realtime server in `server/data/room-authority-store.json`.
+To persist room authority in the Amplify backend data model across redeploys, the realtime server also needs AWS credentials that can call the Amplify AppSync API using IAM. Without those credentials, the server falls back to the local file store in `server/data/room-authority-store.json`.
 
 ## Health check
 
@@ -88,6 +92,8 @@ Example:
 ```powershell
 node -e "fetch('http://127.0.0.1:8787/health').then(r=>r.text()).then(console.log)"
 ```
+
+The health response now includes `authorityPersistence` so you can confirm whether the server is using backend persistence (`backend+fallback`) or local fallback only (`fallback-only`).
 
 ## Render deployment
 
@@ -104,18 +110,24 @@ The included [`render.yaml`](./render.yaml) uses:
 
 That means you do not need a separate static host and websocket host for the first production deploy.
 
+For durable room authority on Render, add these in addition to the Cognito env vars:
+
+- `AWS_REGION=us-east-1`
+- `AWS_ACCESS_KEY_ID=...`
+- `AWS_SECRET_ACCESS_KEY=...`
+- `AWS_SESSION_TOKEN=...` if you use temporary credentials
+
 Detailed steps are in `DEPLOYMENT.md`.
 
 ## Current limitations
 
 - remote avatars are placeholder capsules/name labels
 - object sync is authoritative for ownership and final dropped transform, not continuous mid-air physics sync
-- room authority persistence is filesystem-backed per realtime deployment instance, not shared across multiple server replicas
 - voice chat is not implemented
 
 ## Recommended next steps
 
-- deploy to Render and run a real two-browser QA pass
-- move room authority persistence into your backend data layer if you need multi-instance durability
+- redeploy Render with AWS IAM credentials for durable room authority persistence
+- run a real two-browser QA pass against the deployed app after verifying `/health`
 - add room creation persistence and room listing UX
 - add analytics/logging if this moves beyond local evaluation

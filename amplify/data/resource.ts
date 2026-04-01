@@ -18,6 +18,9 @@ const schema = a.schema({
       createdBy: a.string().required(),
       maxUsers: a.integer().required(),
       isPrivate: a.boolean(),
+      isLocked: a.boolean(),
+      adminUserIds: a.json(),
+      mutedUserIds: a.json(),
     })
     .authorization((allow) => [allow.authenticated()]),
 

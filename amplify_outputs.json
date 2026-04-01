@@ -172,6 +172,27 @@
               "isRequired": false,
               "attributes": []
             },
+            "isLocked": {
+              "name": "isLocked",
+              "isArray": false,
+              "type": "Boolean",
+              "isRequired": false,
+              "attributes": []
+            },
+            "adminUserIds": {
+              "name": "adminUserIds",
+              "isArray": false,
+              "type": "AWSJSON",
+              "isRequired": false,
+              "attributes": []
+            },
+            "mutedUserIds": {
+              "name": "mutedUserIds",
+              "isArray": false,
+              "type": "AWSJSON",
+              "isRequired": false,
+              "attributes": []
+            },
             "createdAt": {
               "name": "createdAt",
               "isArray": false,
