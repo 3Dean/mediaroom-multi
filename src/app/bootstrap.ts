@@ -102,7 +102,11 @@ export function bootstrapApp(): void {
       },
     });
 
-    const roomPanel = new RoomPanel(async ({ roomSlug, displayName }) => {
+    let roomPanel!: RoomPanel;
+    let authPanel!: AuthPanel;
+    let chatPanel!: ChatPanel;
+
+    const enterRoom = ({ roomSlug, displayName }: { roomSlug: string; displayName: string }) => {
       updateRoomSlugInUrl(roomSlug);
       const session = sessionStore.createSession(roomSlug, displayName, currentUser?.userId, preferences.profile.avatarPresetId);
       roomState.reset(session.roomId);
@@ -207,12 +211,14 @@ export function bootstrapApp(): void {
 
       roomClient = nextRoomClient;
       nextRoomClient.connect();
-    }, {
+    };
+
+    roomPanel = new RoomPanel(enterRoom, {
       initialRoomSlug,
       initialDisplayName: preferences.profile.displayName || undefined,
     });
 
-    const authPanel = new AuthPanel({
+    authPanel = new AuthPanel({
       initialLoginId: currentUser?.signInDetails?.loginId ?? null,
       onSignIn: async (email, password) => {
         await signInWithEmail(email, password);
@@ -221,7 +227,19 @@ export function bootstrapApp(): void {
         roomPanel.applyPreferenceDefaults({
           displayName: preferences.profile.displayName,
         });
-        roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Re-enter a room to claim ownership or gain admin access.`);
+        const activeSession = sessionStore.getCurrentSession();
+        if (activeSession) {
+          roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Refreshing room access.`);
+          roomPanel.setMeta('Reconnecting');
+          participantList.setConnectionStatus('Reconnecting');
+          enterRoom({
+            roomSlug: activeSession.roomSlug,
+            displayName: activeSession.displayName,
+          });
+          return;
+        }
+
+        roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Enter a room to claim ownership or gain admin access.`);
       },
       onSignUp: async (email, password) => {
         const result = await signUpWithEmail(email, password);
@@ -369,7 +387,7 @@ export function bootstrapApp(): void {
       },
     });
 
-    const chatPanel = new ChatPanel((body) => {
+    chatPanel = new ChatPanel((body) => {
       const activeSession = sessionStore.getCurrentSession();
       if (!activeSession) {
         roomPanel.setStatus('Enter a room before sending chat.');
@@ -645,6 +663,8 @@ function stopRealtimeLoops(presenceTimer: number | null, heartbeatTimer: number 
     window.clearInterval(heartbeatTimer);
   }
 }
+
+
 
 function getRoomSlugFromUrl(): string | undefined {
   const params = new URLSearchParams(window.location.search);
