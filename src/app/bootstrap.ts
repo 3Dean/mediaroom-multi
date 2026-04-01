@@ -9,6 +9,7 @@ import {
   signOutCurrentUser,
   signUpWithEmail,
 } from '../backend/authClient';
+import { listRooms } from '../backend/dataClient';
 import { RemotePlayerManager } from '../player/remotePlayerManager';
 import { RoomClient } from '../room/roomClient';
 import { applyServerMessage } from '../room/roomPresence';
@@ -24,6 +25,7 @@ import { PreferencesPanel } from '../ui/preferencesPanel';
 import { RoomPanel } from '../ui/roomPanel';
 import { loadPreferences, resetPreferences, savePreferences } from '../preferences/preferencesStore';
 import type { UserPreferences } from '../preferences/preferencesModel';
+import type { RoomSummary } from '../types/room';
 
 const roomState = new RoomStateStore();
 const sessionStore = new RoomSessionStore();
@@ -44,6 +46,7 @@ export function bootstrapApp(): void {
     let appliedSeatId: string | null = null;
     let pendingObjectId: string | null = null;
     let appliedObjectId: string | null = null;
+    let knownRooms: RoomSummary[] = [];
 
     const participantList = new ParticipantList({
       onKick: (targetSessionId) => {
@@ -106,6 +109,24 @@ export function bootstrapApp(): void {
     let authPanel!: AuthPanel;
     let chatPanel!: ChatPanel;
 
+    const refreshRooms = async () => {
+      const activeRoomSlug = sessionStore.getCurrentSession()?.roomSlug ?? null;
+      if (!currentUser) {
+        knownRooms = [];
+        roomPanel.setRoomListSignedOut();
+        return;
+      }
+
+      roomPanel.setRoomListLoading();
+      try {
+        knownRooms = await listRooms();
+        roomPanel.setRooms(knownRooms, activeRoomSlug);
+      } catch (error) {
+        console.error('Failed to load persisted rooms', error);
+        roomPanel.setRoomListError('Unable to load persisted rooms.');
+      }
+    };
+
     const enterRoom = ({ roomSlug, displayName }: { roomSlug: string; displayName: string }) => {
       updateRoomSlugInUrl(roomSlug);
       const session = sessionStore.createSession(roomSlug, displayName, currentUser?.userId, preferences.profile.avatarPresetId);
@@ -127,6 +148,7 @@ export function bootstrapApp(): void {
       const realtimeUrl = getRealtimeUrl();
       roomPanel.setStatus(`Joined ${roomSlug}. Connecting to ${realtimeUrl}.`);
       roomPanel.setMeta('Connecting');
+      roomPanel.setRooms(knownRooms, roomSlug);
       participantList.setConnectionStatus('Connecting');
 
       const nextRoomClient = new RoomClient({
@@ -232,6 +254,7 @@ export function bootstrapApp(): void {
           roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Refreshing room access.`);
           roomPanel.setMeta('Reconnecting');
           participantList.setConnectionStatus('Reconnecting');
+          void refreshRooms();
           enterRoom({
             roomSlug: activeSession.roomSlug,
             displayName: activeSession.displayName,
@@ -240,6 +263,7 @@ export function bootstrapApp(): void {
         }
 
         roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Enter a room to claim ownership or gain admin access.`);
+        void refreshRooms();
       },
       onSignUp: async (email, password) => {
         const result = await signUpWithEmail(email, password);
@@ -247,6 +271,7 @@ export function bootstrapApp(): void {
         if (step === 'DONE') {
           currentUser = await getAuthenticatedUser();
           authPanel.setUser(currentUser?.signInDetails?.loginId ?? email);
+          void refreshRooms();
           roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Re-enter a room to claim ownership or gain admin access.`);
           return {
             needsConfirmation: false,
@@ -278,6 +303,7 @@ export function bootstrapApp(): void {
         syncRoomUi(chatPanel, participantList, remotePlayerManager);
         participantList.setConnectionStatus('Idle');
         roomPanel.setMeta('Idle');
+        void refreshRooms();
         roomPanel.setStatus('Signed out. Enter a room after signing in to claim ownership and use admin controls.');
       },
     });
@@ -431,8 +457,10 @@ export function bootstrapApp(): void {
     if (currentUser?.signInDetails?.loginId) {
       authPanel.setUser(currentUser.signInDetails.loginId);
       roomPanel.setStatus(`Signed in as ${currentUser.signInDetails.loginId}. Enter a room to create it or join it if it already exists.`);
+      void refreshRooms();
     } else {
       authPanel.setUser(null);
+      roomPanel.setRoomListSignedOut();
       roomPanel.setStatus('Enter a room name to create it or join it if it already exists. Sign in to claim ownership and use admin controls.');
     }
 

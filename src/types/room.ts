@@ -8,6 +8,7 @@ export type RoomSummary = {
   name: string;
   maxUsers: number;
   isPrivate?: boolean;
+  isLocked?: boolean;
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
