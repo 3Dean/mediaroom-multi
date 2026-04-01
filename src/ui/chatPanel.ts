@@ -11,37 +11,34 @@ export class ChatPanel {
     this.onSend = onSend;
     this.container = document.createElement('div');
     this.container.id = 'chat-panel';
-    this.container.className = 'musicspace-panel';
+    this.container.className = 'musicspace-panel musicspace-panel--utility';
+
+    const header = document.createElement('div');
+    header.className = 'panel-header';
 
     const title = document.createElement('div');
-    title.textContent = 'Room Chat';
-    title.style.color = '#fff';
-    title.style.fontSize = '14px';
-    title.style.fontWeight = '700';
+    title.className = 'panel-title';
+    title.textContent = 'Chat';
+
+    const status = document.createElement('div');
+    status.className = 'panel-meta';
+    status.textContent = 'Room messages';
 
     this.log = document.createElement('div');
-    this.log.style.display = 'flex';
-    this.log.style.flexDirection = 'column';
-    this.log.style.gap = '6px';
-    this.log.style.minHeight = '140px';
-    this.log.style.maxHeight = '220px';
-    this.log.style.overflowY = 'auto';
+    this.log.className = 'chat-log';
 
     this.form = document.createElement('form');
-    this.form.style.display = 'flex';
-    this.form.style.gap = '8px';
+    this.form.className = 'chat-form';
 
     this.input = document.createElement('input');
     this.input.type = 'text';
-    this.input.placeholder = 'Type a message';
-    this.input.style.flex = '1';
-    this.input.style.padding = '8px 10px';
-    this.input.style.borderRadius = '8px';
-    this.input.style.border = '1px solid rgba(255, 255, 255, 0.14)';
+    this.input.placeholder = 'Message the room';
+    this.input.className = 'chat-input';
 
     const sendButton = document.createElement('button');
     sendButton.type = 'submit';
     sendButton.textContent = 'Send';
+    sendButton.className = 'chat-send-button';
 
     this.form.append(this.input, sendButton);
     this.form.addEventListener('submit', (event) => {
@@ -55,7 +52,8 @@ export class ChatPanel {
       this.input.value = '';
     });
 
-    this.container.append(title, this.log, this.form);
+    header.append(title, status);
+    this.container.append(header, this.log, this.form);
   }
 
   mount(parent: HTMLElement = document.body): void {
@@ -74,8 +72,7 @@ export class ChatPanel {
 
   private createMessageRow(message: ChatMessage): HTMLDivElement {
     const row = document.createElement('div');
-    row.style.color = '#fff';
-    row.style.fontSize = '12px';
+    row.className = 'chat-message';
     row.innerHTML = `<strong>${message.displayName}:</strong> ${message.body}`;
     return row;
   }

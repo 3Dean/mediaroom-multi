@@ -21,19 +21,17 @@ export class ParticipantList {
     this.options = options;
     this.container = document.createElement('div');
     this.container.id = 'participant-list';
-    this.container.className = 'musicspace-panel';
+    this.container.className = 'musicspace-panel musicspace-panel--utility';
+
+    const header = document.createElement('div');
+    header.className = 'panel-header';
 
     const title = document.createElement('div');
+    title.className = 'panel-title';
     title.textContent = 'Participants';
-    title.style.color = '#fff';
-    title.style.fontWeight = '700';
-    title.style.fontSize = '14px';
-    title.style.marginBottom = '8px';
 
     this.status = document.createElement('div');
-    this.status.style.color = '#c8c8c8';
-    this.status.style.fontSize = '12px';
-    this.status.style.marginBottom = '8px';
+    this.status.className = 'panel-meta';
     this.status.textContent = 'Offline';
 
     this.controls = document.createElement('div');
@@ -61,7 +59,8 @@ export class ParticipantList {
     this.list.style.maxHeight = '220px';
     this.list.style.overflowY = 'auto';
 
-    this.container.append(title, this.status, this.controls, this.list);
+    header.append(title, this.status);
+    this.container.append(header, this.controls, this.list);
   }
 
   mount(parent: HTMLElement = document.body): void {
@@ -181,6 +180,7 @@ export class ParticipantList {
 
     const muteButton = document.createElement('button');
     muteButton.type = 'button';
+    muteButton.className = 'participant-action-button';
     muteButton.textContent = authority.mutedUserIds.includes(participant.userId) ? 'Unmute' : 'Mute';
     muteButton.addEventListener('click', () => {
       this.options.onSetMute(participant.userId, !authority.mutedUserIds.includes(participant.userId));
@@ -190,6 +190,7 @@ export class ParticipantList {
     if (isOwner) {
       const roleButton = document.createElement('button');
       roleButton.type = 'button';
+      roleButton.className = 'participant-action-button';
       roleButton.textContent = participantRole === 'admin' ? 'Remove Admin' : 'Make Admin';
       roleButton.addEventListener('click', () => {
         this.options.onSetRole(participant.userId, participantRole === 'admin' ? 'member' : 'admin');
@@ -199,6 +200,7 @@ export class ParticipantList {
 
     const kickButton = document.createElement('button');
     kickButton.type = 'button';
+    kickButton.className = 'participant-action-button is-danger';
     kickButton.textContent = 'Kick';
     kickButton.addEventListener('click', () => {
       this.options.onKick(participant.sessionId);

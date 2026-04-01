@@ -37,6 +37,7 @@ declare global {
     __musicspaceApplyObjectSnapshot?: (snapshot: { objectId: string; ownerSessionId: string | null; position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } | null }) => void;
     __musicspaceGetStationOptions?: () => Array<{ label: string; mood: string }> ;
     __musicspaceApplyPreferences?: (preferences: { preferredStationMood?: string | null; defaultVolume?: number; backgroundOverrideMood?: string | null }) => void;
+    __musicspaceSetLobbyMode?: (enabled: boolean) => void;
   }
 }
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
@@ -79,6 +80,12 @@ let mobileLookZone: HTMLDivElement | null = null;
 let isDraggingView = false;
 let previousMouseX = 0;
 let previousMouseY = 0;
+type SceneMode = 'lobby' | 'room';
+let sceneMode: SceneMode = 'lobby';
+let lobbyCameraTime = 0;
+const lobbyCameraTarget = new THREE.Vector3(0, 2.55, 10.65);
+const lobbyCameraRig = new THREE.Object3D();
+lobbyCameraRig.rotation.order = 'YXZ';
 
 export function initializeApp() {
   console.log(`isTouchDevice: ${isTouchDevice}`); // Diagnostic log
@@ -262,6 +269,9 @@ if (isTouchDevice) {
 
 // Listen for pointer move to update hover detection coordinates
 renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
+    if (sceneMode !== 'room') {
+        return;
+    }
     mouseForHover.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouseForHover.y = - (event.clientY / window.innerHeight) * 2 + 1;
 }, false);
@@ -305,6 +315,7 @@ renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
 // Keep the old function for backward compatibility
 (window as any).resetCouchPositions = (window as any).resetSeatingPositions;
 (window as any).__musicspaceApplyLocalPlayerTransform = (transform: { position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } }) => {
+  setSceneMode('room');
   controls.object.position.set(transform.position.x, transform.position.y, transform.position.z);
   controls.object.rotation.set(0, transform.rotation.yaw, 0);
   camera.rotation.x = transform.rotation.pitch;
@@ -1009,6 +1020,9 @@ function resetMobileMoveTouch() {
     resetMobileMoveTouch();
 
     window.addEventListener('touchstart', (event: TouchEvent) => {
+        if (sceneMode !== 'room') {
+            return;
+        }
         for (let i = 0; i < event.changedTouches.length; i++) {
             const touch = event.changedTouches[i];
             if (isSidebarUiTarget(touch.target)) {
@@ -1032,6 +1046,9 @@ function resetMobileMoveTouch() {
     }, { passive: false });
 
     window.addEventListener('touchmove', (event: TouchEvent) => {
+        if (sceneMode !== 'room') {
+            return;
+        }
         for (let i = 0; i < event.changedTouches.length; i++) {
             const touch = event.changedTouches[i];
             if (touch.identifier === movingTouchId) {
@@ -1078,6 +1095,9 @@ function resetMobileMoveTouch() {
     console.log("Desktop: Initializing click-and-drag view controls.");
 
     renderer.domElement.addEventListener('mousedown', (event: MouseEvent) => {
+        if (sceneMode !== 'room') {
+            return;
+        }
         if (event.button === 0) { // Only on left click
             isDraggingView = true;
             previousMouseX = event.clientX;
@@ -1087,6 +1107,9 @@ function resetMobileMoveTouch() {
     });
 
     window.addEventListener('mousemove', (event: MouseEvent) => {
+        if (sceneMode !== 'room') {
+            return;
+        }
         if (isDraggingView) {
             const deltaX = event.clientX - previousMouseX;
             const deltaY = event.clientY - previousMouseY;
@@ -1104,6 +1127,9 @@ function resetMobileMoveTouch() {
     });
 
     window.addEventListener('mouseup', (event: MouseEvent) => {
+        if (sceneMode !== 'room') {
+            return;
+        }
         if (event.button === 0) { // Only on left click release
             isDraggingView = false;
             renderer.domElement.style.cursor = 'grab'; // Or 'auto' if you prefer
@@ -1863,6 +1889,10 @@ function performStandAction() {
 }
 
 function requestSeatClaim() {
+  if (sceneMode !== 'room') {
+    return;
+  }
+
   if (!nearSittingPosition || isSitting) {
     return;
   }
@@ -1877,6 +1907,10 @@ function requestSeatClaim() {
 }
 
 function requestSeatRelease() {
+  if (sceneMode !== 'room') {
+    return;
+  }
+
   if (!isSitting) {
     return;
   }
@@ -1903,7 +1937,7 @@ closeButton.addEventListener('click', handleCloseButtonPress);
 closeButton.addEventListener('touchend', handleCloseButtonPress, { passive: false });
 
 function handleInteractionButtonPress(event: Event) {
-  if (nearSittingPosition && !isSitting) {
+  if (sceneMode === 'room' && nearSittingPosition && !isSitting) {
     requestSeatClaim();
   }
   event.stopPropagation();
@@ -1957,11 +1991,11 @@ function triggerSitAction(targetSeatId?: string) {
 }
 
 window.__musicspaceGetSeatState = () => ({
-  nearbySeatId: (nearSittingPosition?.userData.seatId as string | undefined) ?? null,
-  currentSeatId,
-  isSitting,
+  nearbySeatId: sceneMode === 'room' ? (nearSittingPosition?.userData.seatId as string | undefined) ?? null : null,
+  currentSeatId: sceneMode === 'room' ? currentSeatId : null,
+  isSitting: sceneMode === 'room' ? isSitting : false,
 });
-window.__musicspaceOccupySeat = (seatId: string) => triggerSitAction(seatId);
+window.__musicspaceOccupySeat = (seatId: string) => sceneMode === 'room' ? triggerSitAction(seatId) : false;
 window.__musicspaceReleaseSeat = () => {
   performStandAction();
 };
@@ -2172,8 +2206,97 @@ function pickupObjectById(objectId: string) {
   return true;
 }
 
+function dropHeldObjectLocally() {
+  if (!heldObject) {
+    heldObjectId = null;
+    return;
+  }
+
+  const worldPosition = new THREE.Vector3();
+  const worldQuaternion = new THREE.Quaternion();
+  heldObject.getWorldPosition(worldPosition);
+  heldObject.getWorldQuaternion(worldQuaternion);
+  heldObject.parent?.remove(heldObject);
+  scene.add(heldObject);
+  heldObject.position.copy(worldPosition);
+  heldObject.quaternion.copy(worldQuaternion);
+  heldObject = null;
+  heldObjectId = null;
+}
+
+function applyLobbyCamera(delta: number) {
+  lobbyCameraTime += delta;
+
+  const orbit = Math.sin(lobbyCameraTime * 0.18);
+  const drift = Math.cos(lobbyCameraTime * 0.11);
+  const dolly = (Math.sin(lobbyCameraTime * 0.24) + 1) * 0.5;
+  const verticalBob = Math.sin(lobbyCameraTime * 0.13) * 0.06;
+
+  controls.object.position.set(
+    2.4 - orbit * 2.15,
+    3.2 + verticalBob,
+    17.7 + dolly * 1.65 - drift * 0.45,
+  );
+
+  lobbyCameraRig.position.copy(controls.object.position);
+  lobbyCameraRig.lookAt(lobbyCameraTarget);
+  controls.object.rotation.set(0, lobbyCameraRig.rotation.y, 0);
+  camera.rotation.x = lobbyCameraRig.rotation.x;
+}
+
+function setSceneMode(nextMode: SceneMode) {
+  if (sceneMode === nextMode) {
+    if (nextMode === 'lobby') {
+      applyLobbyCamera(0);
+    }
+    return;
+  }
+
+  sceneMode = nextMode;
+  resetMovementState();
+  isDraggingView = false;
+  lookingTouchId = null;
+  movingTouchId = null;
+
+  if (nextMode === 'lobby') {
+    if (isSitting) {
+      performStandAction();
+    } else {
+      currentSeatId = null;
+      nearSittingPosition = null;
+      nearCouch = null;
+      interactionPrompt.style.display = 'none';
+      closeButton.style.display = 'none';
+    }
+    if (hoveredObject) {
+      clearMeshHighlight(hoveredObject);
+      hoveredObject = null;
+    }
+    dropHeldObjectLocally();
+    renderer.domElement.style.cursor = 'auto';
+    if (mobileControlLayer) {
+      mobileControlLayer.style.display = 'none';
+    }
+    applyLobbyCamera(0);
+    return;
+  }
+
+  if (mobileControlLayer) {
+    mobileControlLayer.style.display = '';
+  }
+  renderer.domElement.style.cursor = isTouchDevice ? 'auto' : 'grab';
+}
+
+window.__musicspaceSetLobbyMode = (enabled) => {
+  setSceneMode(enabled ? 'lobby' : 'room');
+};
+
 // PICKUP interaction
 window.addEventListener('mousedown', (event) => {
+  if (sceneMode !== 'room') {
+    return;
+  }
+
   let actionTaken = false;
 
   if (heldObject && heldObjectId) {
@@ -2211,10 +2334,10 @@ window.addEventListener('mousedown', (event) => {
 });
 
 window.__musicspaceGetObjectState = () => ({
-  hoveredObjectId: (hoveredObject?.userData.objectId as string | undefined) ?? null,
-  heldObjectId,
+  hoveredObjectId: sceneMode === 'room' ? (hoveredObject?.userData.objectId as string | undefined) ?? null : null,
+  heldObjectId: sceneMode === 'room' ? heldObjectId : null,
 });
-window.__musicspaceOccupyObject = pickupObjectById;
+window.__musicspaceOccupyObject = (objectId: string) => sceneMode === 'room' ? pickupObjectById(objectId) : false;
 window.__musicspaceApplyObjectSnapshot = applyObjectSnapshot;
 
 // WASD movement + collision
@@ -2255,6 +2378,10 @@ document.addEventListener('focusin', (event) => {
      return;
    }
 
+   if (sceneMode !== 'room') {
+     return;
+   }
+
    // Handle sitting/standing with E and W keys
    if (e.code === 'KeyE' && nearSittingPosition && !isSitting) {
      requestSeatClaim();
@@ -2281,6 +2408,10 @@ if (e.code === 'KeyW' && isSitting) {
      return;
    }
 
+   if (sceneMode !== 'room') {
+     return;
+   }
+
    if (!isSitting) {
      if (e.code === 'KeyW') moveState.forward = false;
      if (e.code === 'KeyS') moveState.backward = false;
@@ -2297,6 +2428,8 @@ window.addEventListener('resize', () => {
 });
 
 // Main loop
+setSceneMode('lobby');
+
 function animate() {
   requestAnimationFrame(animate);
 // ——— get a single delta for this frame ———
@@ -2309,6 +2442,9 @@ if (heldObject) {
  heldObject.rotation.y += delta * spinSpeed;
 }
 updateObjectReleaseAnimations(performance.now());
+if (sceneMode === 'lobby') {
+  applyLobbyCamera(delta);
+}
 updateTvVisualizerAudioLevels(delta);
 if (tvVisualizerMaterial) {
   tvVisualizerMaterial.uniforms.uTime.value += delta;
@@ -2350,34 +2486,39 @@ if (tvVisualizerMaterial) {
   } */
 
   // Hover highlight detection - uses mouseForHover updated by pointermove
-  raycaster.setFromCamera(mouseForHover, camera);
-  const hoverHits = raycaster.intersectObjects<THREE.Mesh>(interactiveObjects, true);
+  if (sceneMode === 'room') {
+    raycaster.setFromCamera(mouseForHover, camera);
+    const hoverHits = raycaster.intersectObjects<THREE.Mesh>(interactiveObjects, true);
 
-  if (hoverHits.length > 0 && hoverHits[0].distance <= pickupDistance) {
-    const intersectedMesh = hoverHits[0].object as THREE.Mesh;
-    // Ensure we are highlighting a mesh that is part of a pickable GLB root
-    if (intersectedMesh.userData.pickableGLBRoot) {
-      const pickablePart = intersectedMesh; // The mesh itself is what gets the emissive color
-      const hoveredObjectId = pickablePart.userData.objectId as string | undefined;
-      if (hoveredObjectId === heldObjectId) {
-        if (hoveredObject) {
-          clearMeshHighlight(hoveredObject);
-          hoveredObject = null;
+    if (hoverHits.length > 0 && hoverHits[0].distance <= pickupDistance) {
+      const intersectedMesh = hoverHits[0].object as THREE.Mesh;
+      // Ensure we are highlighting a mesh that is part of a pickable GLB root
+      if (intersectedMesh.userData.pickableGLBRoot) {
+        const pickablePart = intersectedMesh; // The mesh itself is what gets the emissive color
+        const hoveredObjectId = pickablePart.userData.objectId as string | undefined;
+        if (hoveredObjectId === heldObjectId) {
+          if (hoveredObject) {
+            clearMeshHighlight(hoveredObject);
+            hoveredObject = null;
+          }
+        } else if (pickablePart !== hoveredObject) {
+          if (hoveredObject) {
+            clearMeshHighlight(hoveredObject);
+          }
+          hoveredObject = pickablePart;
+          const mat = hoveredObject.material as THREE.MeshStandardMaterial;
+          mat.emissive = new THREE.Color(0x00ff00); // Highlight current
+          mat.emissiveIntensity = 0.5;
         }
-      } else if (pickablePart !== hoveredObject) {
-        if (hoveredObject) {
-          clearMeshHighlight(hoveredObject);
-        }
-        hoveredObject = pickablePart;
-        const mat = hoveredObject.material as THREE.MeshStandardMaterial;
-        mat.emissive = new THREE.Color(0x00ff00); // Highlight current
-        mat.emissiveIntensity = 0.5;
+      } else if (hoveredObject) { // If hovering over something not pickable, or too far
+        clearMeshHighlight(hoveredObject);
+        hoveredObject = null;
       }
-    } else if (hoveredObject) { // If hovering over something not pickable, or too far
+    } else if (hoveredObject) { // No hits or hit is too far
       clearMeshHighlight(hoveredObject);
       hoveredObject = null;
     }
-  } else if (hoveredObject) { // No hits or hit is too far
+  } else if (hoveredObject) {
     clearMeshHighlight(hoveredObject);
     hoveredObject = null;
   }
@@ -2399,7 +2540,7 @@ if (tvVisualizerMaterial) {
   }
 
   // Movement & collision
-  if (collidableMeshList.length > 0 && !isSitting) {
+  if (sceneMode === 'room' && collidableMeshList.length > 0 && !isSitting) {
     //const delta = clock.getDelta();
     velocity.x -= velocity.x * 10.0 * delta;
     velocity.z -= velocity.z * 10.0 * delta;
@@ -2471,6 +2612,10 @@ if (tvVisualizerMaterial) {
         interactionPrompt.style.display = 'none';
       }
     }
+  } else if (sceneMode !== 'room') {
+    nearSittingPosition = null;
+    nearCouch = null;
+    interactionPrompt.style.display = 'none';
   }
 
   // Update debug display
@@ -2491,11 +2636,3 @@ animate();
 //updateNowPlaying();
 //setInterval(updateNowPlaying, 30000);
 } // End of initializeApp function
-
-
-
-
-
-
-
-

@@ -11,6 +11,7 @@
 - Add sort/filter/share actions to the room browser.
 - Add analytics and operational logging for production debugging.
 - Reduce bundle size from the frontend Amplify room-browser path.
+- Add a non-interactive cinematic lobby camera before room entry.
 
 ## Next
 

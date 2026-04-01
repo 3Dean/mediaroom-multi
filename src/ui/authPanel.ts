@@ -26,17 +26,18 @@ export class AuthPanel {
     this.options = options;
     this.container = document.createElement('div');
     this.container.id = 'auth-panel';
-    this.container.className = 'musicspace-panel';
+    this.container.className = 'musicspace-panel musicspace-panel--secondary';
+
+    const header = document.createElement('div');
+    header.className = 'panel-header';
 
     const title = document.createElement('div');
+    title.className = 'panel-title';
     title.textContent = 'Account';
-    title.style.color = '#fff';
-    title.style.fontWeight = '700';
-    title.style.fontSize = '14px';
 
     this.statusLabel = document.createElement('div');
-    this.statusLabel.className = 'auth-status';
-    this.statusLabel.textContent = 'Sign in to claim room ownership and use admin controls.';
+    this.statusLabel.className = 'panel-status auth-status';
+    this.statusLabel.textContent = 'Sign in for ownership and moderation access.';
 
     this.loggedOutView = document.createElement('div');
     this.loggedOutView.className = 'auth-form';
@@ -98,8 +99,8 @@ export class AuthPanel {
     });
 
     this.loggedInView.append(this.accountLabel, this.signOutButton);
-
-    this.container.append(title, this.statusLabel, this.loggedOutView, this.loggedInView);
+    header.append(title, this.statusLabel);
+    this.container.append(header, this.loggedOutView, this.loggedInView);
     this.setUser(options.initialLoginId ?? null);
   }
 
@@ -113,10 +114,10 @@ export class AuthPanel {
     this.loggedInView.style.display = signedIn ? 'grid' : 'none';
     this.accountLabel.textContent = loginId ? `Signed in as ${loginId}` : '';
     if (signedIn) {
-      this.setStatus('Authenticated. Re-enter a room if you were previously connected as a guest.');
+      this.setStatus('Signed in. Re-enter only if you joined earlier as a guest.');
       this.resetConfirmationState();
     } else {
-      this.setStatus('Sign in to claim room ownership and use admin controls.');
+      this.setStatus('Sign in for ownership and moderation access.');
     }
   }
 

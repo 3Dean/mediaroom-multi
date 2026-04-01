@@ -54,16 +54,14 @@ export class PreferencesPanel {
     this.onReset = options.onReset;
     this.container = document.createElement('div');
     this.container.id = 'preferences-panel';
-    this.container.className = 'musicspace-panel';
+    this.container.className = 'musicspace-panel musicspace-panel--utility';
 
     const header = document.createElement('div');
-    header.className = 'preferences-header';
+    header.className = 'preferences-header panel-header';
 
     const title = document.createElement('div');
+    title.className = 'panel-title';
     title.textContent = 'Preferences';
-    title.style.color = '#fff';
-    title.style.fontWeight = '700';
-    title.style.fontSize = '14px';
 
     this.toggleButton = document.createElement('button');
     this.toggleButton.type = 'button';
@@ -102,7 +100,7 @@ export class PreferencesPanel {
 
     const avatarNote = document.createElement('div');
     avatarNote.className = 'preferences-note';
-    avatarNote.textContent = 'Save your avatar preset, then re-enter the room so other users can see the change.';
+    avatarNote.textContent = 'Re-enter the room after changing avatars so others see it.';
 
     const actions = document.createElement('div');
     actions.className = 'preferences-actions';
@@ -121,7 +119,7 @@ export class PreferencesPanel {
 
     this.noteLabel = document.createElement('div');
     this.noteLabel.className = 'preferences-note';
-    this.noteLabel.textContent = 'Local-only for now. Leave default name or room blank to keep using the live join form values.';
+    this.noteLabel.textContent = 'Saved locally. Leave fields blank to keep using the live join form.';
 
     this.volumeInput.addEventListener('input', () => {
       this.volumeValue.textContent = `${Math.round(Number(this.volumeInput.value) * 100)}%`;

@@ -198,6 +198,7 @@ export function bootstrapApp(): void {
           pendingObjectId = null;
           appliedObjectId = null;
           window.__musicspaceReleaseSeat?.();
+          (window as any).__musicspaceSetLobbyMode?.(true);
         },
         onError: () => {
           roomPanel.setStatus(`Realtime connection failed for ${roomSlug}. Make sure the ws server is running.`);
@@ -305,6 +306,7 @@ export function bootstrapApp(): void {
         roomPanel.setMeta('Idle');
         void refreshRooms();
         roomPanel.setStatus('Signed out. Enter a room after signing in to claim ownership and use admin controls.');
+        (window as any).__musicspaceSetLobbyMode?.(true);
       },
     });
 
@@ -510,6 +512,7 @@ function applyInitialSpawnTransform(message: ServerMessage): void {
     document.activeElement.blur();
   }
 
+  (window as any).__musicspaceSetLobbyMode?.(false);
   window.__musicspaceApplyLocalPlayerTransform?.(selfParticipant.transform);
   window.renderer?.domElement?.focus();
 }

@@ -81,14 +81,19 @@ export class RoomPanel {
     this.hasUrlRoom = !!options.initialRoomSlug?.trim();
     this.container = document.createElement('div');
     this.container.id = 'room-panel';
-    this.container.className = 'musicspace-panel';
+    this.container.className = 'musicspace-panel musicspace-panel--primary';
+
+    const header = document.createElement('div');
+    header.className = 'panel-header panel-header--stacked';
 
     const title = document.createElement('div');
+    title.className = 'panel-title panel-title--large';
     title.textContent = 'Room Session';
-    title.style.color = '#fff';
-    title.style.fontWeight = '700';
-    title.style.fontSize = '14px';
-    title.style.marginBottom = '4px';
+
+    const intro = document.createElement('div');
+    intro.className = 'panel-status';
+    intro.textContent = 'Join a room from a link or pick one from the browser.';
+    header.append(title, intro);
 
     const formSection = document.createElement('div');
     formSection.className = 'room-section';
@@ -102,7 +107,7 @@ export class RoomPanel {
 
     const formHint = document.createElement('div');
     formHint.className = 'room-section-hint';
-    formHint.textContent = 'Use the room link to create a room or reconnect to one.';
+    formHint.textContent = 'A new link creates a room. An existing link reconnects to one.';
 
     formHeader.append(formTitle, formHint);
 
@@ -133,7 +138,7 @@ export class RoomPanel {
 
     const helper = document.createElement('div');
     helper.className = 'room-join-helper';
-    helper.textContent = 'Saved rooms appear in the browser list after they are created.';
+    helper.textContent = 'Browse Rooms is available after sign-in.';
 
     this.statusLabel = document.createElement('div');
     this.statusLabel.style.color = '#c8c8c8';
@@ -200,7 +205,10 @@ export class RoomPanel {
     });
 
     formSection.append(formHeader, this.form);
-    this.container.append(title, formSection, listSection, this.statusLabel, this.metaLabel);
+    this.statusLabel.className = 'panel-status room-status';
+    this.metaLabel.className = 'panel-meta room-meta';
+
+    this.container.append(header, formSection, listSection, this.statusLabel, this.metaLabel);
   }
 
   mount(parent: HTMLElement = document.body): void {
