@@ -454,3 +454,96 @@ body.mouse #mobile-controls-layer {
   }
 }
 
+.participant-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.participant-role-badge,
+.participant-inline-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #d9f1ff;
+  background: rgba(94, 168, 255, 0.16);
+  border: 1px solid rgba(94, 168, 255, 0.24);
+}
+
+.participant-inline-badge.is-muted {
+  color: #ffd7c2;
+  background: rgba(214, 105, 42, 0.18);
+  border-color: rgba(214, 105, 42, 0.3);
+}
+
+.participant-lock-button {
+  justify-content: center;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.participant-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.participant-row-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.participant-name-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.participant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.participant-actions button {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.auth-status {
+  color: #c8c8c8;
+  font-size: 12px;
+}
+
+.auth-form,
+.auth-signed-in {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.auth-actions button,
+.auth-signed-in button {
+  width: 100%;
+}
+
+.auth-account {
+  color: #fff;
+  font-size: 12px;
+}

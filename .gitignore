@@ -35,3 +35,7 @@ archive
 .amplify
 amplify_outputs*
 amplifyconfiguration*
+!amplify_outputs.json
+server/data/
+.tmp-*
+

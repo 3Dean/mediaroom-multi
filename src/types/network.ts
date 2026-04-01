@@ -1,6 +1,7 @@
 import type { ChatMessage } from './chat';
 import type { InteractableObjectState, SeatState } from './interactions';
 import type { ObjectTransform, PlayerPresence, PlayerTransform } from './player';
+import type { RoomAuthority, RoomRole } from './room';
 
 export type RoomJoinMessage = {
   type: 'room.join';
@@ -70,6 +71,36 @@ export type PingMessage = {
   ts: number;
 };
 
+export type AdminKickMessage = {
+  type: 'admin.kick';
+  roomId: string;
+  sessionId: string;
+  targetSessionId: string;
+};
+
+export type AdminSetRoleMessage = {
+  type: 'admin.setRole';
+  roomId: string;
+  sessionId: string;
+  targetUserId: string;
+  role: 'admin' | 'member';
+};
+
+export type AdminSetMuteMessage = {
+  type: 'admin.setMute';
+  roomId: string;
+  sessionId: string;
+  targetUserId: string;
+  muted: boolean;
+};
+
+export type AdminSetRoomLockMessage = {
+  type: 'admin.setRoomLock';
+  roomId: string;
+  sessionId: string;
+  locked: boolean;
+};
+
 export type ClientMessage =
   | RoomJoinMessage
   | RoomLeaveMessage
@@ -79,6 +110,10 @@ export type ClientMessage =
   | SeatReleaseMessage
   | ObjectClaimMessage
   | ObjectReleaseMessage
+  | AdminKickMessage
+  | AdminSetRoleMessage
+  | AdminSetMuteMessage
+  | AdminSetRoomLockMessage
   | PingMessage;
 
 export type RoomJoinedMessage = {
@@ -88,6 +123,8 @@ export type RoomJoinedMessage = {
   participants: PlayerPresence[];
   seats: SeatState[];
   objects: InteractableObjectState[];
+  authority: RoomAuthority;
+  selfRole: RoomRole;
   recentMessages: ChatMessage[];
   serverTime: number;
 };
@@ -122,6 +159,17 @@ export type ObjectUpdatedMessage = {
   object: InteractableObjectState;
 };
 
+export type RoomAuthorityUpdatedMessage = {
+  type: 'room.authority.updated';
+  authority: RoomAuthority;
+  selfRole?: RoomRole;
+};
+
+export type SystemNoticeMessage = {
+  type: 'system.notice';
+  notice: ChatMessage;
+};
+
 export type ErrorMessage = {
   type: 'error';
   code: string;
@@ -141,5 +189,7 @@ export type ServerMessage =
   | ChatReceivedMessage
   | SeatUpdatedMessage
   | ObjectUpdatedMessage
+  | RoomAuthorityUpdatedMessage
+  | SystemNoticeMessage
   | ErrorMessage
   | PongMessage;

@@ -13,12 +13,23 @@ export type RoomSummary = {
   updatedAt?: string;
 };
 
+export type RoomRole = 'owner' | 'admin' | 'member';
+
+export type RoomAuthority = {
+  ownerUserId: string | null;
+  adminUserIds: string[];
+  mutedUserIds: string[];
+  isLocked: boolean;
+};
+
 export type RoomSnapshot = {
   roomId: string;
   selfSessionId: string;
   participants: PlayerPresence[];
   seats: SeatState[];
   objects: InteractableObjectState[];
+  authority: RoomAuthority;
+  selfRole: RoomRole;
   recentMessages: ChatMessage[];
   serverTime: number;
 };
@@ -29,5 +40,7 @@ export type RoomState = {
   participants: Record<string, PlayerPresence>;
   seats: Record<string, SeatState>;
   objects: Record<string, InteractableObjectState>;
+  authority: RoomAuthority;
+  selfRole: RoomRole | null;
   messages: ChatMessage[];
 };
