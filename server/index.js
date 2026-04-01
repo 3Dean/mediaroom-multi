@@ -139,7 +139,7 @@ function logServerStart() {
   console.log(`[realtime] spawnPoints=${SPAWN_POINTS.length}`);
   console.log(`[realtime] maxRoomSize=${MAX_ROOM_SIZE} maxChatLength=${MAX_CHAT_LENGTH} chatRate=${CHAT_MAX_MESSAGES}/${CHAT_WINDOW_MS}ms`);
   console.log(`[realtime] allowedOrigins=${ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS.join(',')}`);
-  console.log(`[realtime] authorityStore=${AUTHORITY_STORE_PATH}`);
+  console.log(`[realtime] authorityPersistence=${canUseBackendPersistence() ? 'backend+fallback' : 'fallback-only'}`);
   console.log(`[realtime] cognitoIssuer=${COGNITO_ISSUER || 'disabled'}`);
 }
 
@@ -1086,6 +1086,7 @@ function deriveCognitoIssuer(userPoolId) {
   const [region] = userPoolId.split('_');
   return `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
 }
+
 
 
 
