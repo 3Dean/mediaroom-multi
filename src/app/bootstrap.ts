@@ -9,7 +9,6 @@ import {
   signOutCurrentUser,
   signUpWithEmail,
 } from '../backend/authClient';
-import { listRooms } from '../backend/dataClient';
 import { RemotePlayerManager } from '../player/remotePlayerManager';
 import { RoomClient } from '../room/roomClient';
 import { applyServerMessage } from '../room/roomPresence';
@@ -119,6 +118,7 @@ export function bootstrapApp(): void {
 
       roomPanel.setRoomListLoading();
       try {
+        const { listRooms } = await import('../backend/dataClient');
         knownRooms = await listRooms();
         roomPanel.setRooms(knownRooms, activeRoomSlug);
       } catch (error) {

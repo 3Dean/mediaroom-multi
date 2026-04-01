@@ -23,6 +23,8 @@ type RoomPanelOptions = {
   initialDisplayName?: string;
 };
 
+type RoomSortMode = 'recent' | 'name';
+
 function resolveDisplayName(input: HTMLInputElement): string {
   return input.value.trim() || 'Guest';
 }
@@ -65,9 +67,13 @@ export class RoomPanel {
   private readonly metaLabel: HTMLDivElement;
   private readonly roomListStatus: HTMLDivElement;
   private readonly roomList: HTMLDivElement;
+  private readonly roomFilterInput: HTMLInputElement;
+  private readonly roomSortSelect: HTMLSelectElement;
   private readonly onJoin: (values: RoomPanelValues) => void;
   private readonly generatedRoomSlug: string;
   private readonly hasUrlRoom: boolean;
+  private rooms: RoomSummary[] = [];
+  private activeRoomSlug: string | null = null;
 
   constructor(onJoin: (values: RoomPanelValues) => void, options: RoomPanelOptions = {}) {
     this.onJoin = onJoin;
@@ -153,11 +159,32 @@ export class RoomPanel {
     this.roomListStatus.className = 'room-section-hint room-browser-status';
     this.roomListStatus.textContent = 'Sign in to load persisted rooms.';
 
+    const listControls = document.createElement('div');
+    listControls.className = 'room-browser-controls';
+
+    this.roomFilterInput = document.createElement('input');
+    this.roomFilterInput.type = 'text';
+    this.roomFilterInput.className = 'room-browser-filter';
+    this.roomFilterInput.placeholder = 'Filter rooms';
+    this.roomFilterInput.addEventListener('input', () => this.renderRooms());
+
+    this.roomSortSelect = document.createElement('select');
+    this.roomSortSelect.className = 'room-browser-sort';
+    const recentOption = document.createElement('option');
+    recentOption.value = 'recent';
+    recentOption.textContent = 'Recent';
+    const nameOption = document.createElement('option');
+    nameOption.value = 'name';
+    nameOption.textContent = 'Name';
+    this.roomSortSelect.append(recentOption, nameOption);
+    this.roomSortSelect.addEventListener('change', () => this.renderRooms());
+
     this.roomList = document.createElement('div');
     this.roomList.className = 'room-browser-list';
 
     listHeader.append(listTitle, this.roomListStatus);
-    listSection.append(listHeader, this.roomList);
+    listControls.append(this.roomFilterInput, this.roomSortSelect);
+    listSection.append(listHeader, listControls, this.roomList);
 
     this.form.append(
       roomSlugLabel,
@@ -205,34 +232,63 @@ export class RoomPanel {
   }
 
   setRoomListLoading(message = 'Loading rooms...'): void {
+    this.rooms = [];
     this.roomListStatus.textContent = message;
+    this.roomFilterInput.value = '';
     this.roomList.replaceChildren();
   }
 
   setRoomListSignedOut(message = 'Sign in to load persisted rooms.'): void {
+    this.rooms = [];
     this.roomListStatus.textContent = message;
+    this.roomFilterInput.value = '';
     this.roomList.replaceChildren();
   }
 
   setRoomListError(message = 'Unable to load rooms right now.'): void {
+    this.rooms = [];
     this.roomListStatus.textContent = message;
+    this.roomFilterInput.value = '';
     this.roomList.replaceChildren();
   }
 
   setRooms(rooms: RoomSummary[], activeRoomSlug?: string | null): void {
+    this.rooms = [...rooms];
+    this.activeRoomSlug = activeRoomSlug ?? null;
+    this.renderRooms();
+  }
+
+  private renderRooms(): void {
     this.roomList.replaceChildren();
 
-    if (rooms.length === 0) {
+    if (this.rooms.length === 0) {
       this.roomListStatus.textContent = 'No persisted rooms yet.';
       return;
     }
 
-    this.roomListStatus.textContent = `${rooms.length} room${rooms.length === 1 ? '' : 's'} available`;
-    const rows = rooms.slice(0, 8).map((room) => {
+    const query = this.roomFilterInput.value.trim().toLowerCase();
+    const sortMode = this.roomSortSelect.value === 'name' ? 'name' : 'recent';
+    const filteredRooms = this.rooms
+      .filter((room) => {
+        if (!query) {
+          return true;
+        }
+
+        return room.name.toLowerCase().includes(query) || room.slug.toLowerCase().includes(query);
+      })
+      .sort((left, right) => compareRooms(left, right, sortMode));
+
+    if (filteredRooms.length === 0) {
+      this.roomListStatus.textContent = `No rooms match "${this.roomFilterInput.value.trim()}".`;
+      return;
+    }
+
+    this.roomListStatus.textContent = `${filteredRooms.length} room${filteredRooms.length === 1 ? '' : 's'} available`;
+    const rows = filteredRooms.slice(0, 12).map((room) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'room-browser-item';
-      if (activeRoomSlug && room.slug === activeRoomSlug) {
+      if (this.activeRoomSlug && room.slug === this.activeRoomSlug) {
         button.dataset.active = 'true';
       }
 
@@ -270,7 +326,24 @@ export class RoomPanel {
       meta.className = 'room-browser-item-meta';
       meta.textContent = formatRoomTimestamp(room);
 
-      button.append(title, badges, slug, meta);
+      const actions = document.createElement('div');
+      actions.className = 'room-browser-actions';
+
+      const joinAction = document.createElement('span');
+      joinAction.className = 'room-browser-action-link';
+      joinAction.textContent = 'Join';
+
+      const shareButton = document.createElement('button');
+      shareButton.type = 'button';
+      shareButton.className = 'room-browser-share-button';
+      shareButton.textContent = 'Copy link';
+      shareButton.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        await copyRoomLink(room.slug, shareButton);
+      });
+
+      actions.append(joinAction, shareButton);
+      button.append(title, badges, slug, meta, actions);
       button.addEventListener('click', () => {
         this.roomInput.value = room.slug;
         this.submitRoomJoin(room.slug);
@@ -291,4 +364,52 @@ export class RoomPanel {
     localStorage.setItem(STORAGE_KEYS.displayName, values.displayName);
     this.onJoin(values);
   }
+}
+
+function compareRooms(left: RoomSummary, right: RoomSummary, sortMode: RoomSortMode): number {
+  if (sortMode === 'name') {
+    return left.name.localeCompare(right.name) || left.slug.localeCompare(right.slug);
+  }
+
+  const leftTime = Date.parse(left.updatedAt ?? left.createdAt ?? '') || 0;
+  const rightTime = Date.parse(right.updatedAt ?? right.createdAt ?? '') || 0;
+  return rightTime - leftTime || left.name.localeCompare(right.name);
+}
+
+async function copyRoomLink(roomSlug: string, trigger: HTMLButtonElement): Promise<void> {
+  const url = new URL(window.location.href);
+  url.searchParams.set('room', roomSlug);
+
+  const fallbackCopy = () => {
+    const input = document.createElement('input');
+    input.value = url.toString();
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    input.remove();
+  };
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url.toString());
+    } else {
+      fallbackCopy();
+    }
+    flashShareButton(trigger, 'Copied');
+  } catch {
+    try {
+      fallbackCopy();
+      flashShareButton(trigger, 'Copied');
+    } catch {
+      flashShareButton(trigger, 'Failed');
+    }
+  }
+}
+
+function flashShareButton(button: HTMLButtonElement, label: string): void {
+  const previousLabel = button.textContent;
+  button.textContent = label;
+  window.setTimeout(() => {
+    button.textContent = previousLabel;
+  }, 1200);
 }

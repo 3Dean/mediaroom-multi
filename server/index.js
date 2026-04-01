@@ -17,6 +17,7 @@ const MAX_DISPLAY_NAME_LENGTH = Number(process.env.REALTIME_MAX_DISPLAY_NAME_LEN
 const MAX_ROOM_ID_LENGTH = Number(process.env.REALTIME_MAX_ROOM_ID_LENGTH ?? 64);
 const MAX_OBJECT_ID_LENGTH = Number(process.env.REALTIME_MAX_OBJECT_ID_LENGTH ?? 64);
 const MAX_SEAT_ID_LENGTH = Number(process.env.REALTIME_MAX_SEAT_ID_LENGTH ?? 64);
+const LOG_LEVEL = normalizeLogLevel(process.env.REALTIME_LOG_LEVEL);
 const DEFAULT_EYE_HEIGHT = 1.6;
 const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.REALTIME_ALLOWED_ORIGINS ?? process.env.RENDER_EXTERNAL_URL ?? '');
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -134,13 +135,19 @@ if (HOST) {
 }
 
 function logServerStart() {
-  console.log(`[realtime] listening on port ${PORT}${HOST ? ` host=${HOST}` : ''}`);
-  console.log(`[realtime] servingDist=${HAS_DIST}`);
-  console.log(`[realtime] spawnPoints=${SPAWN_POINTS.length}`);
-  console.log(`[realtime] maxRoomSize=${MAX_ROOM_SIZE} maxChatLength=${MAX_CHAT_LENGTH} chatRate=${CHAT_MAX_MESSAGES}/${CHAT_WINDOW_MS}ms`);
-  console.log(`[realtime] allowedOrigins=${ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS.join(',')}`);
-  console.log(`[realtime] authorityPersistence=${canUseBackendPersistence() ? 'backend+fallback' : 'fallback-only'}`);
-  console.log(`[realtime] cognitoIssuer=${COGNITO_ISSUER || 'disabled'}`);
+  logEvent('info', 'server.start', {
+    port: PORT,
+    host: HOST,
+    servingDist: HAS_DIST,
+    spawnPoints: SPAWN_POINTS.length,
+    maxRoomSize: MAX_ROOM_SIZE,
+    maxChatLength: MAX_CHAT_LENGTH,
+    chatRate: `${CHAT_MAX_MESSAGES}/${CHAT_WINDOW_MS}ms`,
+    allowedOrigins: ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS,
+    authorityPersistence: canUseBackendPersistence() ? 'backend+fallback' : 'fallback-only',
+    cognitoIssuer: COGNITO_ISSUER || 'disabled',
+    logLevel: LOG_LEVEL,
+  });
 }
 
 async function handleClientMessage(socket, message) {
@@ -200,12 +207,22 @@ async function handleRoomJoin(socket, message) {
   const avatarStyle = normalizeToken(message.avatarStyle ?? '', 64);
 
   if (!roomId || !sessionId || !displayName) {
+    logEvent('warn', 'room.join.invalid', {
+      roomId,
+      sessionId,
+      hasDisplayName: Boolean(displayName),
+    });
     send(socket, { type: 'error', code: 'invalid_join', message: 'roomId, sessionId, and displayName are required.' });
     return;
   }
 
   const authResult = await verifyAuthToken(message.token);
   if (message.token && !authResult.ok) {
+    logEvent('warn', 'room.join.invalid_auth', {
+      roomId,
+      sessionId,
+      reason: authResult.message,
+    });
     send(socket, { type: 'error', code: 'invalid_auth', message: authResult.message });
     return;
   }
@@ -213,6 +230,13 @@ async function handleRoomJoin(socket, message) {
   const userId = authResult.userId ?? `guest:${sessionId}`;
   const participants = ensureRoomParticipants(roomId);
   if (!participants.has(sessionId) && participants.size >= MAX_ROOM_SIZE) {
+    logEvent('warn', 'room.join.full', {
+      roomId,
+      sessionId,
+      userId,
+      participantCount: participants.size,
+      maxRoomSize: MAX_ROOM_SIZE,
+    });
     send(socket, { type: 'error', code: 'room_full', message: `Room ${roomId} is full.` });
     return;
   }
@@ -227,6 +251,12 @@ async function handleRoomJoin(socket, message) {
 
   const selfRole = resolveRole(userId, authority);
   if (authority.isLocked && selfRole === 'member') {
+    logEvent('warn', 'room.join.locked', {
+      roomId,
+      sessionId,
+      userId,
+      selfRole,
+    });
     send(socket, { type: 'error', code: 'room_locked', message: `Room ${roomId} is locked.` });
     return;
   }
@@ -254,6 +284,17 @@ async function handleRoomJoin(socket, message) {
   socket.userId = userId;
   participants.set(sessionId, participant);
   sockets.set(sessionId, socket);
+  logEvent('info', 'room.join.success', {
+    roomId,
+    sessionId,
+    userId,
+    displayName,
+    selfRole,
+    isAuthenticated: Boolean(authResult.userId),
+    participantCount: participants.size,
+    ownerUserId: authority.ownerUserId,
+    isLocked: authority.isLocked,
+  });
 
   send(socket, {
     type: 'room.joined',
@@ -322,11 +363,20 @@ function handleChatSend(socket, message) {
 
   const body = typeof message.body === 'string' ? message.body.trim() : '';
   if (!body || body.length > MAX_CHAT_LENGTH) {
+    logEvent('warn', 'chat.invalid', {
+      roomId,
+      sessionId,
+      length: body.length,
+    });
     send(socket, { type: 'error', code: 'invalid_chat', message: `Chat messages must be 1-${MAX_CHAT_LENGTH} characters.` });
     return;
   }
 
   if (!checkChatRateLimit(sessionId)) {
+    logEvent('warn', 'chat.rate_limited', {
+      roomId,
+      sessionId,
+    });
     send(socket, { type: 'error', code: 'chat_rate_limited', message: 'You are sending messages too quickly.' });
     return;
   }
@@ -337,6 +387,11 @@ function handleChatSend(socket, message) {
 
   const authority = ensureRoomAuthority(roomId);
   if (authority.mutedUserIds.includes(participant.userId)) {
+    logEvent('warn', 'chat.muted', {
+      roomId,
+      sessionId,
+      userId: participant.userId,
+    });
     send(socket, { type: 'error', code: 'user_muted', message: 'You are muted in this room.' });
     return;
   }
@@ -353,6 +408,13 @@ function handleChatSend(socket, message) {
   const messages = roomMessages.get(roomId) ?? [];
   messages.push(chatMessage);
   roomMessages.set(roomId, messages.slice(-50));
+  logEvent('debug', 'chat.sent', {
+    roomId,
+    sessionId,
+    userId: participant.userId,
+    messageId: chatMessage.id,
+    length: body.length,
+  });
   broadcast(roomId, { type: 'chat.received', message: chatMessage });
 }
 
@@ -494,6 +556,12 @@ function handleAdminKick(socket, message) {
 
   const authorization = authorizeModerator(roomId, actor.userId, target.userId, { ownerOnly: false });
   if (!authorization.ok) {
+    logEvent('warn', 'moderation.kick.denied', {
+      roomId,
+      actorUserId: actor.userId,
+      targetUserId: target.userId,
+      reason: authorization.message,
+    });
     send(socket, { type: 'error', code: 'forbidden', message: authorization.message });
     return;
   }
@@ -505,6 +573,13 @@ function handleAdminKick(socket, message) {
 
   send(targetSocket, { type: 'error', code: 'kicked', message: `You were removed from ${roomId}.` });
   targetSocket.close(4001, 'room_kicked');
+  logEvent('info', 'moderation.kick', {
+    roomId,
+    actorUserId: actor.userId,
+    actorDisplayName: actor.displayName,
+    targetUserId: target.userId,
+    targetDisplayName: target.displayName,
+  });
   pushSystemNotice(roomId, `${target.displayName} was removed by ${actor.displayName}.`);
 }
 
@@ -524,6 +599,13 @@ async function handleAdminSetRole(socket, message) {
 
   const authorization = authorizeModerator(roomId, actor.userId, targetUserId, { ownerOnly: true });
   if (!authorization.ok) {
+    logEvent('warn', 'moderation.role.denied', {
+      roomId,
+      actorUserId: actor.userId,
+      targetUserId,
+      role,
+      reason: authorization.message,
+    });
     send(socket, { type: 'error', code: 'forbidden', message: authorization.message });
     return;
   }
@@ -542,6 +624,14 @@ async function handleAdminSetRole(socket, message) {
   }
   authority.adminUserIds = Array.from(nextAdmins);
   await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
+  logEvent('info', 'moderation.role.updated', {
+    roomId,
+    actorUserId: actor.userId,
+    actorDisplayName: actor.displayName,
+    targetUserId,
+    role,
+    adminCount: authority.adminUserIds.length,
+  });
   broadcastAuthorityUpdate(roomId);
   pushSystemNotice(roomId, `${actor.displayName} ${role === 'admin' ? 'granted' : 'removed'} admin access.`);
 }
@@ -561,6 +651,13 @@ async function handleAdminSetMute(socket, message) {
 
   const authorization = authorizeModerator(roomId, actor.userId, targetUserId, { ownerOnly: false });
   if (!authorization.ok) {
+    logEvent('warn', 'moderation.mute.denied', {
+      roomId,
+      actorUserId: actor.userId,
+      targetUserId,
+      muted: message.muted,
+      reason: authorization.message,
+    });
     send(socket, { type: 'error', code: 'forbidden', message: authorization.message });
     return;
   }
@@ -574,6 +671,14 @@ async function handleAdminSetMute(socket, message) {
   }
   authority.mutedUserIds = Array.from(nextMuted);
   await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
+  logEvent('info', 'moderation.mute.updated', {
+    roomId,
+    actorUserId: actor.userId,
+    actorDisplayName: actor.displayName,
+    targetUserId,
+    muted: message.muted,
+    mutedCount: authority.mutedUserIds.length,
+  });
   broadcastAuthorityUpdate(roomId);
 
   const affectedParticipant = Array.from(roomParticipants.get(roomId)?.values() ?? []).find((participant) => participant.userId === targetUserId);
@@ -596,6 +701,12 @@ async function handleAdminSetRoomLock(socket, message) {
 
   const authorization = authorizeModerator(roomId, actor.userId, actor.userId, { ownerOnly: true });
   if (!authorization.ok) {
+    logEvent('warn', 'moderation.lock.denied', {
+      roomId,
+      actorUserId: actor.userId,
+      locked: message.locked,
+      reason: authorization.message,
+    });
     send(socket, { type: 'error', code: 'forbidden', message: authorization.message });
     return;
   }
@@ -603,6 +714,12 @@ async function handleAdminSetRoomLock(socket, message) {
   const authority = ensureRoomAuthority(roomId);
   authority.isLocked = message.locked;
   await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
+  logEvent('info', 'moderation.lock.updated', {
+    roomId,
+    actorUserId: actor.userId,
+    actorDisplayName: actor.displayName,
+    locked: message.locked,
+  });
   broadcastAuthorityUpdate(roomId);
   pushSystemNotice(roomId, `${actor.displayName} ${message.locked ? 'locked' : 'unlocked'} the room.`);
 }
@@ -628,6 +745,7 @@ function cleanupSocket(socket, roomId = socket.roomId, sessionId = socket.sessio
   }
 
   participants?.delete(sessionId);
+  const remainingParticipants = participants?.size ?? 0;
   if (participants && participants.size === 0) roomParticipants.delete(roomId);
   const sockets = roomSockets.get(roomId);
   sockets?.delete(sessionId);
@@ -635,6 +753,13 @@ function cleanupSocket(socket, roomId = socket.roomId, sessionId = socket.sessio
   chatRateLimits.delete(sessionId);
   broadcast(roomId, { type: 'participant.left', sessionId }, sessionId);
   broadcastAuthorityUpdate(roomId);
+  logEvent('info', 'room.leave', {
+    roomId,
+    sessionId,
+    userId: socket.userId ?? null,
+    displayName: participant?.displayName ?? null,
+    remainingParticipants,
+  });
 }
 
 function ensureRoomParticipants(roomId) {
@@ -690,6 +815,10 @@ async function hydrateRoomAuthority(roomId) {
       return persisted;
     }
   } catch (error) {
+    logEvent('error', 'authority.hydrate.failed', {
+      roomId,
+      error: formatErrorForLog(error),
+    });
     console.error('[realtime] failed to hydrate room authority from backend', error);
   }
 
@@ -708,6 +837,10 @@ async function persistRoomAuthority(roomId, options = {}) {
       return persisted;
     }
   } catch (error) {
+    logEvent('error', 'authority.persist.failed', {
+      roomId,
+      error: formatErrorForLog(error),
+    });
     console.error('[realtime] failed to persist room authority to backend', error);
   }
 
@@ -1048,9 +1181,63 @@ async function verifyAuthToken(token) {
 
     return { ok: true, userId: payload.sub, claims: payload };
   } catch (error) {
+    logEvent('error', 'auth.verify.failed', {
+      error: formatErrorForLog(error),
+    });
     console.error('[realtime] auth verification failed', error);
     return { ok: false, message: 'Unable to verify auth token.' };
   }
+}
+
+function normalizeLogLevel(value) {
+  if (value === 'debug' || value === 'info' || value === 'warn' || value === 'error') {
+    return value;
+  }
+
+  return 'info';
+}
+
+function shouldLog(level) {
+  const priority = { debug: 10, info: 20, warn: 30, error: 40 };
+  return priority[level] >= priority[LOG_LEVEL];
+}
+
+function logEvent(level, event, details = {}) {
+  if (!shouldLog(level)) {
+    return;
+  }
+
+  const payload = {
+    ts: new Date().toISOString(),
+    level,
+    event,
+    ...details,
+  };
+  const line = `[realtime] ${JSON.stringify(payload)}`;
+
+  if (level === 'error') {
+    console.error(line);
+    return;
+  }
+  if (level === 'warn') {
+    console.warn(line);
+    return;
+  }
+
+  console.log(line);
+}
+
+function formatErrorForLog(error) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+    };
+  }
+
+  return {
+    message: String(error),
+  };
 }
 
 async function getSigningKey(kid) {

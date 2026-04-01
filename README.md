@@ -59,6 +59,7 @@ Server:
 - `REALTIME_CHAT_WINDOW_MS`
 - `REALTIME_CHAT_MAX_MESSAGES`
 - `REALTIME_MAX_DISPLAY_NAME_LENGTH`
+- `REALTIME_LOG_LEVEL` (`debug`, `info`, `warn`, or `error`)
 - `REALTIME_COGNITO_USER_POOL_ID`
 - `REALTIME_COGNITO_CLIENT_ID`
 - `REALTIME_COGNITO_ISSUER` (optional override)
@@ -78,6 +79,8 @@ To enable verified room ownership/admin controls, the realtime server must be ab
 - muted users are blocked from sending chat messages server-side
 
 To persist room authority in the Amplify backend data model across redeploys, the realtime server also needs AWS credentials that can call the Amplify AppSync API using IAM. Without those credentials, the server falls back to the local file store in `server/data/room-authority-store.json`.
+
+For operational debugging, the realtime server now emits structured JSON logs for joins, disconnects, moderation actions, chat enforcement, and authority persistence failures. Use `REALTIME_LOG_LEVEL=debug|info|warn|error` to control verbosity. `info` is the default and is appropriate for Render.
 
 ## Health check
 
@@ -127,7 +130,7 @@ Detailed steps are in `DEPLOYMENT.md`.
 
 ## Recommended next steps
 
-- redeploy Render with AWS IAM credentials for durable room authority persistence
-- run a real two-browser QA pass against the deployed app after verifying `/health`
-- add room creation persistence and room listing UX
-- add analytics/logging if this moves beyond local evaluation
+- improve remote avatar presentation beyond placeholders
+- improve shared object sync beyond claim/drop authority only
+- evaluate voice chat after the room/session UX is stable
+- revisit editable room titles later as an owner-only room setting, not part of the join flow
