@@ -60,13 +60,15 @@ export class AuthPanel {
     this.signInButton = document.createElement('button');
     this.signInButton.type = 'button';
     this.signInButton.textContent = 'Sign In';
+    this.signInButton.className = 'auth-primary-action';
     this.signInButton.addEventListener('click', () => {
       void this.handleSignIn();
     });
 
     this.signUpButton = document.createElement('button');
     this.signUpButton.type = 'button';
-    this.signUpButton.textContent = 'Sign Up';
+    this.signUpButton.textContent = 'Create account';
+    this.signUpButton.className = 'auth-secondary-action';
     this.signUpButton.addEventListener('click', () => {
       void this.handleSignUp();
     });
@@ -74,16 +76,23 @@ export class AuthPanel {
     this.confirmButton = document.createElement('button');
     this.confirmButton.type = 'button';
     this.confirmButton.textContent = 'Confirm Email';
+    this.confirmButton.className = 'auth-secondary-action';
     this.confirmButton.style.display = 'none';
     this.confirmButton.addEventListener('click', () => {
       void this.handleConfirm();
     });
 
-    const actions = document.createElement('div');
-    actions.className = 'auth-actions';
-    actions.append(this.signInButton, this.signUpButton, this.confirmButton);
+    const secondaryActions = document.createElement('div');
+    secondaryActions.className = 'auth-secondary-actions';
+    secondaryActions.append(this.signUpButton, this.confirmButton);
 
-    this.loggedOutView.append(this.emailInput, this.passwordInput, this.codeInput, actions);
+    this.loggedOutView.append(
+      this.emailInput,
+      this.passwordInput,
+      this.codeInput,
+      this.signInButton,
+      secondaryActions,
+    );
 
     this.loggedInView = document.createElement('div');
     this.loggedInView.className = 'auth-signed-in';

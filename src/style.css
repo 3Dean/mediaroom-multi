@@ -586,15 +586,40 @@ body.mouse #mobile-controls-layer {
   gap: 8px;
 }
 
-.auth-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.auth-actions button,
+.auth-primary-action,
 .auth-signed-in button {
   width: 100%;
+}
+
+.auth-primary-action {
+  margin-top: 4px;
+}
+
+.auth-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.auth-secondary-action {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #d9e3f4;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.auth-secondary-action:hover {
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.auth-secondary-action:disabled {
+  opacity: 0.55;
 }
 
 .auth-account {
