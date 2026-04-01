@@ -1,7 +1,14 @@
 import * as THREE from 'three';
 import { APP_CONFIG } from './config';
 import { initializeApp } from './initializeApp';
-import { getAuthenticatedUser } from '../backend/authClient';
+import {
+  confirmSignUpWithEmail,
+  getAuthenticatedUser,
+  getRealtimeAuthToken,
+  signInWithEmail,
+  signOutCurrentUser,
+  signUpWithEmail,
+} from '../backend/authClient';
 import { RemotePlayerManager } from '../player/remotePlayerManager';
 import { RoomClient } from '../room/roomClient';
 import { applyServerMessage } from '../room/roomPresence';
@@ -10,6 +17,7 @@ import { RoomStateStore } from '../room/roomState';
 import type { ChatMessage } from '../types/chat';
 import type { ServerMessage } from '../types/network';
 import type { PlayerTransform } from '../types/player';
+import { AuthPanel } from '../ui/authPanel';
 import { ChatPanel } from '../ui/chatPanel';
 import { ParticipantList } from '../ui/participantList';
 import { PreferencesPanel } from '../ui/preferencesPanel';
@@ -25,11 +33,10 @@ export function bootstrapApp(): void {
     const sidebarPanels = initializeSidebarLayout();
     initializeApp();
 
-    const currentUser = await getAuthenticatedUser();
+    let currentUser = await getAuthenticatedUser();
     let preferences = loadPreferences();
     const initialRoomSlug = getRoomSlugFromUrl() ?? (preferences.room.defaultRoomSlug || undefined);
     const remotePlayerManager = window.scene ? new RemotePlayerManager(window.scene) : null;
-    const participantList = new ParticipantList();
     let roomClient: RoomClient | null = null;
     let presenceTimer: number | null = null;
     let heartbeatTimer: number | null = null;
@@ -38,7 +45,64 @@ export function bootstrapApp(): void {
     let pendingObjectId: string | null = null;
     let appliedObjectId: string | null = null;
 
-    const roomPanel = new RoomPanel(({ roomSlug, displayName }) => {
+    const participantList = new ParticipantList({
+      onKick: (targetSessionId) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          return;
+        }
+
+        roomClient.send({
+          type: 'admin.kick',
+          roomId: activeSession.roomId,
+          sessionId: activeSession.sessionId,
+          targetSessionId,
+        });
+      },
+      onSetRole: (targetUserId, role) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          return;
+        }
+
+        roomClient.send({
+          type: 'admin.setRole',
+          roomId: activeSession.roomId,
+          sessionId: activeSession.sessionId,
+          targetUserId,
+          role,
+        });
+      },
+      onSetMute: (targetUserId, muted) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          return;
+        }
+
+        roomClient.send({
+          type: 'admin.setMute',
+          roomId: activeSession.roomId,
+          sessionId: activeSession.sessionId,
+          targetUserId,
+          muted,
+        });
+      },
+      onSetRoomLock: (locked) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          return;
+        }
+
+        roomClient.send({
+          type: 'admin.setRoomLock',
+          roomId: activeSession.roomId,
+          sessionId: activeSession.sessionId,
+          locked,
+        });
+      },
+    });
+
+    const roomPanel = new RoomPanel(async ({ roomSlug, displayName }) => {
       updateRoomSlugInUrl(roomSlug);
       const session = sessionStore.createSession(roomSlug, displayName, currentUser?.userId, preferences.profile.avatarPresetId);
       roomState.reset(session.roomId);
@@ -66,7 +130,8 @@ export function bootstrapApp(): void {
         reconnect: true,
         reconnectDelayMs: APP_CONFIG.reconnectBaseDelayMs,
         maxReconnectDelayMs: APP_CONFIG.reconnectMaxDelayMs,
-        onOpen: () => {
+        onOpen: async () => {
+          const authToken = await getRealtimeAuthToken();
           roomPanel.setStatus(`Connected to ${roomSlug}.`);
           roomPanel.setMeta('Live');
           participantList.setConnectionStatus('Live');
@@ -77,6 +142,7 @@ export function bootstrapApp(): void {
             displayName: session.displayName,
             userId: session.userId,
             avatarStyle: session.avatarStyle,
+            token: authToken ?? undefined,
           });
 
           startRealtimeLoops(
@@ -144,6 +210,58 @@ export function bootstrapApp(): void {
     }, {
       initialRoomSlug,
       initialDisplayName: preferences.profile.displayName || undefined,
+    });
+
+    const authPanel = new AuthPanel({
+      initialLoginId: currentUser?.signInDetails?.loginId ?? null,
+      onSignIn: async (email, password) => {
+        await signInWithEmail(email, password);
+        currentUser = await getAuthenticatedUser();
+        authPanel.setUser(currentUser?.signInDetails?.loginId ?? null);
+        roomPanel.applyPreferenceDefaults({
+          displayName: preferences.profile.displayName,
+        });
+        roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Re-enter a room to claim ownership or gain admin access.`);
+      },
+      onSignUp: async (email, password) => {
+        const result = await signUpWithEmail(email, password);
+        const step = result.nextStep?.signUpStep;
+        if (step === 'DONE') {
+          currentUser = await getAuthenticatedUser();
+          authPanel.setUser(currentUser?.signInDetails?.loginId ?? email);
+          roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Re-enter a room to claim ownership or gain admin access.`);
+          return {
+            needsConfirmation: false,
+            message: 'Account created and signed in.',
+          };
+        }
+
+        return {
+          needsConfirmation: true,
+          message: 'Account created. Check your email for the confirmation code.',
+        };
+      },
+      onConfirm: async (email, code) => {
+        await confirmSignUpWithEmail(email, code);
+      },
+      onSignOut: async () => {
+        await signOutCurrentUser();
+        currentUser = null;
+        authPanel.setUser(null);
+        if (roomClient) {
+          roomClient.disconnect(1000, 'sign-out');
+          roomClient = null;
+        }
+        stopRealtimeLoops(presenceTimer, heartbeatTimer);
+        presenceTimer = null;
+        heartbeatTimer = null;
+        sessionStore.clear();
+        roomState.clearPresence();
+        syncRoomUi(chatPanel, participantList, remotePlayerManager);
+        participantList.setConnectionStatus('Idle');
+        roomPanel.setMeta('Idle');
+        roomPanel.setStatus('Signed out. Enter a room after signing in to claim ownership and use admin controls.');
+      },
     });
 
     window.__musicspaceRequestSeatClaim = (seatId: string) => {
@@ -283,6 +401,7 @@ export function bootstrapApp(): void {
       roomPanel.setStatus('Stored message locally. Start the realtime server to broadcast chat.');
     });
 
+    authPanel.mount(sidebarPanels);
     roomPanel.mount(sidebarPanels);
     participantList.mount(sidebarPanels);
     chatPanel.mount(sidebarPanels);
@@ -292,9 +411,11 @@ export function bootstrapApp(): void {
     participantList.setConnectionStatus('Idle');
 
     if (currentUser?.signInDetails?.loginId) {
+      authPanel.setUser(currentUser.signInDetails.loginId);
       roomPanel.setStatus(`Signed in as ${currentUser.signInDetails.loginId}. Enter a room to create it or join it if it already exists.`);
     } else {
-      roomPanel.setStatus('Enter a room name to create it or join it if it already exists.');
+      authPanel.setUser(null);
+      roomPanel.setStatus('Enter a room name to create it or join it if it already exists. Sign in to claim ownership and use admin controls.');
     }
 
     window.addEventListener('beforeunload', () => {
@@ -351,7 +472,7 @@ function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remo
   const snapshot = roomState.getSnapshot();
   const participants = Object.values(snapshot.participants);
   chatPanel.setMessages(snapshot.messages.slice(-APP_CONFIG.chatHistoryLimit));
-  participantList.setParticipants(participants, snapshot.selfSessionId);
+  participantList.setParticipants(participants, snapshot.selfSessionId, snapshot.authority, snapshot.selfRole);
   Object.values(snapshot.objects).forEach((object) => window.__musicspaceApplyObjectSnapshot?.(object));
   window.__musicspaceGetRemoteParticipants = () => participants
     .filter((participant) => participant.sessionId !== snapshot.selfSessionId)
@@ -524,8 +645,6 @@ function stopRealtimeLoops(presenceTimer: number | null, heartbeatTimer: number 
     window.clearInterval(heartbeatTimer);
   }
 }
-
-
 
 function getRoomSlugFromUrl(): string | undefined {
   const params = new URLSearchParams(window.location.search);

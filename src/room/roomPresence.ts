@@ -11,6 +11,8 @@ export function applyServerMessage(store: RoomStateStore, message: ServerMessage
         participants: message.participants,
         seats: message.seats,
         objects: message.objects,
+        authority: message.authority,
+        selfRole: message.selfRole,
         recentMessages: message.recentMessages,
         serverTime: message.serverTime,
       });
@@ -33,8 +35,16 @@ export function applyServerMessage(store: RoomStateStore, message: ServerMessage
       store.upsertObject(message.object as InteractableObjectState);
       return;
     }
+    case 'room.authority.updated': {
+      store.setAuthority(message.authority, message.selfRole ?? store.getSnapshot().selfRole);
+      return;
+    }
     case 'chat.received': {
       store.addMessage(message.message);
+      return;
+    }
+    case 'system.notice': {
+      store.addMessage(message.notice);
       return;
     }
     case 'error': {

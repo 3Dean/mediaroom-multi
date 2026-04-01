@@ -1,7 +1,14 @@
 import type { ChatMessage } from '../types/chat';
 import type { InteractableObjectState, SeatState } from '../types/interactions';
 import type { PlayerPresence } from '../types/player';
-import type { RoomSnapshot, RoomState } from '../types/room';
+import type { RoomAuthority, RoomSnapshot, RoomState } from '../types/room';
+
+const emptyAuthority = (): RoomAuthority => ({
+  ownerUserId: null,
+  adminUserIds: [],
+  mutedUserIds: [],
+  isLocked: false,
+});
 
 const emptyRoomState = (): RoomState => ({
   roomId: '',
@@ -9,6 +16,8 @@ const emptyRoomState = (): RoomState => ({
   participants: {},
   seats: {},
   objects: {},
+  authority: emptyAuthority(),
+  selfRole: null,
   messages: [],
 });
 
@@ -22,6 +31,13 @@ export class RoomStateStore {
       participants: { ...this.state.participants },
       seats: { ...this.state.seats },
       objects: { ...this.state.objects },
+      authority: {
+        ownerUserId: this.state.authority.ownerUserId,
+        adminUserIds: [...this.state.authority.adminUserIds],
+        mutedUserIds: [...this.state.authority.mutedUserIds],
+        isLocked: this.state.authority.isLocked,
+      },
+      selfRole: this.state.selfRole,
       messages: [...this.state.messages],
     };
   }
@@ -37,6 +53,8 @@ export class RoomStateStore {
     this.state.participants = {};
     this.state.seats = {};
     this.state.objects = {};
+    this.state.authority = emptyAuthority();
+    this.state.selfRole = null;
     this.state.selfSessionId = null;
   }
 
@@ -48,6 +66,13 @@ export class RoomStateStore {
     );
     this.state.seats = Object.fromEntries(snapshot.seats.map((seat) => [seat.seatId, seat]));
     this.state.objects = Object.fromEntries(snapshot.objects.map((object) => [object.objectId, object]));
+    this.state.authority = {
+      ownerUserId: snapshot.authority.ownerUserId,
+      adminUserIds: [...snapshot.authority.adminUserIds],
+      mutedUserIds: [...snapshot.authority.mutedUserIds],
+      isLocked: snapshot.authority.isLocked,
+    };
+    this.state.selfRole = snapshot.selfRole;
     this.state.messages = [...snapshot.recentMessages];
   }
 
@@ -65,6 +90,16 @@ export class RoomStateStore {
 
   upsertObject(object: InteractableObjectState): void {
     this.state.objects[object.objectId] = object;
+  }
+
+  setAuthority(authority: RoomAuthority, selfRole: RoomState['selfRole']): void {
+    this.state.authority = {
+      ownerUserId: authority.ownerUserId,
+      adminUserIds: [...authority.adminUserIds],
+      mutedUserIds: [...authority.mutedUserIds],
+      isLocked: authority.isLocked,
+    };
+    this.state.selfRole = selfRole;
   }
 
   addMessage(message: ChatMessage): void {
