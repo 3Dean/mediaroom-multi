@@ -47,6 +47,14 @@ export function bootstrapApp(): void {
     let appliedObjectId: string | null = null;
     let knownRooms: RoomSummary[] = [];
 
+    const updateLobbyOverlay = () => {
+      if (currentUser?.signInDetails?.loginId) {
+        (window as any).__musicspaceSetLobbyOverlaySupport?.('Choose a room or create one from the sidebar.');
+        return;
+      }
+      (window as any).__musicspaceSetLobbyOverlaySupport?.('Sign in to claim ownership and moderation controls.');
+    };
+
     const participantList = new ParticipantList({
       onKick: (targetSessionId) => {
         const activeSession = sessionStore.getCurrentSession();
@@ -247,6 +255,7 @@ export function bootstrapApp(): void {
         await signInWithEmail(email, password);
         currentUser = await getAuthenticatedUser();
         authPanel.setUser(currentUser?.signInDetails?.loginId ?? null);
+        updateLobbyOverlay();
         roomPanel.applyPreferenceDefaults({
           displayName: preferences.profile.displayName,
         });
@@ -272,6 +281,7 @@ export function bootstrapApp(): void {
         if (step === 'DONE') {
           currentUser = await getAuthenticatedUser();
           authPanel.setUser(currentUser?.signInDetails?.loginId ?? email);
+          updateLobbyOverlay();
           void refreshRooms();
           roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Re-enter a room to claim ownership or gain admin access.`);
           return {
@@ -292,6 +302,7 @@ export function bootstrapApp(): void {
         await signOutCurrentUser();
         currentUser = null;
         authPanel.setUser(null);
+        updateLobbyOverlay();
         if (roomClient) {
           roomClient.disconnect(1000, 'sign-out');
           roomClient = null;
@@ -458,10 +469,12 @@ export function bootstrapApp(): void {
 
     if (currentUser?.signInDetails?.loginId) {
       authPanel.setUser(currentUser.signInDetails.loginId);
+      updateLobbyOverlay();
       roomPanel.setStatus(`Signed in as ${currentUser.signInDetails.loginId}. Enter a room to create it or join it if it already exists.`);
       void refreshRooms();
     } else {
       authPanel.setUser(null);
+      updateLobbyOverlay();
       roomPanel.setRoomListSignedOut();
       roomPanel.setStatus('Enter a room name to create it or join it if it already exists. Sign in to claim ownership and use admin controls.');
     }

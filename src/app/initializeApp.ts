@@ -38,6 +38,7 @@ declare global {
     __musicspaceGetStationOptions?: () => Array<{ label: string; mood: string }> ;
     __musicspaceApplyPreferences?: (preferences: { preferredStationMood?: string | null; defaultVolume?: number; backgroundOverrideMood?: string | null }) => void;
     __musicspaceSetLobbyMode?: (enabled: boolean) => void;
+    __musicspaceSetLobbyOverlaySupport?: (message: string) => void;
   }
 }
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
@@ -249,6 +250,34 @@ if (appDiv) {
 //document.getElementById('app')?.appendChild(renderer.domElement);
 renderer.domElement.tabIndex = 0;
 renderer.domElement.style.outline = 'none';
+
+const lobbyOverlay = document.createElement('div');
+lobbyOverlay.id = 'musicspace-lobby-overlay';
+lobbyOverlay.className = 'is-visible';
+
+const lobbyOverlayEyebrow = document.createElement('div');
+lobbyOverlayEyebrow.className = 'lobby-overlay-eyebrow';
+lobbyOverlayEyebrow.textContent = 'MediaRoom';
+
+const lobbyOverlayHeadline = document.createElement('div');
+lobbyOverlayHeadline.className = 'lobby-overlay-headline';
+lobbyOverlayHeadline.innerHTML = 'Step into<br>the session';
+
+const lobbyOverlaySupport = document.createElement('div');
+lobbyOverlaySupport.className = 'lobby-overlay-support';
+lobbyOverlaySupport.textContent = 'Sign in to claim ownership and moderation controls.';
+
+lobbyOverlay.append(lobbyOverlayEyebrow, lobbyOverlayHeadline, lobbyOverlaySupport);
+
+if (appDiv) {
+  appDiv.appendChild(lobbyOverlay);
+} else {
+  document.body.appendChild(lobbyOverlay);
+}
+
+window.__musicspaceSetLobbyOverlaySupport = (message: string) => {
+  lobbyOverlaySupport.textContent = message;
+};
 
 if (isTouchDevice) {
   mobileControlLayer = document.createElement('div');
@@ -2277,6 +2306,7 @@ function setSceneMode(nextMode: SceneMode) {
     if (mobileControlLayer) {
       mobileControlLayer.style.display = 'none';
     }
+    lobbyOverlay.classList.add('is-visible');
     applyLobbyCamera(0);
     return;
   }
@@ -2284,6 +2314,7 @@ function setSceneMode(nextMode: SceneMode) {
   if (mobileControlLayer) {
     mobileControlLayer.style.display = '';
   }
+  lobbyOverlay.classList.remove('is-visible');
   renderer.domElement.style.cursor = isTouchDevice ? 'auto' : 'grab';
 }
 
