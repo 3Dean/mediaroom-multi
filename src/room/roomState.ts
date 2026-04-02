@@ -12,6 +12,7 @@ const emptyAuthority = (): RoomAuthority => ({
 
 const emptyRoomState = (): RoomState => ({
   roomId: '',
+  isPersisted: false,
   selfSessionId: null,
   participants: {},
   seats: {},
@@ -28,6 +29,7 @@ export class RoomStateStore {
   getSnapshot(): RoomState {
     return {
       roomId: this.state.roomId,
+      isPersisted: this.state.isPersisted,
       selfSessionId: this.state.selfSessionId,
       participants: { ...this.state.participants },
       seats: { ...this.state.seats },
@@ -56,6 +58,7 @@ export class RoomStateStore {
     this.state.seats = {};
     this.state.objects = {};
     this.state.surfaces = {};
+    this.state.isPersisted = false;
     this.state.authority = emptyAuthority();
     this.state.selfRole = null;
     this.state.selfSessionId = null;
@@ -63,6 +66,7 @@ export class RoomStateStore {
 
   hydrate(snapshot: RoomSnapshot): void {
     this.state.roomId = snapshot.roomId;
+    this.state.isPersisted = snapshot.isPersisted;
     this.state.selfSessionId = snapshot.selfSessionId;
     this.state.participants = Object.fromEntries(
       snapshot.participants.map((participant) => [participant.sessionId, participant]),

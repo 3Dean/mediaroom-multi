@@ -128,6 +128,7 @@ export type ClientMessage =
 export type RoomJoinedMessage = {
   type: 'room.joined';
   roomId: string;
+  isPersisted: boolean;
   selfSessionId: string;
   participants: PlayerPresence[];
   seats: SeatState[];

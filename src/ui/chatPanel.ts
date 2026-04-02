@@ -21,6 +21,7 @@ export class ChatPanel {
   private readonly onSend: (body: string) => void;
   private readonly onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
   private surfaceUploadEnabled = false;
+  private surfaceUploadVisible = false;
 
   constructor(options: ChatPanelOptions) {
     this.onSend = options.onSend;
@@ -109,7 +110,7 @@ export class ChatPanel {
 
     header.append(title, status);
     this.container.append(header, this.log, this.form, this.surfaceSection);
-    this.setSurfaceUploadState(null);
+    this.setSurfaceUploadState(null, false);
   }
 
   mount(parent: HTMLElement = document.body): void {
@@ -126,16 +127,23 @@ export class ChatPanel {
     this.log.scrollTop = this.log.scrollHeight;
   }
 
-  setSurfaceUploadState(role: RoomRole | null): void {
-    const enabled = role === 'owner' || role === 'admin';
+  setSurfaceUploadState(role: RoomRole | null, isPersistedRoom: boolean): void {
+    const canManageSurfaces = role === 'owner' || role === 'admin';
+    const visible = canManageSurfaces || !isPersistedRoom;
+    const enabled = canManageSurfaces && isPersistedRoom;
+    this.surfaceUploadVisible = visible;
     this.surfaceUploadEnabled = enabled;
-    this.surfaceSection.style.display = enabled ? 'grid' : 'none';
+    this.surfaceSection.style.display = visible ? 'grid' : 'none';
     this.surfaceSelect.disabled = !enabled;
     this.surfaceFileInput.disabled = !enabled;
     this.surfaceUploadButton.disabled = !enabled;
-    this.surfaceHelper.textContent = enabled
-      ? 'Upload PNG, JPG, or WebP to replace image01-image04 for everyone in the room.'
-      : 'Owner/admin can replace image01-image04 for everyone in the room.';
+    if (enabled) {
+      this.surfaceHelper.textContent = 'Upload PNG, JPG, or WebP to replace image01-image04 for everyone in the room.';
+    } else if (!isPersistedRoom) {
+      this.surfaceHelper.textContent = 'Shared surfaces are available only in saved rooms. Sign in and create the room to enable them.';
+    } else {
+      this.surfaceHelper.textContent = 'Owner/admin can replace image01-image04 for everyone in the room.';
+    }
     if (!enabled) {
       this.surfaceFileInput.value = '';
       this.surfaceUploadButton.textContent = 'Upload';
@@ -144,6 +152,9 @@ export class ChatPanel {
 
   private async handleSurfaceUpload(): Promise<void> {
     if (!this.surfaceUploadEnabled) {
+      if (this.surfaceUploadVisible) {
+        this.surfaceHelper.textContent = 'Shared surfaces are available only to owner/admin in saved rooms.';
+      }
       return;
     }
 

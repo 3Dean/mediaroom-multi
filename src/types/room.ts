@@ -34,6 +34,7 @@ export type RoomAuthority = {
 
 export type RoomSnapshot = {
   roomId: string;
+  isPersisted: boolean;
   selfSessionId: string;
   participants: PlayerPresence[];
   seats: SeatState[];
@@ -47,6 +48,7 @@ export type RoomSnapshot = {
 
 export type RoomState = {
   roomId: string;
+  isPersisted: boolean;
   selfSessionId: string | null;
   participants: Record<string, PlayerPresence>;
   seats: Record<string, SeatState>;

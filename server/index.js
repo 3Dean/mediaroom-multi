@@ -310,6 +310,7 @@ async function handleRoomJoin(socket, message) {
   send(socket, {
     type: 'room.joined',
     roomId,
+    isPersisted: Boolean(authority.roomRecordId),
     selfSessionId: sessionId,
     participants: Array.from(participants.values()),
     seats,

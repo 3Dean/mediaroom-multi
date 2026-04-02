@@ -7,6 +7,7 @@ export function applyServerMessage(store: RoomStateStore, message: ServerMessage
     case 'room.joined': {
       store.hydrate({
         roomId: message.roomId,
+        isPersisted: message.isPersisted,
         selfSessionId: message.selfSessionId,
         participants: message.participants,
         seats: message.seats,

@@ -268,7 +268,7 @@ lobbyOverlayHeadline.innerHTML = 'Step into<br>the session';
 
 const lobbyOverlaySupport = document.createElement('div');
 lobbyOverlaySupport.className = 'lobby-overlay-support';
-lobbyOverlaySupport.textContent = 'Sign in to claim ownership and moderation controls.';
+  lobbyOverlaySupport.textContent = 'Sign in to create a saved room with ownership and moderation controls.';
 
 lobbyOverlay.append(lobbyOverlayEyebrow, lobbyOverlayHeadline, lobbyOverlaySupport);
 
