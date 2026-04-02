@@ -1,7 +1,7 @@
 import type { ChatMessage } from '../types/chat';
 import type { InteractableObjectState, SeatState } from '../types/interactions';
 import type { PlayerPresence } from '../types/player';
-import type { RoomAuthority, RoomSnapshot, RoomState } from '../types/room';
+import type { RoomAuthority, RoomSnapshot, RoomState, RoomSurfaceSnapshot } from '../types/room';
 
 const emptyAuthority = (): RoomAuthority => ({
   ownerUserId: null,
@@ -16,6 +16,7 @@ const emptyRoomState = (): RoomState => ({
   participants: {},
   seats: {},
   objects: {},
+  surfaces: {},
   authority: emptyAuthority(),
   selfRole: null,
   messages: [],
@@ -31,6 +32,7 @@ export class RoomStateStore {
       participants: { ...this.state.participants },
       seats: { ...this.state.seats },
       objects: { ...this.state.objects },
+      surfaces: { ...this.state.surfaces },
       authority: {
         ownerUserId: this.state.authority.ownerUserId,
         adminUserIds: [...this.state.authority.adminUserIds],
@@ -53,6 +55,7 @@ export class RoomStateStore {
     this.state.participants = {};
     this.state.seats = {};
     this.state.objects = {};
+    this.state.surfaces = {};
     this.state.authority = emptyAuthority();
     this.state.selfRole = null;
     this.state.selfSessionId = null;
@@ -66,6 +69,7 @@ export class RoomStateStore {
     );
     this.state.seats = Object.fromEntries(snapshot.seats.map((seat) => [seat.seatId, seat]));
     this.state.objects = Object.fromEntries(snapshot.objects.map((object) => [object.objectId, object]));
+    this.state.surfaces = Object.fromEntries(snapshot.surfaces.map((surface) => [surface.surfaceId, surface]));
     this.state.authority = {
       ownerUserId: snapshot.authority.ownerUserId,
       adminUserIds: [...snapshot.authority.adminUserIds],
@@ -90,6 +94,10 @@ export class RoomStateStore {
 
   upsertObject(object: InteractableObjectState): void {
     this.state.objects[object.objectId] = object;
+  }
+
+  upsertSurface(surface: RoomSurfaceSnapshot): void {
+    this.state.surfaces[surface.surfaceId] = surface;
   }
 
   setAuthority(authority: RoomAuthority, selfRole: RoomState['selfRole']): void {

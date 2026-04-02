@@ -16,6 +16,13 @@
 ## Next
 
 - Improve remote avatar presentation beyond placeholders.
+- Feature branch: shared surface image upload
+  - done: add Amplify storage for guest-readable room surface images
+  - done: add persisted room surface snapshot model and server repository
+  - done: add realtime room snapshot/broadcast support for surface updates
+  - done: refactor frame texture replacement into reusable surface image application
+  - done: add owner/admin-only upload controls targeting `image01`-`image04`
+  - next: verify persistence, guest visibility, and reconnect/join sync after backend deployment
 
 ## Later
 

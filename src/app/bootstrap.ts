@@ -9,6 +9,7 @@ import {
   signOutCurrentUser,
   signUpWithEmail,
 } from '../backend/authClient';
+import { uploadRoomSurfaceImage } from '../backend/surfaceImageClient';
 import { RemotePlayerManager } from '../player/remotePlayerManager';
 import { RoomClient } from '../room/roomClient';
 import { applyServerMessage } from '../room/roomPresence';
@@ -24,7 +25,7 @@ import { PreferencesPanel } from '../ui/preferencesPanel';
 import { RoomPanel } from '../ui/roomPanel';
 import { loadPreferences, resetPreferences, savePreferences } from '../preferences/preferencesStore';
 import type { UserPreferences } from '../preferences/preferencesModel';
-import type { RoomSummary } from '../types/room';
+import type { RoomSummary, RoomSurfaceId } from '../types/room';
 
 const roomState = new RoomStateStore();
 const sessionStore = new RoomSessionStore();
@@ -426,36 +427,57 @@ export function bootstrapApp(): void {
       },
     });
 
-    chatPanel = new ChatPanel((body) => {
-      const activeSession = sessionStore.getCurrentSession();
-      if (!activeSession) {
-        roomPanel.setStatus('Enter a room before sending chat.');
-        return;
-      }
+    chatPanel = new ChatPanel({
+      onSend: (body) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession) {
+          roomPanel.setStatus('Enter a room before sending chat.');
+          return;
+        }
 
-      if (roomClient?.isConnected()) {
+        if (roomClient?.isConnected()) {
+          roomClient.send({
+            type: 'chat.send',
+            roomId: activeSession.roomId,
+            sessionId: activeSession.sessionId,
+            body,
+            clientMessageId: `${activeSession.sessionId}-${Date.now()}`,
+          });
+          return;
+        }
+
+        const localMessage: ChatMessage = {
+          id: `${activeSession.sessionId}-${Date.now()}`,
+          roomId: activeSession.roomId,
+          userId: activeSession.userId,
+          displayName: activeSession.displayName,
+          body,
+          createdAt: new Date().toISOString(),
+        };
+
+        roomState.addMessage(localMessage);
+        syncRoomUi(chatPanel, participantList, remotePlayerManager);
+        roomPanel.setStatus('Stored message locally. Start the realtime server to broadcast chat.');
+      },
+      onUploadSurface: async (surfaceId: RoomSurfaceId, file: File) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          throw new Error('Enter a live room before updating shared surfaces.');
+        }
+        if (!activeSession.userId) {
+          throw new Error('Sign in to update shared surfaces.');
+        }
+
+        const imagePath = await uploadRoomSurfaceImage(activeSession.roomId, surfaceId, file);
         roomClient.send({
-          type: 'chat.send',
+          type: 'admin.setSurfaceImage',
           roomId: activeSession.roomId,
           sessionId: activeSession.sessionId,
-          body,
-          clientMessageId: `${activeSession.sessionId}-${Date.now()}`,
+          surfaceId,
+          imagePath,
         });
-        return;
-      }
-
-      const localMessage: ChatMessage = {
-        id: `${activeSession.sessionId}-${Date.now()}`,
-        roomId: activeSession.roomId,
-        userId: activeSession.userId,
-        displayName: activeSession.displayName,
-        body,
-        createdAt: new Date().toISOString(),
-      };
-
-      roomState.addMessage(localMessage);
-      syncRoomUi(chatPanel, participantList, remotePlayerManager);
-      roomPanel.setStatus('Stored message locally. Start the realtime server to broadcast chat.');
+        roomPanel.setStatus(`Uploaded ${surfaceId}. Waiting for room sync...`);
+      },
     });
 
     authPanel.mount(sidebarPanels);
@@ -534,8 +556,10 @@ function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remo
   const snapshot = roomState.getSnapshot();
   const participants = Object.values(snapshot.participants);
   chatPanel.setMessages(snapshot.messages.slice(-APP_CONFIG.chatHistoryLimit));
+  chatPanel.setSurfaceUploadState(snapshot.selfRole);
   participantList.setParticipants(participants, snapshot.selfSessionId, snapshot.authority, snapshot.selfRole);
   Object.values(snapshot.objects).forEach((object) => window.__musicspaceApplyObjectSnapshot?.(object));
+  window.__musicspaceSyncRoomSurfaces?.(Object.values(snapshot.surfaces));
   window.__musicspaceGetRemoteParticipants = () => participants
     .filter((participant) => participant.sessionId !== snapshot.selfSessionId)
     .map((participant) => ({

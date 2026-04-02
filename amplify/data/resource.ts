@@ -53,6 +53,16 @@ const schema = a.schema({
       updatedAt: a.datetime().required(),
     })
     .authorization((allow) => [allow.authenticated()]),
+
+  RoomSurfaceSnapshot: a
+    .model({
+      roomId: a.string().required(),
+      surfaceId: a.string().required(),
+      imagePath: a.string().required(),
+      updatedByUserId: a.string().required(),
+      updatedAt: a.datetime().required(),
+    })
+    .authorization((allow) => [allow.authenticated()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

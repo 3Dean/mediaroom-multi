@@ -16,6 +16,15 @@ export type RoomSummary = {
 
 export type RoomRole = 'owner' | 'admin' | 'member';
 
+export type RoomSurfaceId = 'image01' | 'image02' | 'image03' | 'image04';
+
+export type RoomSurfaceSnapshot = {
+  surfaceId: RoomSurfaceId;
+  imagePath: string;
+  updatedByUserId: string;
+  updatedAt: string;
+};
+
 export type RoomAuthority = {
   ownerUserId: string | null;
   adminUserIds: string[];
@@ -29,6 +38,7 @@ export type RoomSnapshot = {
   participants: PlayerPresence[];
   seats: SeatState[];
   objects: InteractableObjectState[];
+  surfaces: RoomSurfaceSnapshot[];
   authority: RoomAuthority;
   selfRole: RoomRole;
   recentMessages: ChatMessage[];
@@ -41,6 +51,7 @@ export type RoomState = {
   participants: Record<string, PlayerPresence>;
   seats: Record<string, SeatState>;
   objects: Record<string, InteractableObjectState>;
+  surfaces: Record<string, RoomSurfaceSnapshot>;
   authority: RoomAuthority;
   selfRole: RoomRole | null;
   messages: ChatMessage[];
