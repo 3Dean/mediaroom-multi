@@ -85,7 +85,7 @@ type SceneMode = 'lobby' | 'room';
 let sceneMode: SceneMode | null = null;
 let lobbyCameraTime = 0;
 const lobbyCameraPosition = new THREE.Vector3(0, -10, 0);
-const lobbyCameraYawSpeed = Math.PI / 48;
+const lobbyCameraYawSpeed = Math.PI / 90;
 
 export function initializeApp() {
   console.log(`isTouchDevice: ${isTouchDevice}`); // Diagnostic log
