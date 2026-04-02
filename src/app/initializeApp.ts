@@ -84,9 +84,8 @@ let previousMouseY = 0;
 type SceneMode = 'lobby' | 'room';
 let sceneMode: SceneMode | null = null;
 let lobbyCameraTime = 0;
-const lobbyCameraTarget = new THREE.Vector3(0, 2.55, 10.65);
-const lobbyCameraRig = new THREE.Object3D();
-lobbyCameraRig.rotation.order = 'YXZ';
+const lobbyCameraPosition = new THREE.Vector3(0, -10, 0);
+const lobbyCameraYawSpeed = Math.PI / 48;
 
 export function initializeApp() {
   console.log(`isTouchDevice: ${isTouchDevice}`); // Diagnostic log
@@ -2255,22 +2254,9 @@ function dropHeldObjectLocally() {
 
 function applyLobbyCamera(delta: number) {
   lobbyCameraTime += delta;
-
-  const orbit = Math.sin(lobbyCameraTime * 0.18);
-  const drift = Math.cos(lobbyCameraTime * 0.11);
-  const dolly = (Math.sin(lobbyCameraTime * 0.24) + 1) * 0.5;
-  const verticalBob = Math.sin(lobbyCameraTime * 0.13) * 0.06;
-
-  controls.object.position.set(
-    2.4 - orbit * 2.15,
-    3.2 + verticalBob,
-    17.7 + dolly * 1.65 - drift * 0.45,
-  );
-
-  lobbyCameraRig.position.copy(controls.object.position);
-  lobbyCameraRig.lookAt(lobbyCameraTarget);
-  controls.object.rotation.set(0, lobbyCameraRig.rotation.y, 0);
-  camera.rotation.x = lobbyCameraRig.rotation.x;
+  controls.object.position.copy(lobbyCameraPosition);
+  controls.object.rotation.set(0, lobbyCameraTime * lobbyCameraYawSpeed, 0);
+  camera.rotation.x = 0;
 }
 
 function setSceneMode(nextMode: SceneMode) {

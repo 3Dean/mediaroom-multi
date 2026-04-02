@@ -117,7 +117,7 @@ button:focus-visible {
   top: 16px;
   left: 16px;
   bottom: 16px;
-  width: min(320px, calc(100vw - 72px));
+  width: min(330px, calc(100vw - 72px));
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -152,7 +152,7 @@ button:focus-visible {
 }
 
 #musicspace-sidebar.is-open + #musicspace-sidebar-toggle {
-  left: calc(min(320px, calc(100vw - 72px)) + 30px);
+  left: calc(min(350px, calc(100vw - 72px)) + 30px);
 }
 
 #musicspace-sidebar-toggle:hover {
@@ -743,6 +743,7 @@ body.mouse #mobile-controls-layer {
   color: #fff;
   font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .room-section-hint {
