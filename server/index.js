@@ -251,12 +251,12 @@ async function handleRoomJoin(socket, message) {
     return;
   }
 
-  const authority = await hydrateRoomAuthority(roomId);
+  let authority = await hydrateRoomAuthority(roomId);
   if (!authority.ownerUserId && authResult.userId) {
     authority.ownerUserId = authResult.userId;
-    await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
+    authority = await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
   } else if (authority.ownerUserId && !authority.roomRecordId && authResult.userId) {
-    await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
+    authority = await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
   }
 
   const selfRole = resolveRole(userId, authority);
