@@ -9,6 +9,7 @@ import {
   signOutCurrentUser,
   signUpWithEmail,
 } from '../backend/authClient';
+import { uploadRoomSurfaceImage } from '../backend/surfaceImageClient';
 import { RemotePlayerManager } from '../player/remotePlayerManager';
 import { RoomClient } from '../room/roomClient';
 import { applyServerMessage } from '../room/roomPresence';
@@ -24,7 +25,7 @@ import { PreferencesPanel } from '../ui/preferencesPanel';
 import { RoomPanel } from '../ui/roomPanel';
 import { loadPreferences, resetPreferences, savePreferences } from '../preferences/preferencesStore';
 import type { UserPreferences } from '../preferences/preferencesModel';
-import type { RoomSummary } from '../types/room';
+import type { RoomSummary, RoomSurfaceId } from '../types/room';
 
 const roomState = new RoomStateStore();
 const sessionStore = new RoomSessionStore();
@@ -52,7 +53,7 @@ export function bootstrapApp(): void {
         (window as any).__musicspaceSetLobbyOverlaySupport?.('Choose a room or create one from the sidebar.');
         return;
       }
-      (window as any).__musicspaceSetLobbyOverlaySupport?.('Sign in to claim ownership and moderation controls.');
+      (window as any).__musicspaceSetLobbyOverlaySupport?.('Sign in to create a saved room with ownership and moderation controls.');
     };
 
     const participantList = new ParticipantList({
@@ -156,7 +157,7 @@ export function bootstrapApp(): void {
       const realtimeUrl = getRealtimeUrl();
       roomPanel.setStatus(`Joined ${roomSlug}. Connecting to ${realtimeUrl}.`);
       roomPanel.setMeta('Connecting');
-      roomPanel.setRooms(knownRooms, roomSlug);
+      roomPanel.setActiveRoom(roomSlug, knownRooms.some((room) => room.slug.toLowerCase() === roomSlug.toLowerCase()));
       participantList.setConnectionStatus('Connecting');
 
       const nextRoomClient = new RoomClient({
@@ -193,6 +194,7 @@ export function bootstrapApp(): void {
           );
         },
         onClose: () => {
+          const wasPersistedRoom = roomState.getSnapshot().isPersisted;
           stopRealtimeLoops(presenceTimer, heartbeatTimer);
           presenceTimer = null;
           heartbeatTimer = null;
@@ -200,6 +202,7 @@ export function bootstrapApp(): void {
           syncRoomUi(chatPanel, participantList, remotePlayerManager);
           roomPanel.setStatus(`Disconnected from ${roomSlug}.`);
           roomPanel.setMeta('Offline');
+          roomPanel.setActiveRoom(roomSlug, wasPersistedRoom);
           participantList.setConnectionStatus('Offline');
           pendingSeatRequestId = null;
           appliedSeatId = null;
@@ -220,6 +223,10 @@ export function bootstrapApp(): void {
         },
         onMessage: (message) => {
           applyServerMessage(roomState, message);
+          roomPanel.setActiveRoom(session.roomSlug, roomState.getSnapshot().isPersisted);
+          if (message.type === 'room.joined' && message.isPersisted && !knownRooms.some((room) => room.slug.toLowerCase() === session.roomSlug.toLowerCase())) {
+            void refreshRooms();
+          }
           applyInitialSpawnTransform(message);
           syncSeatState(session.sessionId, roomPanel, () => {
             pendingSeatRequestId = null;
@@ -247,6 +254,7 @@ export function bootstrapApp(): void {
     roomPanel = new RoomPanel(enterRoom, {
       initialRoomSlug,
       initialDisplayName: preferences.profile.displayName || undefined,
+      initialIsAuthenticated: Boolean(currentUser),
     });
 
     authPanel = new AuthPanel({
@@ -256,12 +264,13 @@ export function bootstrapApp(): void {
         currentUser = await getAuthenticatedUser();
         authPanel.setUser(currentUser?.signInDetails?.loginId ?? null);
         updateLobbyOverlay();
+        roomPanel.setAuthenticationState(Boolean(currentUser));
         roomPanel.applyPreferenceDefaults({
           displayName: preferences.profile.displayName,
         });
         const activeSession = sessionStore.getCurrentSession();
         if (activeSession) {
-          roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Refreshing room access.`);
+          roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Refreshing room access and saved-room ownership.`);
           roomPanel.setMeta('Reconnecting');
           participantList.setConnectionStatus('Reconnecting');
           void refreshRooms();
@@ -272,7 +281,7 @@ export function bootstrapApp(): void {
           return;
         }
 
-        roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Enter a room to claim ownership or gain admin access.`);
+        roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Create a saved room or join an existing one.`);
         void refreshRooms();
       },
       onSignUp: async (email, password) => {
@@ -282,8 +291,9 @@ export function bootstrapApp(): void {
           currentUser = await getAuthenticatedUser();
           authPanel.setUser(currentUser?.signInDetails?.loginId ?? email);
           updateLobbyOverlay();
+          roomPanel.setAuthenticationState(Boolean(currentUser));
           void refreshRooms();
-          roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Re-enter a room to claim ownership or gain admin access.`);
+          roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Re-enter a room to create or claim its saved session.`);
           return {
             needsConfirmation: false,
             message: 'Account created and signed in.',
@@ -303,6 +313,7 @@ export function bootstrapApp(): void {
         currentUser = null;
         authPanel.setUser(null);
         updateLobbyOverlay();
+        roomPanel.setAuthenticationState(false);
         if (roomClient) {
           roomClient.disconnect(1000, 'sign-out');
           roomClient = null;
@@ -316,7 +327,7 @@ export function bootstrapApp(): void {
         participantList.setConnectionStatus('Idle');
         roomPanel.setMeta('Idle');
         void refreshRooms();
-        roomPanel.setStatus('Signed out. Enter a room after signing in to claim ownership and use admin controls.');
+        roomPanel.setStatus('Signed out. Join a saved room or enter a temporary guest room. Sign in to create saved rooms and use admin controls.');
         (window as any).__musicspaceSetLobbyMode?.(true);
       },
     });
@@ -426,36 +437,60 @@ export function bootstrapApp(): void {
       },
     });
 
-    chatPanel = new ChatPanel((body) => {
-      const activeSession = sessionStore.getCurrentSession();
-      if (!activeSession) {
-        roomPanel.setStatus('Enter a room before sending chat.');
-        return;
-      }
+    chatPanel = new ChatPanel({
+      onSend: (body) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession) {
+          roomPanel.setStatus('Enter a room before sending chat.');
+          return;
+        }
 
-      if (roomClient?.isConnected()) {
+        if (roomClient?.isConnected()) {
+          roomClient.send({
+            type: 'chat.send',
+            roomId: activeSession.roomId,
+            sessionId: activeSession.sessionId,
+            body,
+            clientMessageId: `${activeSession.sessionId}-${Date.now()}`,
+          });
+          return;
+        }
+
+        const localMessage: ChatMessage = {
+          id: `${activeSession.sessionId}-${Date.now()}`,
+          roomId: activeSession.roomId,
+          userId: activeSession.userId,
+          displayName: activeSession.displayName,
+          body,
+          createdAt: new Date().toISOString(),
+        };
+
+        roomState.addMessage(localMessage);
+        syncRoomUi(chatPanel, participantList, remotePlayerManager);
+        roomPanel.setStatus('Stored message locally. Start the realtime server to broadcast chat.');
+      },
+      onUploadSurface: async (surfaceId: RoomSurfaceId, file: File) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          throw new Error('Enter a live room before updating shared surfaces.');
+        }
+        if (!activeSession.userId) {
+          throw new Error('Sign in to update shared surfaces.');
+        }
+        if (!roomState.getSnapshot().isPersisted) {
+          throw new Error('Shared surfaces are available only in saved rooms.');
+        }
+
+        const imagePath = await uploadRoomSurfaceImage(activeSession.roomId, surfaceId, file);
         roomClient.send({
-          type: 'chat.send',
+          type: 'admin.setSurfaceImage',
           roomId: activeSession.roomId,
           sessionId: activeSession.sessionId,
-          body,
-          clientMessageId: `${activeSession.sessionId}-${Date.now()}`,
+          surfaceId,
+          imagePath,
         });
-        return;
-      }
-
-      const localMessage: ChatMessage = {
-        id: `${activeSession.sessionId}-${Date.now()}`,
-        roomId: activeSession.roomId,
-        userId: activeSession.userId,
-        displayName: activeSession.displayName,
-        body,
-        createdAt: new Date().toISOString(),
-      };
-
-      roomState.addMessage(localMessage);
-      syncRoomUi(chatPanel, participantList, remotePlayerManager);
-      roomPanel.setStatus('Stored message locally. Start the realtime server to broadcast chat.');
+        roomPanel.setStatus(`Uploaded ${surfaceId}. Waiting for room sync...`);
+      },
     });
 
     authPanel.mount(sidebarPanels);
@@ -470,13 +505,15 @@ export function bootstrapApp(): void {
     if (currentUser?.signInDetails?.loginId) {
       authPanel.setUser(currentUser.signInDetails.loginId);
       updateLobbyOverlay();
-      roomPanel.setStatus(`Signed in as ${currentUser.signInDetails.loginId}. Enter a room to create it or join it if it already exists.`);
+      roomPanel.setAuthenticationState(true);
+      roomPanel.setStatus(`Signed in as ${currentUser.signInDetails.loginId}. Create a saved room or join an existing one.`);
       void refreshRooms();
     } else {
       authPanel.setUser(null);
       updateLobbyOverlay();
+      roomPanel.setAuthenticationState(false);
       roomPanel.setRoomListSignedOut();
-      roomPanel.setStatus('Enter a room name to create it or join it if it already exists. Sign in to claim ownership and use admin controls.');
+      roomPanel.setStatus('Join a saved room or enter a temporary guest room. Sign in to create saved rooms and use admin controls.');
     }
 
     window.addEventListener('beforeunload', () => {
@@ -534,8 +571,10 @@ function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remo
   const snapshot = roomState.getSnapshot();
   const participants = Object.values(snapshot.participants);
   chatPanel.setMessages(snapshot.messages.slice(-APP_CONFIG.chatHistoryLimit));
+  chatPanel.setSurfaceUploadState(snapshot.selfRole, snapshot.isPersisted);
   participantList.setParticipants(participants, snapshot.selfSessionId, snapshot.authority, snapshot.selfRole);
   Object.values(snapshot.objects).forEach((object) => window.__musicspaceApplyObjectSnapshot?.(object));
+  window.__musicspaceSyncRoomSurfaces?.(Object.values(snapshot.surfaces));
   window.__musicspaceGetRemoteParticipants = () => participants
     .filter((participant) => participant.sessionId !== snapshot.selfSessionId)
     .map((participant) => ({

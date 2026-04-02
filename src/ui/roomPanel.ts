@@ -21,6 +21,7 @@ type RoomPanelValues = {
 type RoomPanelOptions = {
   initialRoomSlug?: string;
   initialDisplayName?: string;
+  initialIsAuthenticated?: boolean;
 };
 
 type RoomSortMode = 'recent' | 'name';
@@ -76,11 +77,14 @@ export class RoomPanel {
   private readonly hasUrlRoom: boolean;
   private rooms: RoomSummary[] = [];
   private activeRoomSlug: string | null = null;
+  private activeRoomIsPersisted = false;
+  private isAuthenticated = false;
 
   constructor(onJoin: (values: RoomPanelValues) => void, options: RoomPanelOptions = {}) {
     this.onJoin = onJoin;
     this.generatedRoomSlug = generateRoomSlug();
     this.hasUrlRoom = !!options.initialRoomSlug?.trim();
+    this.isAuthenticated = Boolean(options.initialIsAuthenticated);
     this.container = document.createElement('div');
     this.container.id = 'room-panel';
     this.container.className = 'musicspace-panel musicspace-panel--primary';
@@ -109,7 +113,7 @@ export class RoomPanel {
 
     const formHint = document.createElement('div');
     formHint.className = 'room-section-hint';
-    formHint.textContent = 'A new link creates a room. An existing link reconnects to one.';
+    formHint.textContent = 'Signed-in users create saved rooms. Guests can enter temporary sessions.';
 
     formHeader.append(formTitle, formHint);
 
@@ -270,6 +274,21 @@ export class RoomPanel {
   setRooms(rooms: RoomSummary[], activeRoomSlug?: string | null): void {
     this.rooms = [...rooms];
     this.activeRoomSlug = activeRoomSlug ?? null;
+    this.activeRoomIsPersisted = this.activeRoomSlug
+      ? this.rooms.some((room) => room.slug.toLowerCase() === this.activeRoomSlug?.trim().toLowerCase())
+      : false;
+    this.renderRooms();
+    this.refreshJoinIntent();
+  }
+
+  setAuthenticationState(isAuthenticated: boolean): void {
+    this.isAuthenticated = isAuthenticated;
+    this.refreshJoinIntent();
+  }
+
+  setActiveRoom(activeRoomSlug: string | null, isPersisted: boolean): void {
+    this.activeRoomSlug = activeRoomSlug;
+    this.activeRoomIsPersisted = isPersisted;
     this.renderRooms();
     this.refreshJoinIntent();
   }
@@ -388,7 +407,9 @@ export class RoomPanel {
 
     if (activeRoomSlug && roomSlug && roomSlug === activeRoomSlug) {
       this.joinButton.textContent = 'Re-Enter Room';
-      this.joinHelper.textContent = 'You are already in this room. Re-enter to refresh your session.';
+      this.joinHelper.textContent = this.activeRoomIsPersisted
+        ? 'You are already in this saved room. Re-enter to refresh your session.'
+        : 'You are already in this temporary guest room. Re-enter to refresh your session.';
       return;
     }
 
@@ -398,8 +419,14 @@ export class RoomPanel {
       return;
     }
 
-    this.joinButton.textContent = 'Create Room';
-    this.joinHelper.textContent = 'This link is new. A room will be created.';
+    if (this.isAuthenticated) {
+      this.joinButton.textContent = 'Create Room';
+      this.joinHelper.textContent = 'This link is new. A saved room will be created and assigned to you.';
+      return;
+    }
+
+    this.joinButton.textContent = 'Enter as Guest';
+    this.joinHelper.textContent = 'This link is new. Guests enter temporary rooms. Sign in to create a saved room.';
   }
 }
 

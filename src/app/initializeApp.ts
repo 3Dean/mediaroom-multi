@@ -39,14 +39,17 @@ declare global {
     __musicspaceApplyPreferences?: (preferences: { preferredStationMood?: string | null; defaultVolume?: number; backgroundOverrideMood?: string | null }) => void;
     __musicspaceSetLobbyMode?: (enabled: boolean) => void;
     __musicspaceSetLobbyOverlaySupport?: (message: string) => void;
+    __musicspaceSyncRoomSurfaces?: (surfaces: RoomSurfaceSnapshot[]) => void;
   }
 }
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
+import { getUrl } from 'aws-amplify/storage';
 let controls: any;
 import { addVaporToCoffee } from '../addingVapor.js'; // Import the vapor function
 import { animateFlowers, initializeWindEffectOnModel } from '../wind'; // Import wind animation
 import { loadPreferences } from '../preferences/preferencesStore';
+import type { RoomSurfaceSnapshot } from '../types/room';
 //import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 //import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 //import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
@@ -86,6 +89,7 @@ let sceneMode: SceneMode | null = null;
 let lobbyCameraTime = 0;
 const lobbyCameraPosition = new THREE.Vector3(0, -10, 0);
 const lobbyCameraYawSpeed = Math.PI / 90;
+const FRAME_SURFACE_IDS = ['image01', 'image02', 'image03', 'image04'] as const;
 
 export function initializeApp() {
   console.log(`isTouchDevice: ${isTouchDevice}`); // Diagnostic log
@@ -264,7 +268,7 @@ lobbyOverlayHeadline.innerHTML = 'Step into<br>the session';
 
 const lobbyOverlaySupport = document.createElement('div');
 lobbyOverlaySupport.className = 'lobby-overlay-support';
-lobbyOverlaySupport.textContent = 'Sign in to claim ownership and moderation controls.';
+  lobbyOverlaySupport.textContent = 'Sign in to create a saved room with ownership and moderation controls.';
 
 lobbyOverlay.append(lobbyOverlayEyebrow, lobbyOverlayHeadline, lobbyOverlaySupport);
 
@@ -1732,6 +1736,9 @@ staticModelUrls.forEach(url => {
     modelScene.name = modelName;
 
     scene.add(modelScene);
+    if ((FRAME_SURFACE_IDS as readonly string[]).includes(modelName)) {
+      applyActiveSurfaceSource(modelName);
+    }
 
     // Initialize wind effect for plant leaves
     if (url === '/models/plantleaves2_L.glb') {
@@ -1811,55 +1818,111 @@ staticModelUrls.forEach(url => {
     }
   });
 });
+const frameTextureLoader = new THREE.TextureLoader(manager);
+const moodSurfaceSources = new Map<string, string>();
+const roomSurfaceSources = new Map<string, RoomSurfaceSnapshot>();
+const appliedSurfaceSources = new Map<string, string>();
+const surfaceRequestTokens = new Map<string, number>();
 
+function findFrameMesh(surfaceId: string): THREE.Mesh | null {
+  let meshToUpdate: THREE.Mesh | null = null;
+  scene.traverse((obj) => {
+    if ((obj as THREE.Mesh).isMesh && obj.name === surfaceId) {
+      meshToUpdate = obj as THREE.Mesh;
+    }
+  });
+  return meshToUpdate;
+}
 
+function buildSurfaceMaterial(texture: THREE.Texture) {
+  texture.flipY = false;
+  texture.colorSpace = THREE.SRGBColorSpace;
 
-// Function to switch mood textures
-function switchMoodTextures(mood: string) {
-  const loader = new THREE.TextureLoader(manager);
+  const updatedMaterial = new THREE.MeshStandardMaterial({
+    map: texture,
+    metalness: 0.0,
+    roughness: 1.0,
+    toneMapped: true,
+  });
+  updatedMaterial.needsUpdate = true;
+  return updatedMaterial;
+}
 
-  const frameNames = ['image01', 'image02', 'image03', 'image04'];
+function applySurfaceTextureFromUrl(surfaceId: string, textureUrl: string) {
+  const meshToUpdate = findFrameMesh(surfaceId);
+  if (!meshToUpdate) {
+    console.warn(`Mesh not found: ${surfaceId}`);
+    return;
+  }
 
-  frameNames.forEach((frameName) => {
-    const texturePath = `/images/moods/${mood}/${frameName}.png`;
+  const currentSource = appliedSurfaceSources.get(surfaceId);
+  if (currentSource === textureUrl) {
+    return;
+  }
 
-    let meshToUpdate: THREE.Mesh | null = null;
-
-    scene.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh && obj.name === frameName) {
-        meshToUpdate = obj as THREE.Mesh;
-      }
-    });
-
-    if (!meshToUpdate) {
-      console.warn(`Mesh not found: ${frameName}`);
+  const requestToken = (surfaceRequestTokens.get(surfaceId) ?? 0) + 1;
+  surfaceRequestTokens.set(surfaceId, requestToken);
+  frameTextureLoader.load(textureUrl, (newTexture) => {
+    if (surfaceRequestTokens.get(surfaceId) !== requestToken) {
+      newTexture.dispose();
       return;
     }
 
-    loader.load(texturePath, (newTexture) => {
-      //renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      //renderer.toneMappingExposure = 1.2;
-      //(renderer as any).outputEncoding = (THREE as any).sRGBEncoding;
-
-      newTexture.flipY = false;
-      //(newTexture as any).encoding = (THREE as any).sRGBEncoding;
-      newTexture.colorSpace = THREE.SRGBColorSpace;
-
-      // Create a new standard material (instead of keeping AO/etc from the GLB)
-      const updatedMaterial = new THREE.MeshStandardMaterial({
-        map: newTexture,
-        metalness: 0.0,
-        roughness: 1.0,
-        toneMapped: true
-      });
-
-      updatedMaterial.needsUpdate = true;
-      meshToUpdate!.material = updatedMaterial;
-
-      console.log(`✅ Replaced full material for ${frameName}`);
-    });
+    const previousMaterial = meshToUpdate.material;
+    meshToUpdate.material = buildSurfaceMaterial(newTexture);
+    appliedSurfaceSources.set(surfaceId, textureUrl);
+    if (Array.isArray(previousMaterial)) {
+      previousMaterial.forEach((material) => material.dispose?.());
+    } else {
+      previousMaterial?.dispose?.();
+    }
   });
 }
+
+async function applySurfaceTexture(surfaceId: string, imagePath: string) {
+  try {
+    const result = await getUrl({ path: imagePath });
+    applySurfaceTextureFromUrl(surfaceId, result.url.toString());
+  } catch (error) {
+    console.error(`Failed to resolve room surface ${surfaceId}`, error);
+    const fallbackSource = moodSurfaceSources.get(surfaceId);
+    if (fallbackSource) {
+      applySurfaceTextureFromUrl(surfaceId, fallbackSource);
+    }
+  }
+}
+
+function applyActiveSurfaceSource(surfaceId: string) {
+  const roomSurface = roomSurfaceSources.get(surfaceId);
+  if (roomSurface) {
+    void applySurfaceTexture(surfaceId, roomSurface.imagePath);
+    return;
+  }
+
+  const moodSource = moodSurfaceSources.get(surfaceId);
+  if (moodSource) {
+    applySurfaceTextureFromUrl(surfaceId, moodSource);
+  }
+}
+
+// Function to switch mood textures
+function switchMoodTextures(mood: string) {
+  FRAME_SURFACE_IDS.forEach((frameName) => {
+    moodSurfaceSources.set(frameName, `/images/moods/${mood}/${frameName}.png`);
+    applyActiveSurfaceSource(frameName);
+  });
+}
+
+window.__musicspaceSyncRoomSurfaces = (surfaces) => {
+  roomSurfaceSources.clear();
+  surfaces.forEach((surface) => {
+    roomSurfaceSources.set(surface.surfaceId, surface);
+  });
+
+  FRAME_SURFACE_IDS.forEach((surfaceId) => {
+    applyActiveSurfaceSource(surfaceId);
+  });
+};
 
 (window as any).switchMoodTextures = switchMoodTextures;
 

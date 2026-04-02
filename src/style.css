@@ -297,8 +297,8 @@ button:focus-visible {
 }
 
 #chat-panel {
-  flex: 1 1 auto;
-  min-height: 220px;
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 #participant-list {
@@ -552,6 +552,10 @@ body.mouse #mobile-controls-layer {
   #chat-panel > div:nth-child(2) {
     min-height: 92px !important;
     max-height: 120px !important;
+  }
+
+  .chat-surface-controls {
+    grid-template-columns: 1fr;
   }
 
   .preferences-toggle {
@@ -887,8 +891,8 @@ body.mouse #mobile-controls-layer {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-height: 140px;
-  max-height: 220px;
+  min-height: 120px;
+  max-height: 160px;
   overflow-y: auto;
   padding: 2px 2px 0;
 }
@@ -917,6 +921,44 @@ body.mouse #mobile-controls-layer {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
+}
+
+.chat-surface-section {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.chat-surface-title {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chat-surface-helper {
+  color: #9eacbe;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.chat-surface-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.chat-surface-select,
+.chat-surface-file {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.chat-surface-upload-button {
+  min-width: 76px;
 }
 
 .participant-action-button {

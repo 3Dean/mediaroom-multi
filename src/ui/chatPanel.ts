@@ -1,14 +1,31 @@
 import type { ChatMessage } from '../types/chat';
+import type { RoomRole, RoomSurfaceId } from '../types/room';
+
+type ChatPanelOptions = {
+  onSend: (body: string) => void;
+  onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
+};
+
+const SURFACE_IDS: RoomSurfaceId[] = ['image01', 'image02', 'image03', 'image04'];
 
 export class ChatPanel {
   private readonly container: HTMLDivElement;
   private readonly log: HTMLDivElement;
   private readonly form: HTMLFormElement;
   private readonly input: HTMLInputElement;
+  private readonly surfaceSection: HTMLDivElement;
+  private readonly surfaceSelect: HTMLSelectElement;
+  private readonly surfaceFileInput: HTMLInputElement;
+  private readonly surfaceUploadButton: HTMLButtonElement;
+  private readonly surfaceHelper: HTMLDivElement;
   private readonly onSend: (body: string) => void;
+  private readonly onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
+  private surfaceUploadEnabled = false;
+  private surfaceUploadVisible = false;
 
-  constructor(onSend: (body: string) => void) {
-    this.onSend = onSend;
+  constructor(options: ChatPanelOptions) {
+    this.onSend = options.onSend;
+    this.onUploadSurface = options.onUploadSurface;
     this.container = document.createElement('div');
     this.container.id = 'chat-panel';
     this.container.className = 'musicspace-panel musicspace-panel--utility';
@@ -52,8 +69,48 @@ export class ChatPanel {
       this.input.value = '';
     });
 
+    this.surfaceSection = document.createElement('div');
+    this.surfaceSection.className = 'chat-surface-section';
+
+    const surfaceTitle = document.createElement('div');
+    surfaceTitle.className = 'chat-surface-title';
+    surfaceTitle.textContent = 'Shared surfaces';
+
+    this.surfaceHelper = document.createElement('div');
+    this.surfaceHelper.className = 'chat-surface-helper';
+    this.surfaceHelper.textContent = 'Owner/admin can replace image01-image04 for everyone in the room.';
+
+    const surfaceControls = document.createElement('div');
+    surfaceControls.className = 'chat-surface-controls';
+
+    this.surfaceSelect = document.createElement('select');
+    this.surfaceSelect.className = 'chat-surface-select';
+    SURFACE_IDS.forEach((surfaceId) => {
+      const option = document.createElement('option');
+      option.value = surfaceId;
+      option.textContent = surfaceId;
+      this.surfaceSelect.appendChild(option);
+    });
+
+    this.surfaceFileInput = document.createElement('input');
+    this.surfaceFileInput.type = 'file';
+    this.surfaceFileInput.accept = 'image/png,image/jpeg,image/webp';
+    this.surfaceFileInput.className = 'chat-surface-file';
+
+    this.surfaceUploadButton = document.createElement('button');
+    this.surfaceUploadButton.type = 'button';
+    this.surfaceUploadButton.textContent = 'Upload';
+    this.surfaceUploadButton.className = 'chat-surface-upload-button';
+    this.surfaceUploadButton.addEventListener('click', () => {
+      void this.handleSurfaceUpload();
+    });
+
+    surfaceControls.append(this.surfaceSelect, this.surfaceFileInput, this.surfaceUploadButton);
+    this.surfaceSection.append(surfaceTitle, this.surfaceHelper, surfaceControls);
+
     header.append(title, status);
-    this.container.append(header, this.log, this.form);
+    this.container.append(header, this.log, this.form, this.surfaceSection);
+    this.setSurfaceUploadState(null, false);
   }
 
   mount(parent: HTMLElement = document.body): void {
@@ -70,10 +127,75 @@ export class ChatPanel {
     this.log.scrollTop = this.log.scrollHeight;
   }
 
+  setSurfaceUploadState(role: RoomRole | null, isPersistedRoom: boolean): void {
+    const canManageSurfaces = role === 'owner' || role === 'admin';
+    const visible = canManageSurfaces || !isPersistedRoom;
+    const enabled = canManageSurfaces && isPersistedRoom;
+    this.surfaceUploadVisible = visible;
+    this.surfaceUploadEnabled = enabled;
+    this.surfaceSection.style.display = visible ? 'grid' : 'none';
+    this.surfaceSelect.disabled = !enabled;
+    this.surfaceFileInput.disabled = !enabled;
+    this.surfaceUploadButton.disabled = !enabled;
+    if (enabled) {
+      this.surfaceHelper.textContent = 'Upload PNG, JPG, or WebP to replace image01-image04 for everyone in the room.';
+    } else if (!isPersistedRoom) {
+      this.surfaceHelper.textContent = 'Shared surfaces are available only in saved rooms. Sign in and create the room to enable them.';
+    } else {
+      this.surfaceHelper.textContent = 'Owner/admin can replace image01-image04 for everyone in the room.';
+    }
+    if (!enabled) {
+      this.surfaceFileInput.value = '';
+      this.surfaceUploadButton.textContent = 'Upload';
+    }
+  }
+
+  private async handleSurfaceUpload(): Promise<void> {
+    if (!this.surfaceUploadEnabled) {
+      if (this.surfaceUploadVisible) {
+        this.surfaceHelper.textContent = 'Shared surfaces are available only to owner/admin in saved rooms.';
+      }
+      return;
+    }
+
+    const file = this.surfaceFileInput.files?.[0];
+    if (!file) {
+      this.surfaceHelper.textContent = 'Choose an image before uploading.';
+      return;
+    }
+
+    const surfaceId = this.surfaceSelect.value as RoomSurfaceId;
+    this.surfaceUploadButton.disabled = true;
+    this.surfaceSelect.disabled = true;
+    this.surfaceFileInput.disabled = true;
+    this.surfaceUploadButton.textContent = 'Uploading...';
+    this.surfaceHelper.textContent = `Uploading ${file.name} to ${surfaceId}...`;
+
+    try {
+      await this.onUploadSurface(surfaceId, file);
+      this.surfaceHelper.textContent = `${surfaceId} updated for the room.`;
+      this.surfaceFileInput.value = '';
+    } catch (error) {
+      this.surfaceHelper.textContent = getErrorMessage(error, 'Unable to upload that image right now.');
+    } finally {
+      this.surfaceUploadButton.disabled = !this.surfaceUploadEnabled;
+      this.surfaceSelect.disabled = !this.surfaceUploadEnabled;
+      this.surfaceFileInput.disabled = !this.surfaceUploadEnabled;
+      this.surfaceUploadButton.textContent = 'Upload';
+    }
+  }
+
   private createMessageRow(message: ChatMessage): HTMLDivElement {
     const row = document.createElement('div');
     row.className = 'chat-message';
     row.innerHTML = `<strong>${message.displayName}:</strong> ${message.body}`;
     return row;
   }
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
 }

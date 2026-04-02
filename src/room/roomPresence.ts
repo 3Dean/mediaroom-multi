@@ -7,10 +7,12 @@ export function applyServerMessage(store: RoomStateStore, message: ServerMessage
     case 'room.joined': {
       store.hydrate({
         roomId: message.roomId,
+        isPersisted: message.isPersisted,
         selfSessionId: message.selfSessionId,
         participants: message.participants,
         seats: message.seats,
         objects: message.objects,
+        surfaces: message.surfaces,
         authority: message.authority,
         selfRole: message.selfRole,
         recentMessages: message.recentMessages,
@@ -33,6 +35,10 @@ export function applyServerMessage(store: RoomStateStore, message: ServerMessage
     }
     case 'object.updated': {
       store.upsertObject(message.object as InteractableObjectState);
+      return;
+    }
+    case 'surface.updated': {
+      store.upsertSurface(message.surface);
       return;
     }
     case 'room.authority.updated': {

@@ -1,7 +1,7 @@
 import type { ChatMessage } from '../types/chat';
 import type { InteractableObjectState, SeatState } from '../types/interactions';
 import type { PlayerPresence } from '../types/player';
-import type { RoomAuthority, RoomSnapshot, RoomState } from '../types/room';
+import type { RoomAuthority, RoomSnapshot, RoomState, RoomSurfaceSnapshot } from '../types/room';
 
 const emptyAuthority = (): RoomAuthority => ({
   ownerUserId: null,
@@ -12,10 +12,12 @@ const emptyAuthority = (): RoomAuthority => ({
 
 const emptyRoomState = (): RoomState => ({
   roomId: '',
+  isPersisted: false,
   selfSessionId: null,
   participants: {},
   seats: {},
   objects: {},
+  surfaces: {},
   authority: emptyAuthority(),
   selfRole: null,
   messages: [],
@@ -27,10 +29,12 @@ export class RoomStateStore {
   getSnapshot(): RoomState {
     return {
       roomId: this.state.roomId,
+      isPersisted: this.state.isPersisted,
       selfSessionId: this.state.selfSessionId,
       participants: { ...this.state.participants },
       seats: { ...this.state.seats },
       objects: { ...this.state.objects },
+      surfaces: { ...this.state.surfaces },
       authority: {
         ownerUserId: this.state.authority.ownerUserId,
         adminUserIds: [...this.state.authority.adminUserIds],
@@ -53,6 +57,8 @@ export class RoomStateStore {
     this.state.participants = {};
     this.state.seats = {};
     this.state.objects = {};
+    this.state.surfaces = {};
+    this.state.isPersisted = false;
     this.state.authority = emptyAuthority();
     this.state.selfRole = null;
     this.state.selfSessionId = null;
@@ -60,12 +66,14 @@ export class RoomStateStore {
 
   hydrate(snapshot: RoomSnapshot): void {
     this.state.roomId = snapshot.roomId;
+    this.state.isPersisted = snapshot.isPersisted;
     this.state.selfSessionId = snapshot.selfSessionId;
     this.state.participants = Object.fromEntries(
       snapshot.participants.map((participant) => [participant.sessionId, participant]),
     );
     this.state.seats = Object.fromEntries(snapshot.seats.map((seat) => [seat.seatId, seat]));
     this.state.objects = Object.fromEntries(snapshot.objects.map((object) => [object.objectId, object]));
+    this.state.surfaces = Object.fromEntries(snapshot.surfaces.map((surface) => [surface.surfaceId, surface]));
     this.state.authority = {
       ownerUserId: snapshot.authority.ownerUserId,
       adminUserIds: [...snapshot.authority.adminUserIds],
@@ -90,6 +98,10 @@ export class RoomStateStore {
 
   upsertObject(object: InteractableObjectState): void {
     this.state.objects[object.objectId] = object;
+  }
+
+  upsertSurface(surface: RoomSurfaceSnapshot): void {
+    this.state.surfaces[surface.surfaceId] = surface;
   }
 
   setAuthority(authority: RoomAuthority, selfRole: RoomState['selfRole']): void {

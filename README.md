@@ -80,6 +80,23 @@ To enable verified room ownership/admin controls, the realtime server must be ab
 
 To persist room authority in the Amplify backend data model across redeploys, the realtime server also needs AWS credentials that can call the Amplify AppSync API using IAM. Without those credentials, the server falls back to the local file store in `server/data/room-authority-store.json`.
 
+## Room lifecycle
+
+The room flow now distinguishes between temporary guest sessions and saved rooms:
+
+- signed-in users can create new saved rooms
+- saved rooms are persisted to the backend and appear in the room browser
+- guests can join saved rooms
+- guests entering a brand-new link create a temporary room session, not a saved room
+- durable room features such as shared surface uploads are available only in saved rooms
+
+In the room panel this means:
+
+- known saved room: `Join Room`
+- signed-in user + new link: `Create Room`
+- signed-out user + new link: `Enter as Guest`
+- current room: `Re-Enter Room`
+
 For operational debugging, the realtime server now emits structured JSON logs for joins, disconnects, moderation actions, chat enforcement, and authority persistence failures. Use `REALTIME_LOG_LEVEL=debug|info|warn|error` to control verbosity. `info` is the default and is appropriate for Render.
 
 ## Health check
@@ -133,4 +150,5 @@ Detailed steps are in `DEPLOYMENT.md`.
 - improve remote avatar presentation beyond placeholders
 - improve shared object sync beyond claim/drop authority only
 - evaluate voice chat after the room/session UX is stable
+- consider a future "claim/save this room" action for users who sign in after starting in a temporary guest room
 - revisit editable room titles later as an owner-only room setting, not part of the join flow

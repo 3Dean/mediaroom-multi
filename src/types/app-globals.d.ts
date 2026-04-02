@@ -29,6 +29,13 @@ type LivePreferencesSnapshot = {
   backgroundOverrideMood?: string | null;
 };
 
+type SurfaceSnapshot = {
+  surfaceId: 'image01' | 'image02' | 'image03' | 'image04';
+  imagePath: string;
+  updatedByUserId: string;
+  updatedAt: string;
+};
+
 type RemoteParticipantSnapshot = {
   sessionId: string;
   position: { x: number; y: number; z: number };
@@ -57,6 +64,7 @@ declare global {
     __musicspaceGetStationOptions?: () => StationOptionSnapshot[];
     __musicspaceApplyPreferences?: (preferences: LivePreferencesSnapshot) => void;
     __musicspaceGetRemoteParticipants?: () => RemoteParticipantSnapshot[];
+    __musicspaceSyncRoomSurfaces?: (surfaces: SurfaceSnapshot[]) => void;
   }
 }
 

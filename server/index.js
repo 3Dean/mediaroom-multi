@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { WebSocketServer } from 'ws';
 import { canUseBackendPersistence, loadAuthorityFromBackend, loadFallbackAuthorityStore, normalizeAuthority as normalizeRoomAuthority, persistFallbackAuthorityStore, saveAuthorityToBackend } from './roomAuthorityRepository.js';
+import { canUseSurfaceBackendPersistence, loadSurfaceSnapshotsFromBackend, saveSurfaceSnapshotToBackend } from './roomSurfaceRepository.js';
 
 const HOST = process.env.REALTIME_HOST?.trim() || null;
 const PORT = Number(process.env.REALTIME_PORT ?? process.env.PORT ?? 8787);
@@ -17,8 +18,10 @@ const MAX_DISPLAY_NAME_LENGTH = Number(process.env.REALTIME_MAX_DISPLAY_NAME_LEN
 const MAX_ROOM_ID_LENGTH = Number(process.env.REALTIME_MAX_ROOM_ID_LENGTH ?? 64);
 const MAX_OBJECT_ID_LENGTH = Number(process.env.REALTIME_MAX_OBJECT_ID_LENGTH ?? 64);
 const MAX_SEAT_ID_LENGTH = Number(process.env.REALTIME_MAX_SEAT_ID_LENGTH ?? 64);
+const MAX_SURFACE_IMAGE_PATH_LENGTH = Number(process.env.REALTIME_MAX_SURFACE_IMAGE_PATH_LENGTH ?? 512);
 const LOG_LEVEL = normalizeLogLevel(process.env.REALTIME_LOG_LEVEL);
 const DEFAULT_EYE_HEIGHT = 1.6;
+const VALID_SURFACE_IDS = new Set(['image01', 'image02', 'image03', 'image04']);
 const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.REALTIME_ALLOWED_ORIGINS ?? process.env.RENDER_EXTERNAL_URL ?? '');
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const AMPLIFY_OUTPUTS_PATH = join(__dirname, '..', 'amplify_outputs.json');
@@ -49,6 +52,8 @@ const roomSockets = new Map();
 const roomMessages = new Map();
 const roomSeats = new Map();
 const roomObjects = new Map();
+const roomSurfaces = new Map();
+const hydratedSurfaceRooms = new Set();
 const chatRateLimits = new Map();
 const roomAuthorities = new Map(Object.entries(loadFallbackAuthorityStore()).map(([roomId, authority]) => [roomId, normalizeRoomAuthority(authority)]));
 const jwksCache = new Map();
@@ -66,7 +71,9 @@ const server = createServer((request, response) => {
       servingDist: HAS_DIST,
       spawnPoints: SPAWN_POINTS.length,
       authorityRooms: roomAuthorities.size,
+      surfaceRooms: roomSurfaces.size,
       authorityPersistence: canUseBackendPersistence() ? 'backend+fallback' : 'fallback-only',
+      surfacePersistence: canUseSurfaceBackendPersistence() ? 'backend' : 'memory-only',
       cognitoIssuer: COGNITO_ISSUER || null,
     }));
     return;
@@ -193,6 +200,9 @@ async function handleClientMessage(socket, message) {
     case 'admin.setRoomLock':
       await handleAdminSetRoomLock(socket, message);
       return;
+    case 'admin.setSurfaceImage':
+      await handleAdminSetSurfaceImage(socket, message);
+      return;
     case 'ping':
       send(socket, { type: 'pong', ts: message.ts });
       return;
@@ -264,6 +274,7 @@ async function handleRoomJoin(socket, message) {
   const sockets = ensureRoomSockets(roomId);
   const seats = ensureRoomSeats(roomId);
   const objects = ensureRoomObjects(roomId);
+  const surfaces = await ensureRoomSurfaces(roomId);
   const spawn = selectSpawnPoint(participants);
   const participant = {
     sessionId,
@@ -299,10 +310,12 @@ async function handleRoomJoin(socket, message) {
   send(socket, {
     type: 'room.joined',
     roomId,
+    isPersisted: Boolean(authority.roomRecordId),
     selfSessionId: sessionId,
     participants: Array.from(participants.values()),
     seats,
     objects,
+    surfaces,
     authority: serializeAuthority(authority),
     selfRole,
     recentMessages: roomMessages.get(roomId) ?? [],
@@ -724,6 +737,60 @@ async function handleAdminSetRoomLock(socket, message) {
   pushSystemNotice(roomId, `${actor.displayName} ${message.locked ? 'locked' : 'unlocked'} the room.`);
 }
 
+async function handleAdminSetSurfaceImage(socket, message) {
+  const roomId = getSocketRoomId(socket, message.roomId);
+  const sessionId = getSocketSessionId(socket, message.sessionId);
+  const surfaceId = normalizeSurfaceId(message.surfaceId);
+  const imagePath = normalizeToken(message.imagePath, MAX_SURFACE_IMAGE_PATH_LENGTH);
+  if (!roomId || !sessionId || !surfaceId || !imagePath) {
+    return;
+  }
+
+  const actor = getParticipant(roomId, sessionId);
+  if (!actor?.userId) {
+    send(socket, { type: 'error', code: 'forbidden', message: 'You must be signed in to update room surfaces.' });
+    return;
+  }
+
+  const actorRole = resolveRole(actor.userId, ensureRoomAuthority(roomId));
+  if (actorRole !== 'owner' && actorRole !== 'admin') {
+    logEvent('warn', 'surface.update.denied', {
+      roomId,
+      actorUserId: actor.userId,
+      surfaceId,
+      reason: 'insufficient_role',
+    });
+    send(socket, { type: 'error', code: 'forbidden', message: 'Only the room owner or admins can update shared surfaces.' });
+    return;
+  }
+
+  const surface = {
+    surfaceId,
+    imagePath,
+    updatedByUserId: actor.userId,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const surfaces = await ensureRoomSurfaces(roomId);
+  const nextSurface = await persistRoomSurface(roomId, surface);
+  const index = surfaces.findIndex((entry) => entry.surfaceId === surfaceId);
+  if (index >= 0) {
+    surfaces[index] = nextSurface;
+  } else {
+    surfaces.push(nextSurface);
+  }
+
+  logEvent('info', 'surface.update', {
+    roomId,
+    actorUserId: actor.userId,
+    actorDisplayName: actor.displayName,
+    surfaceId,
+    imagePath,
+  });
+  broadcast(roomId, { type: 'surface.updated', surface: nextSurface });
+  pushSystemNotice(roomId, `${actor.displayName} updated ${surfaceId}.`);
+}
+
 function cleanupSocket(socket, roomId = socket.roomId, sessionId = socket.sessionId) {
   if (!roomId || !sessionId) return;
 
@@ -794,6 +861,30 @@ function ensureRoomObjects(roomId) {
   return created;
 }
 
+async function ensureRoomSurfaces(roomId) {
+  if (!hydratedSurfaceRooms.has(roomId)) {
+    hydratedSurfaceRooms.add(roomId);
+    try {
+      roomSurfaces.set(roomId, await loadSurfaceSnapshotsFromBackend(roomId));
+    } catch (error) {
+      hydratedSurfaceRooms.delete(roomId);
+      logEvent('error', 'surface.hydrate.failed', {
+        roomId,
+        error: formatErrorForLog(error),
+      });
+      if (!roomSurfaces.has(roomId)) {
+        roomSurfaces.set(roomId, []);
+      }
+    }
+  }
+
+  const existing = roomSurfaces.get(roomId);
+  if (existing) return existing;
+  const created = [];
+  roomSurfaces.set(roomId, created);
+  return created;
+}
+
 function ensureRoomAuthority(roomId) {
   const existing = roomAuthorities.get(roomId);
   if (existing) {
@@ -847,6 +938,20 @@ async function persistRoomAuthority(roomId, options = {}) {
   return authority;
 }
 
+async function persistRoomSurface(roomId, surface) {
+  try {
+    const persisted = await saveSurfaceSnapshotToBackend(roomId, surface);
+    return persisted ?? surface;
+  } catch (error) {
+    logEvent('error', 'surface.persist.failed', {
+      roomId,
+      surfaceId: surface.surfaceId,
+      error: formatErrorForLog(error),
+    });
+    return surface;
+  }
+}
+
 function ensureSeatState(seats, seatId) {
   let seat = seats.find((entry) => entry.seatId === seatId);
   if (seat) return seat;
@@ -883,6 +988,10 @@ function normalizeToken(value, maxLength) {
 
 function normalizeDisplayName(value) {
   return typeof value === 'string' && value.trim() && value.trim().length <= MAX_DISPLAY_NAME_LENGTH ? value.trim() : null;
+}
+
+function normalizeSurfaceId(value) {
+  return typeof value === 'string' && VALID_SURFACE_IDS.has(value.trim()) ? value.trim() : null;
 }
 
 function getSocketRoomId(socket, roomId) {
