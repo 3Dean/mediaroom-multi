@@ -63,6 +63,8 @@ export class RoomPanel {
   private readonly form: HTMLFormElement;
   private readonly roomInput: HTMLInputElement;
   private readonly nameInput: HTMLInputElement;
+  private readonly joinButton: HTMLButtonElement;
+  private readonly joinHelper: HTMLDivElement;
   private readonly statusLabel: HTMLDivElement;
   private readonly metaLabel: HTMLDivElement;
   private readonly roomListStatus: HTMLDivElement;
@@ -118,6 +120,7 @@ export class RoomPanel {
     this.roomInput.type = 'text';
     this.roomInput.placeholder = 'Room link / slug';
     this.roomInput.value = options.initialRoomSlug?.trim() || this.generatedRoomSlug;
+    this.roomInput.addEventListener('input', () => this.refreshJoinIntent());
 
     const roomSlugLabel = document.createElement('label');
     roomSlugLabel.className = 'room-field-label';
@@ -132,13 +135,13 @@ export class RoomPanel {
     this.nameInput.placeholder = 'Display name';
     this.nameInput.value = options.initialDisplayName?.trim() || localStorage.getItem(STORAGE_KEYS.displayName) || '';
 
-    const joinButton = document.createElement('button');
-    joinButton.type = 'submit';
-    joinButton.textContent = 'Enter Room';
+    this.joinButton = document.createElement('button');
+    this.joinButton.type = 'submit';
+    this.joinButton.textContent = 'Create Room';
 
-    const helper = document.createElement('div');
-    helper.className = 'room-join-helper';
-    helper.textContent = 'Browse Rooms is available after sign-in.';
+    this.joinHelper = document.createElement('div');
+    this.joinHelper.className = 'room-join-helper';
+    this.joinHelper.textContent = 'This link is new. A room will be created.';
 
     this.statusLabel = document.createElement('div');
     this.statusLabel.style.color = '#c8c8c8';
@@ -196,8 +199,8 @@ export class RoomPanel {
       this.roomInput,
       displayNameLabel,
       this.nameInput,
-      joinButton,
-      helper,
+      this.joinButton,
+      this.joinHelper,
     );
     this.form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -209,6 +212,7 @@ export class RoomPanel {
     this.metaLabel.className = 'panel-meta room-meta';
 
     this.container.append(header, formSection, listSection, this.statusLabel, this.metaLabel);
+    this.refreshJoinIntent();
   }
 
   mount(parent: HTMLElement = document.body): void {
@@ -244,6 +248,7 @@ export class RoomPanel {
     this.roomListStatus.textContent = message;
     this.roomFilterInput.value = '';
     this.roomList.replaceChildren();
+    this.refreshJoinIntent();
   }
 
   setRoomListSignedOut(message = 'Sign in to load persisted rooms.'): void {
@@ -251,6 +256,7 @@ export class RoomPanel {
     this.roomListStatus.textContent = message;
     this.roomFilterInput.value = '';
     this.roomList.replaceChildren();
+    this.refreshJoinIntent();
   }
 
   setRoomListError(message = 'Unable to load rooms right now.'): void {
@@ -258,12 +264,14 @@ export class RoomPanel {
     this.roomListStatus.textContent = message;
     this.roomFilterInput.value = '';
     this.roomList.replaceChildren();
+    this.refreshJoinIntent();
   }
 
   setRooms(rooms: RoomSummary[], activeRoomSlug?: string | null): void {
     this.rooms = [...rooms];
     this.activeRoomSlug = activeRoomSlug ?? null;
     this.renderRooms();
+    this.refreshJoinIntent();
   }
 
   private renderRooms(): void {
@@ -371,6 +379,27 @@ export class RoomPanel {
     localStorage.setItem(STORAGE_KEYS.lastRoomSlug, values.roomSlug);
     localStorage.setItem(STORAGE_KEYS.displayName, values.displayName);
     this.onJoin(values);
+  }
+
+  private refreshJoinIntent(): void {
+    const roomSlug = this.roomInput.value.trim().toLowerCase();
+    const activeRoomSlug = this.activeRoomSlug?.trim().toLowerCase() ?? null;
+    const matchedRoom = roomSlug ? this.rooms.find((room) => room.slug.toLowerCase() === roomSlug) : null;
+
+    if (activeRoomSlug && roomSlug && roomSlug === activeRoomSlug) {
+      this.joinButton.textContent = 'Re-Enter Room';
+      this.joinHelper.textContent = 'You are already in this room. Re-enter to refresh your session.';
+      return;
+    }
+
+    if (matchedRoom) {
+      this.joinButton.textContent = 'Join Room';
+      this.joinHelper.textContent = 'This room already exists. You will join it.';
+      return;
+    }
+
+    this.joinButton.textContent = 'Create Room';
+    this.joinHelper.textContent = 'This link is new. A room will be created.';
   }
 }
 

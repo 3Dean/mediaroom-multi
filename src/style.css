@@ -506,18 +506,21 @@ body.mouse #mobile-controls-layer {
 @media (max-width: 768px), (pointer: coarse) {
   #musicspace-lobby-overlay {
     top: auto;
-    right: 18px;
-    bottom: 26px;
-    max-width: min(52vw, 340px);
-    padding: 16px 18px;
+    left: 14px;
+    right: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
+    max-width: min(40vw, 220px);
+    padding: 14px 14px 16px;
   }
 
   .lobby-overlay-headline {
-    font-size: clamp(28px, 7vw, 42px);
+    font-size: clamp(22px, 5.4vw, 30px);
   }
 
   .lobby-overlay-support {
-    font-size: 14px;
+    max-width: 18ch;
+    font-size: 12px;
+    line-height: 1.38;
   }
 
   #musicspace-sidebar {
@@ -579,20 +582,21 @@ body.mouse #mobile-controls-layer {
 
 @media (max-width: 720px) {
   #musicspace-lobby-overlay {
-    right: 16px;
-    left: 16px;
-    bottom: 20px;
-    max-width: none;
-    padding: 14px 16px;
+    top: auto;
+    left: 12px;
+    right: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 68px);
+    max-width: min(44vw, 190px);
+    padding: 12px 12px 14px;
   }
 
   .lobby-overlay-headline {
-    font-size: clamp(24px, 8vw, 34px);
+    font-size: clamp(18px, 5vw, 24px);
   }
 
   .lobby-overlay-support {
-    max-width: 30ch;
-    font-size: 13px;
+    max-width: 16ch;
+    font-size: 11px;
   }
 }
 
