@@ -79,6 +79,14 @@ const server = createServer((request, response) => {
     return;
   }
 
+  if (request.url === '/api/rooms/live') {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({
+      rooms: listLiveRooms(),
+    }));
+    return;
+  }
+
   if (HAS_DIST) {
     serveStaticAsset(request, response);
     return;
@@ -835,6 +843,26 @@ function ensureRoomParticipants(roomId) {
   const created = new Map();
   roomParticipants.set(roomId, created);
   return created;
+}
+
+function listLiveRooms() {
+  return Array.from(roomParticipants.entries())
+    .filter(([, participants]) => participants.size > 0)
+    .map(([roomId, participants]) => {
+      const authority = roomAuthorities.get(roomId) ?? null;
+      const lastActiveAt = new Date(Math.max(...Array.from(participants.values()).map((participant) => participant.updatedAt || Date.now()))).toISOString();
+      return {
+        id: roomId,
+        slug: roomId,
+        name: roomId,
+        maxUsers: MAX_ROOM_SIZE,
+        isPersisted: Boolean(authority?.roomRecordId),
+        isPrivate: false,
+        isLocked: Boolean(authority?.isLocked),
+        liveParticipantCount: participants.size,
+        lastActiveAt,
+      };
+    });
 }
 
 function ensureRoomSockets(roomId) {

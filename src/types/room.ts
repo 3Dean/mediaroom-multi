@@ -7,6 +7,10 @@ export type RoomSummary = {
   slug: string;
   name: string;
   maxUsers: number;
+  isPersisted?: boolean;
+  isLive?: boolean;
+  liveParticipantCount?: number;
+  lastActiveAt?: string;
   isPrivate?: boolean;
   isLocked?: boolean;
   createdBy?: string;

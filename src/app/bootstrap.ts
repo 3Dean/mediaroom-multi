@@ -119,17 +119,52 @@ export function bootstrapApp(): void {
 
     const refreshRooms = async () => {
       const activeRoomSlug = sessionStore.getCurrentSession()?.roomSlug ?? null;
-      if (!currentUser) {
-        knownRooms = [];
-        roomPanel.setRoomListSignedOut();
-        return;
-      }
-
       roomPanel.setRoomListLoading();
       try {
-        const { listRooms } = await import('../backend/dataClient');
-        knownRooms = await listRooms();
+        const { listLiveRooms, listRooms, mergeRoomSummaries } = await import('../backend/dataClient');
+        if (!currentUser) {
+          let liveRooms: RoomSummary[] = [];
+          try {
+            liveRooms = await listLiveRooms();
+          } catch (error) {
+            console.error('Failed to load live rooms', error);
+          }
+
+          knownRooms = mergeRoomSummaries([], liveRooms);
+          roomPanel.setRooms(knownRooms, activeRoomSlug);
+          roomPanel.setStatus('Signed out. Join a live room as guest or sign in to create a saved room.');
+          if (liveRooms.length === 0) {
+            roomPanel.setRoomListSignedOut('No live rooms right now. Sign in to load saved rooms.');
+          } else {
+            roomPanel.setRoomListStatusMessage(`${liveRooms.length} live room${liveRooms.length === 1 ? '' : 's'} available`);
+          }
+          return;
+        }
+
+        const [savedResult, liveResult] = await Promise.allSettled([listRooms(), listLiveRooms()]);
+        const nextSavedRooms = savedResult.status === 'fulfilled' ? savedResult.value : [];
+        const liveRooms = liveResult.status === 'fulfilled' ? liveResult.value : [];
+
+        if (savedResult.status === 'rejected') {
+          console.error('Failed to load persisted rooms', savedResult.reason);
+        }
+        if (liveResult.status === 'rejected') {
+          console.error('Failed to load live rooms', liveResult.reason);
+        }
+
+        knownRooms = mergeRoomSummaries(nextSavedRooms, liveRooms);
         roomPanel.setRooms(knownRooms, activeRoomSlug);
+        if (savedResult.status === 'rejected' && liveResult.status === 'fulfilled') {
+          roomPanel.setRoomListStatusMessage('Saved rooms are unavailable right now. Showing live rooms only.');
+          return;
+        }
+        if (savedResult.status === 'fulfilled' && liveResult.status === 'rejected') {
+          roomPanel.setStatus('Live room lookup is unavailable right now. Saved rooms are still available.');
+        }
+        if (savedResult.status === 'rejected' && liveResult.status === 'rejected') {
+          roomPanel.setRoomListError('Unable to load saved or live rooms right now.');
+          return;
+        }
       } catch (error) {
         console.error('Failed to load persisted rooms', error);
         roomPanel.setRoomListError('Unable to load persisted rooms.');
@@ -157,7 +192,7 @@ export function bootstrapApp(): void {
       const realtimeUrl = getRealtimeUrl();
       roomPanel.setStatus(`Joined ${roomSlug}. Connecting to ${realtimeUrl}.`);
       roomPanel.setMeta('Connecting');
-      roomPanel.setActiveRoom(roomSlug, knownRooms.some((room) => room.slug.toLowerCase() === roomSlug.toLowerCase()));
+      roomPanel.setActiveRoom(roomSlug, knownRooms.some((room) => room.slug.toLowerCase() === roomSlug.toLowerCase() && room.isPersisted));
       participantList.setConnectionStatus('Connecting');
 
       const nextRoomClient = new RoomClient({
@@ -224,7 +259,11 @@ export function bootstrapApp(): void {
         onMessage: (message) => {
           applyServerMessage(roomState, message);
           roomPanel.setActiveRoom(session.roomSlug, roomState.getSnapshot().isPersisted);
-          if (message.type === 'room.joined' && message.isPersisted && !knownRooms.some((room) => room.slug.toLowerCase() === session.roomSlug.toLowerCase())) {
+          if (
+            message.type === 'room.joined'
+            && message.isPersisted
+            && !knownRooms.some((room) => room.slug.toLowerCase() === session.roomSlug.toLowerCase() && room.isPersisted)
+          ) {
             void refreshRooms();
           }
           applyInitialSpawnTransform(message);
@@ -512,8 +551,8 @@ export function bootstrapApp(): void {
       authPanel.setUser(null);
       updateLobbyOverlay();
       roomPanel.setAuthenticationState(false);
-      roomPanel.setRoomListSignedOut();
-      roomPanel.setStatus('Join a saved room or enter a temporary guest room. Sign in to create saved rooms and use admin controls.');
+      void refreshRooms();
+      roomPanel.setStatus('Join a live room as guest or sign in to create saved rooms and use admin controls.');
     }
 
     window.addEventListener('beforeunload', () => {

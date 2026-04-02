@@ -854,6 +854,12 @@ body.mouse #mobile-controls-layer {
   border-color: rgba(214, 105, 42, 0.28);
 }
 
+.room-browser-badge.is-live {
+  color: #dff8d6;
+  background: rgba(79, 173, 89, 0.18);
+  border-color: rgba(79, 173, 89, 0.28);
+}
+
 .room-browser-item-slug {
   color: #dce6f3;
   font-size: 11px;

@@ -31,7 +31,7 @@ function resolveDisplayName(input: HTMLInputElement): string {
 }
 
 function formatRoomTimestamp(room: RoomSummary): string {
-  const raw = room.updatedAt ?? room.createdAt;
+  const raw = room.lastActiveAt ?? room.updatedAt ?? room.createdAt;
   if (!raw) {
     return 'No activity yet';
   }
@@ -247,6 +247,10 @@ export class RoomPanel {
     this.metaLabel.textContent = message;
   }
 
+  setRoomListStatusMessage(message: string): void {
+    this.roomListStatus.textContent = message;
+  }
+
   setRoomListLoading(message = 'Loading rooms...'): void {
     this.rooms = [];
     this.roomListStatus.textContent = message;
@@ -275,7 +279,7 @@ export class RoomPanel {
     this.rooms = [...rooms];
     this.activeRoomSlug = activeRoomSlug ?? null;
     this.activeRoomIsPersisted = this.activeRoomSlug
-      ? this.rooms.some((room) => room.slug.toLowerCase() === this.activeRoomSlug?.trim().toLowerCase())
+      ? this.rooms.some((room) => room.slug.toLowerCase() === this.activeRoomSlug?.trim().toLowerCase() && room.isPersisted)
       : false;
     this.renderRooms();
     this.refreshJoinIntent();
@@ -297,7 +301,7 @@ export class RoomPanel {
     this.roomList.replaceChildren();
 
     if (this.rooms.length === 0) {
-      this.roomListStatus.textContent = 'No persisted rooms yet.';
+      this.roomListStatus.textContent = 'No rooms available right now.';
       return;
     }
 
@@ -338,6 +342,22 @@ export class RoomPanel {
       capacityBadge.className = 'room-browser-badge';
       capacityBadge.textContent = `max ${room.maxUsers}`;
       badges.appendChild(capacityBadge);
+
+      if (room.isLive) {
+        const liveBadge = document.createElement('span');
+        liveBadge.className = 'room-browser-badge is-live';
+        liveBadge.textContent = room.liveParticipantCount && room.liveParticipantCount > 0
+          ? `${room.liveParticipantCount} live`
+          : 'Live';
+        badges.appendChild(liveBadge);
+      }
+
+      if (!room.isPersisted) {
+        const tempBadge = document.createElement('span');
+        tempBadge.className = 'room-browser-badge';
+        tempBadge.textContent = 'Temp';
+        badges.appendChild(tempBadge);
+      }
 
       if (room.isLocked) {
         const lockedBadge = document.createElement('span');
@@ -435,8 +455,8 @@ function compareRooms(left: RoomSummary, right: RoomSummary, sortMode: RoomSortM
     return left.name.localeCompare(right.name) || left.slug.localeCompare(right.slug);
   }
 
-  const leftTime = Date.parse(left.updatedAt ?? left.createdAt ?? '') || 0;
-  const rightTime = Date.parse(right.updatedAt ?? right.createdAt ?? '') || 0;
+  const leftTime = Date.parse(left.lastActiveAt ?? left.updatedAt ?? left.createdAt ?? '') || 0;
+  const rightTime = Date.parse(right.lastActiveAt ?? right.updatedAt ?? right.createdAt ?? '') || 0;
   return rightTime - leftTime || left.name.localeCompare(right.name);
 }
 
