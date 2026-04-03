@@ -1,7 +1,7 @@
 import type { ChatMessage } from './chat';
 import type { InteractableObjectState, SeatState } from './interactions';
 import type { ObjectTransform, PlayerPresence, PlayerTransform } from './player';
-import type { RoomAuthority, RoomRole, RoomSurfaceId, RoomSurfaceSnapshot } from './room';
+import type { RoomAuthority, RoomRole, RoomSurfaceId, RoomSurfaceSnapshot, RoomTvMediaState } from './room';
 
 export type RoomJoinMessage = {
   type: 'room.join';
@@ -109,6 +109,13 @@ export type AdminSetSurfaceImageMessage = {
   imagePath: string;
 };
 
+export type AdminSetTvMediaMessage = {
+  type: 'admin.setTvMedia';
+  roomId: string;
+  sessionId: string;
+  sourceUrl: string | null;
+};
+
 export type ClientMessage =
   | RoomJoinMessage
   | RoomLeaveMessage
@@ -123,6 +130,7 @@ export type ClientMessage =
   | AdminSetMuteMessage
   | AdminSetRoomLockMessage
   | AdminSetSurfaceImageMessage
+  | AdminSetTvMediaMessage
   | PingMessage;
 
 export type RoomJoinedMessage = {
@@ -134,6 +142,7 @@ export type RoomJoinedMessage = {
   seats: SeatState[];
   objects: InteractableObjectState[];
   surfaces: RoomSurfaceSnapshot[];
+  tvMedia: RoomTvMediaState | null;
   authority: RoomAuthority;
   selfRole: RoomRole;
   recentMessages: ChatMessage[];
@@ -175,6 +184,11 @@ export type SurfaceUpdatedMessage = {
   surface: RoomSurfaceSnapshot;
 };
 
+export type TvMediaUpdatedMessage = {
+  type: 'tv.updated';
+  tvMedia: RoomTvMediaState | null;
+};
+
 export type RoomAuthorityUpdatedMessage = {
   type: 'room.authority.updated';
   authority: RoomAuthority;
@@ -206,6 +220,7 @@ export type ServerMessage =
   | SeatUpdatedMessage
   | ObjectUpdatedMessage
   | SurfaceUpdatedMessage
+  | TvMediaUpdatedMessage
   | RoomAuthorityUpdatedMessage
   | SystemNoticeMessage
   | ErrorMessage

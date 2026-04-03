@@ -4,6 +4,7 @@ import type { RoomRole, RoomSurfaceId } from '../types/room';
 type ChatPanelOptions = {
   onSend: (body: string) => void;
   onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
+  onSetTvMedia: (sourceUrl: string | null) => Promise<void>;
 };
 
 const SURFACE_IDS: RoomSurfaceId[] = ['image01', 'image02', 'image03', 'image04'];
@@ -18,14 +19,23 @@ export class ChatPanel {
   private readonly surfaceFileInput: HTMLInputElement;
   private readonly surfaceUploadButton: HTMLButtonElement;
   private readonly surfaceHelper: HTMLDivElement;
+  private readonly tvSection: HTMLDivElement;
+  private readonly tvInput: HTMLInputElement;
+  private readonly tvApplyButton: HTMLButtonElement;
+  private readonly tvClearButton: HTMLButtonElement;
+  private readonly tvHelper: HTMLDivElement;
   private readonly onSend: (body: string) => void;
   private readonly onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
+  private readonly onSetTvMedia: (sourceUrl: string | null) => Promise<void>;
   private surfaceUploadEnabled = false;
   private surfaceUploadVisible = false;
+  private tvEnabled = false;
+  private tvVisible = false;
 
   constructor(options: ChatPanelOptions) {
     this.onSend = options.onSend;
     this.onUploadSurface = options.onUploadSurface;
+    this.onSetTvMedia = options.onSetTvMedia;
     this.container = document.createElement('div');
     this.container.id = 'chat-panel';
     this.container.className = 'musicspace-panel musicspace-panel--utility';
@@ -108,9 +118,48 @@ export class ChatPanel {
     surfaceControls.append(this.surfaceSelect, this.surfaceFileInput, this.surfaceUploadButton);
     this.surfaceSection.append(surfaceTitle, this.surfaceHelper, surfaceControls);
 
+    this.tvSection = document.createElement('div');
+    this.tvSection.className = 'chat-surface-section';
+
+    const tvTitle = document.createElement('div');
+    tvTitle.className = 'chat-surface-title';
+    tvTitle.textContent = 'Shared TV';
+
+    this.tvHelper = document.createElement('div');
+    this.tvHelper.className = 'chat-surface-helper';
+    this.tvHelper.textContent = 'Owner/admin can set a shared TV video source for the room.';
+
+    const tvControls = document.createElement('div');
+    tvControls.className = 'chat-tv-controls';
+
+    this.tvInput = document.createElement('input');
+    this.tvInput.type = 'text';
+    this.tvInput.placeholder = '/videos/tvscreen.mp4';
+    this.tvInput.className = 'chat-tv-input';
+
+    this.tvApplyButton = document.createElement('button');
+    this.tvApplyButton.type = 'button';
+    this.tvApplyButton.textContent = 'Set Video';
+    this.tvApplyButton.className = 'chat-surface-upload-button';
+    this.tvApplyButton.addEventListener('click', () => {
+      void this.handleTvMediaUpdate(this.tvInput.value.trim() || null);
+    });
+
+    this.tvClearButton = document.createElement('button');
+    this.tvClearButton.type = 'button';
+    this.tvClearButton.textContent = 'Clear';
+    this.tvClearButton.className = 'chat-surface-upload-button';
+    this.tvClearButton.addEventListener('click', () => {
+      void this.handleTvMediaUpdate(null);
+    });
+
+    tvControls.append(this.tvInput, this.tvApplyButton, this.tvClearButton);
+    this.tvSection.append(tvTitle, this.tvHelper, tvControls);
+
     header.append(title, status);
-    this.container.append(header, this.log, this.form, this.surfaceSection);
+    this.container.append(header, this.log, this.form, this.surfaceSection, this.tvSection);
     this.setSurfaceUploadState(null, false);
+    this.setTvMediaState(null, false, null);
   }
 
   mount(parent: HTMLElement = document.body): void {
@@ -150,6 +199,28 @@ export class ChatPanel {
     }
   }
 
+  setTvMediaState(role: RoomRole | null, isPersistedRoom: boolean, sourceUrl: string | null): void {
+    const canManageTv = role === 'owner' || role === 'admin';
+    const visible = canManageTv || !isPersistedRoom;
+    const enabled = canManageTv && isPersistedRoom;
+    this.tvVisible = visible;
+    this.tvEnabled = enabled;
+    this.tvSection.style.display = visible ? 'grid' : 'none';
+    this.tvInput.disabled = !enabled;
+    this.tvApplyButton.disabled = !enabled;
+    this.tvClearButton.disabled = !enabled;
+    this.tvInput.value = sourceUrl ?? '';
+    if (enabled) {
+      this.tvHelper.textContent = sourceUrl
+        ? 'Shared TV video is live for the room. Set a new source or clear it to return to the visualizer.'
+        : 'Owner/admin can set a shared TV video source for the room.';
+    } else if (!isPersistedRoom) {
+      this.tvHelper.textContent = 'Shared TV is available only in saved rooms. Sign in and create the room to enable it.';
+    } else {
+      this.tvHelper.textContent = 'Owner/admin can control the shared TV video source.';
+    }
+  }
+
   private async handleSurfaceUpload(): Promise<void> {
     if (!this.surfaceUploadEnabled) {
       if (this.surfaceUploadVisible) {
@@ -182,6 +253,38 @@ export class ChatPanel {
       this.surfaceSelect.disabled = !this.surfaceUploadEnabled;
       this.surfaceFileInput.disabled = !this.surfaceUploadEnabled;
       this.surfaceUploadButton.textContent = 'Upload';
+    }
+  }
+
+  private async handleTvMediaUpdate(sourceUrl: string | null): Promise<void> {
+    if (!this.tvEnabled) {
+      if (this.tvVisible) {
+        this.tvHelper.textContent = 'Shared TV is available only to owner/admin in saved rooms.';
+      }
+      return;
+    }
+
+    if (sourceUrl && !sourceUrl.trim()) {
+      this.tvHelper.textContent = 'Enter a video URL or path before setting the shared TV.';
+      return;
+    }
+
+    this.tvInput.disabled = true;
+    this.tvApplyButton.disabled = true;
+    this.tvClearButton.disabled = true;
+    this.tvHelper.textContent = sourceUrl ? 'Updating shared TV...' : 'Clearing shared TV...';
+
+    try {
+      await this.onSetTvMedia(sourceUrl);
+      this.tvHelper.textContent = sourceUrl
+        ? 'Shared TV updated for the room.'
+        : 'Shared TV cleared. Visualizer restored.';
+    } catch (error) {
+      this.tvHelper.textContent = getErrorMessage(error, 'Unable to update the shared TV right now.');
+    } finally {
+      this.tvInput.disabled = !this.tvEnabled;
+      this.tvApplyButton.disabled = !this.tvEnabled;
+      this.tvClearButton.disabled = !this.tvEnabled;
     }
   }
 

@@ -530,6 +530,26 @@ export function bootstrapApp(): void {
         });
         roomPanel.setStatus(`Uploaded ${surfaceId}. Waiting for room sync...`);
       },
+      onSetTvMedia: async (sourceUrl: string | null) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          throw new Error('Enter a live room before updating the shared TV.');
+        }
+        if (!activeSession.userId) {
+          throw new Error('Sign in to update the shared TV.');
+        }
+        if (!roomState.getSnapshot().isPersisted) {
+          throw new Error('Shared TV is available only in saved rooms.');
+        }
+
+        roomClient.send({
+          type: 'admin.setTvMedia',
+          roomId: activeSession.roomId,
+          sessionId: activeSession.sessionId,
+          sourceUrl,
+        });
+        roomPanel.setStatus(sourceUrl ? 'Updating shared TV...' : 'Clearing shared TV...');
+      },
     });
 
     authPanel.mount(sidebarPanels);
@@ -611,9 +631,15 @@ function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remo
   const participants = Object.values(snapshot.participants);
   chatPanel.setMessages(snapshot.messages.slice(-APP_CONFIG.chatHistoryLimit));
   chatPanel.setSurfaceUploadState(snapshot.selfRole, snapshot.isPersisted);
+  chatPanel.setTvMediaState(snapshot.selfRole, snapshot.isPersisted, snapshot.tvMedia?.sourceUrl ?? null);
   participantList.setParticipants(participants, snapshot.selfSessionId, snapshot.authority, snapshot.selfRole);
   Object.values(snapshot.objects).forEach((object) => window.__musicspaceApplyObjectSnapshot?.(object));
   window.__musicspaceSyncRoomSurfaces?.(Object.values(snapshot.surfaces));
+  if (snapshot.tvMedia?.sourceUrl) {
+    window.__musicspaceSetTvVideoSource?.(snapshot.tvMedia.sourceUrl);
+  } else {
+    window.__musicspaceClearTvVideoSource?.();
+  }
   window.__musicspaceGetRemoteParticipants = () => participants
     .filter((participant) => participant.sessionId !== snapshot.selfSessionId)
     .map((participant) => ({

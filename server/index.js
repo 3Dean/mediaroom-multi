@@ -53,6 +53,7 @@ const roomMessages = new Map();
 const roomSeats = new Map();
 const roomObjects = new Map();
 const roomSurfaces = new Map();
+const roomTvMedia = new Map();
 const hydratedSurfaceRooms = new Set();
 const chatRateLimits = new Map();
 const roomAuthorities = new Map(Object.entries(loadFallbackAuthorityStore()).map(([roomId, authority]) => [roomId, normalizeRoomAuthority(authority)]));
@@ -211,6 +212,9 @@ async function handleClientMessage(socket, message) {
     case 'admin.setSurfaceImage':
       await handleAdminSetSurfaceImage(socket, message);
       return;
+    case 'admin.setTvMedia':
+      await handleAdminSetTvMedia(socket, message);
+      return;
     case 'ping':
       send(socket, { type: 'pong', ts: message.ts });
       return;
@@ -283,6 +287,7 @@ async function handleRoomJoin(socket, message) {
   const seats = ensureRoomSeats(roomId);
   const objects = ensureRoomObjects(roomId);
   const surfaces = await ensureRoomSurfaces(roomId);
+  const tvMedia = roomTvMedia.get(roomId) ?? null;
   const spawn = selectSpawnPoint(participants);
   const participant = {
     sessionId,
@@ -324,6 +329,7 @@ async function handleRoomJoin(socket, message) {
     seats,
     objects,
     surfaces,
+    tvMedia,
     authority: serializeAuthority(authority),
     selfRole,
     recentMessages: roomMessages.get(roomId) ?? [],
@@ -797,6 +803,63 @@ async function handleAdminSetSurfaceImage(socket, message) {
   });
   broadcast(roomId, { type: 'surface.updated', surface: nextSurface });
   pushSystemNotice(roomId, `${actor.displayName} updated ${surfaceId}.`);
+}
+
+async function handleAdminSetTvMedia(socket, message) {
+  const roomId = getSocketRoomId(socket, message.roomId);
+  const sessionId = getSocketSessionId(socket, message.sessionId);
+  if (!roomId || !sessionId) {
+    return;
+  }
+
+  const actor = getParticipant(roomId, sessionId);
+  if (!actor?.userId) {
+    send(socket, { type: 'error', code: 'forbidden', message: 'You must be signed in to update the shared TV.' });
+    return;
+  }
+
+  const authority = ensureRoomAuthority(roomId);
+  const actorRole = resolveRole(actor.userId, authority);
+  if (actorRole !== 'owner' && actorRole !== 'admin') {
+    send(socket, { type: 'error', code: 'forbidden', message: 'Only owner/admin can control the shared TV.' });
+    return;
+  }
+
+  if (!authority.roomRecordId) {
+    send(socket, { type: 'error', code: 'room_not_persisted', message: 'Shared TV is available only in saved rooms.' });
+    return;
+  }
+
+  const sourceUrl = typeof message.sourceUrl === 'string' && message.sourceUrl.trim()
+    ? normalizeToken(message.sourceUrl, 512)
+    : null;
+  if (message.sourceUrl && !sourceUrl) {
+    send(socket, { type: 'error', code: 'invalid_tv_source', message: 'TV source URL is invalid.' });
+    return;
+  }
+
+  const tvMedia = sourceUrl
+    ? {
+        sourceUrl,
+        updatedByUserId: actor.userId,
+        updatedAt: new Date().toISOString(),
+      }
+    : null;
+
+  if (tvMedia) {
+    roomTvMedia.set(roomId, tvMedia);
+  } else {
+    roomTvMedia.delete(roomId);
+  }
+
+  logEvent('info', 'tv.updated', {
+    roomId,
+    actorUserId: actor.userId,
+    actorDisplayName: actor.displayName,
+    sourceUrl,
+  });
+  broadcast(roomId, { type: 'tv.updated', tvMedia });
+  pushSystemNotice(roomId, sourceUrl ? `${actor.displayName} updated the shared TV.` : `${actor.displayName} restored the TV visualizer.`);
 }
 
 function cleanupSocket(socket, roomId = socket.roomId, sessionId = socket.sessionId) {

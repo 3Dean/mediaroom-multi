@@ -957,8 +957,16 @@ body.mouse #mobile-controls-layer {
   align-items: center;
 }
 
+.chat-tv-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .chat-surface-select,
-.chat-surface-file {
+.chat-surface-file,
+.chat-tv-input {
   width: 100%;
   box-sizing: border-box;
 }

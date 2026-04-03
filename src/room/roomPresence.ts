@@ -13,6 +13,7 @@ export function applyServerMessage(store: RoomStateStore, message: ServerMessage
         seats: message.seats,
         objects: message.objects,
         surfaces: message.surfaces,
+        tvMedia: message.tvMedia,
         authority: message.authority,
         selfRole: message.selfRole,
         recentMessages: message.recentMessages,
@@ -39,6 +40,10 @@ export function applyServerMessage(store: RoomStateStore, message: ServerMessage
     }
     case 'surface.updated': {
       store.upsertSurface(message.surface);
+      return;
+    }
+    case 'tv.updated': {
+      store.setTvMedia(message.tvMedia);
       return;
     }
     case 'room.authority.updated': {

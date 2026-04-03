@@ -29,6 +29,12 @@ export type RoomSurfaceSnapshot = {
   updatedAt: string;
 };
 
+export type RoomTvMediaState = {
+  sourceUrl: string;
+  updatedByUserId: string;
+  updatedAt: string;
+};
+
 export type RoomAuthority = {
   ownerUserId: string | null;
   adminUserIds: string[];
@@ -44,6 +50,7 @@ export type RoomSnapshot = {
   seats: SeatState[];
   objects: InteractableObjectState[];
   surfaces: RoomSurfaceSnapshot[];
+  tvMedia: RoomTvMediaState | null;
   authority: RoomAuthority;
   selfRole: RoomRole;
   recentMessages: ChatMessage[];
@@ -58,6 +65,7 @@ export type RoomState = {
   seats: Record<string, SeatState>;
   objects: Record<string, InteractableObjectState>;
   surfaces: Record<string, RoomSurfaceSnapshot>;
+  tvMedia: RoomTvMediaState | null;
   authority: RoomAuthority;
   selfRole: RoomRole | null;
   messages: ChatMessage[];

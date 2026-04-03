@@ -1,7 +1,7 @@
 import type { ChatMessage } from '../types/chat';
 import type { InteractableObjectState, SeatState } from '../types/interactions';
 import type { PlayerPresence } from '../types/player';
-import type { RoomAuthority, RoomSnapshot, RoomState, RoomSurfaceSnapshot } from '../types/room';
+import type { RoomAuthority, RoomSnapshot, RoomState, RoomSurfaceSnapshot, RoomTvMediaState } from '../types/room';
 
 const emptyAuthority = (): RoomAuthority => ({
   ownerUserId: null,
@@ -18,6 +18,7 @@ const emptyRoomState = (): RoomState => ({
   seats: {},
   objects: {},
   surfaces: {},
+  tvMedia: null,
   authority: emptyAuthority(),
   selfRole: null,
   messages: [],
@@ -35,6 +36,7 @@ export class RoomStateStore {
       seats: { ...this.state.seats },
       objects: { ...this.state.objects },
       surfaces: { ...this.state.surfaces },
+      tvMedia: this.state.tvMedia ? { ...this.state.tvMedia } : null,
       authority: {
         ownerUserId: this.state.authority.ownerUserId,
         adminUserIds: [...this.state.authority.adminUserIds],
@@ -58,6 +60,7 @@ export class RoomStateStore {
     this.state.seats = {};
     this.state.objects = {};
     this.state.surfaces = {};
+    this.state.tvMedia = null;
     this.state.isPersisted = false;
     this.state.authority = emptyAuthority();
     this.state.selfRole = null;
@@ -74,6 +77,7 @@ export class RoomStateStore {
     this.state.seats = Object.fromEntries(snapshot.seats.map((seat) => [seat.seatId, seat]));
     this.state.objects = Object.fromEntries(snapshot.objects.map((object) => [object.objectId, object]));
     this.state.surfaces = Object.fromEntries(snapshot.surfaces.map((surface) => [surface.surfaceId, surface]));
+    this.state.tvMedia = snapshot.tvMedia ? { ...snapshot.tvMedia } : null;
     this.state.authority = {
       ownerUserId: snapshot.authority.ownerUserId,
       adminUserIds: [...snapshot.authority.adminUserIds],
@@ -102,6 +106,10 @@ export class RoomStateStore {
 
   upsertSurface(surface: RoomSurfaceSnapshot): void {
     this.state.surfaces[surface.surfaceId] = surface;
+  }
+
+  setTvMedia(tvMedia: RoomTvMediaState | null): void {
+    this.state.tvMedia = tvMedia ? { ...tvMedia } : null;
   }
 
   setAuthority(authority: RoomAuthority, selfRole: RoomState['selfRole']): void {
