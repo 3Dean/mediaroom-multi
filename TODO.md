@@ -17,14 +17,19 @@
 ## Next
 
 - Improve remote avatar presentation beyond placeholders.
-- Feature branch: shared surface image upload
+- Shared surface image upload and saved-room lifecycle follow-up
   - done: add Amplify storage for guest-readable room surface images
   - done: add persisted room surface snapshot model and server repository
   - done: add realtime room snapshot/broadcast support for surface updates
   - done: refactor frame texture replacement into reusable surface image application
   - done: add owner/admin-only upload controls targeting `image01`-`image04`
   - done: gate shared surfaces to saved rooms so temporary guest sessions do not imply durable ownership
-  - next: verify persistence, guest visibility, reconnect/join sync, and saved-room gating after backend deployment
+  - done: merge live rooms into the room browser so active rooms show as joinable
+  - done: verify Render can perform shared surface updates after widening AppSync IAM access
+  - investigate: durable room ownership still does not survive Render restart
+  - investigate: `Room` records are being written to DynamoDB, but post-restart authority hydration still returns `ownerUserId: null`
+  - investigate: compare server AppSync read path in `server/roomAuthorityRepository.js` with the persisted `Room` table contents
+  - investigate: once authority hydration is fixed, verify saved-room upload gating and `Recent` ordering again in production
 
 ## Later
 
