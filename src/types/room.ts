@@ -31,6 +31,8 @@ export type RoomSurfaceSnapshot = {
 
 export type RoomTvMediaState = {
   sourceUrl: string;
+  isPlaying: boolean;
+  currentTime: number;
   updatedByUserId: string;
   updatedAt: string;
 };

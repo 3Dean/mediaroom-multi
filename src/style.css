@@ -959,7 +959,7 @@ body.mouse #mobile-controls-layer {
 
 .chat-tv-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(72px, 96px) auto auto;
   gap: 8px;
   align-items: center;
 }
@@ -969,6 +969,12 @@ body.mouse #mobile-controls-layer {
 .chat-tv-input {
   width: 100%;
   box-sizing: border-box;
+}
+
+.chat-tv-seek-label {
+  color: #9eacbe;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .chat-surface-upload-button {

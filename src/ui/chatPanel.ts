@@ -5,6 +5,7 @@ type ChatPanelOptions = {
   onSend: (body: string) => void;
   onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
   onSetTvMedia: (sourceUrl: string | null) => Promise<void>;
+  onSetTvPlayback: (isPlaying: boolean, currentTime: number) => Promise<void>;
 };
 
 const SURFACE_IDS: RoomSurfaceId[] = ['image01', 'image02', 'image03', 'image04'];
@@ -23,19 +24,25 @@ export class ChatPanel {
   private readonly tvInput: HTMLInputElement;
   private readonly tvApplyButton: HTMLButtonElement;
   private readonly tvClearButton: HTMLButtonElement;
+  private readonly tvTogglePlaybackButton: HTMLButtonElement;
+  private readonly tvSeekInput: HTMLInputElement;
+  private readonly tvSeekButton: HTMLButtonElement;
   private readonly tvHelper: HTMLDivElement;
   private readonly onSend: (body: string) => void;
   private readonly onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
   private readonly onSetTvMedia: (sourceUrl: string | null) => Promise<void>;
+  private readonly onSetTvPlayback: (isPlaying: boolean, currentTime: number) => Promise<void>;
   private surfaceUploadEnabled = false;
   private surfaceUploadVisible = false;
   private tvEnabled = false;
   private tvVisible = false;
+  private tvIsPlaying = false;
 
   constructor(options: ChatPanelOptions) {
     this.onSend = options.onSend;
     this.onUploadSurface = options.onUploadSurface;
     this.onSetTvMedia = options.onSetTvMedia;
+    this.onSetTvPlayback = options.onSetTvPlayback;
     this.container = document.createElement('div');
     this.container.id = 'chat-panel';
     this.container.className = 'musicspace-panel musicspace-panel--utility';
@@ -154,7 +161,39 @@ export class ChatPanel {
     });
 
     tvControls.append(this.tvInput, this.tvApplyButton, this.tvClearButton);
-    this.tvSection.append(tvTitle, this.tvHelper, tvControls);
+
+    const tvPlaybackControls = document.createElement('div');
+    tvPlaybackControls.className = 'chat-tv-controls';
+
+    this.tvTogglePlaybackButton = document.createElement('button');
+    this.tvTogglePlaybackButton.type = 'button';
+    this.tvTogglePlaybackButton.textContent = 'Play';
+    this.tvTogglePlaybackButton.className = 'chat-surface-upload-button';
+    this.tvTogglePlaybackButton.addEventListener('click', () => {
+      void this.handleTvPlaybackUpdate(!this.tvIsPlaying);
+    });
+
+    this.tvSeekInput = document.createElement('input');
+    this.tvSeekInput.type = 'number';
+    this.tvSeekInput.min = '0';
+    this.tvSeekInput.step = '0.1';
+    this.tvSeekInput.placeholder = '0';
+    this.tvSeekInput.className = 'chat-tv-input';
+
+    const tvSeekLabel = document.createElement('div');
+    tvSeekLabel.className = 'chat-tv-seek-label';
+    tvSeekLabel.textContent = 'Seconds';
+
+    this.tvSeekButton = document.createElement('button');
+    this.tvSeekButton.type = 'button';
+    this.tvSeekButton.textContent = 'Seek';
+    this.tvSeekButton.className = 'chat-surface-upload-button';
+    this.tvSeekButton.addEventListener('click', () => {
+      void this.handleTvSeekUpdate();
+    });
+
+    tvPlaybackControls.append(this.tvTogglePlaybackButton, this.tvSeekInput, tvSeekLabel, this.tvSeekButton);
+    this.tvSection.append(tvTitle, this.tvHelper, tvControls, tvPlaybackControls);
 
     header.append(title, status);
     this.container.append(header, this.log, this.form, this.surfaceSection, this.tvSection);
@@ -199,20 +238,26 @@ export class ChatPanel {
     }
   }
 
-  setTvMediaState(role: RoomRole | null, isPersistedRoom: boolean, sourceUrl: string | null): void {
+  setTvMediaState(role: RoomRole | null, isPersistedRoom: boolean, sourceUrl: string | null, isPlaying = false, currentTime = 0): void {
     const canManageTv = role === 'owner' || role === 'admin';
     const visible = canManageTv || !isPersistedRoom;
     const enabled = canManageTv && isPersistedRoom;
     this.tvVisible = visible;
     this.tvEnabled = enabled;
+    this.tvIsPlaying = isPlaying;
     this.tvSection.style.display = visible ? 'grid' : 'none';
     this.tvInput.disabled = !enabled;
     this.tvApplyButton.disabled = !enabled;
     this.tvClearButton.disabled = !enabled;
+    this.tvTogglePlaybackButton.disabled = !enabled || !sourceUrl;
+    this.tvTogglePlaybackButton.textContent = isPlaying ? 'Pause' : 'Play';
+    this.tvSeekInput.disabled = !enabled || !sourceUrl;
+    this.tvSeekButton.disabled = !enabled || !sourceUrl;
     this.tvInput.value = sourceUrl ?? '';
+    this.tvSeekInput.value = sourceUrl ? String(Math.max(0, Number.isFinite(currentTime) ? currentTime : 0)) : '';
     if (enabled) {
       this.tvHelper.textContent = sourceUrl
-        ? 'Shared TV video is live for the room. Set a new source or clear it to return to the visualizer.'
+        ? `Shared TV is ${isPlaying ? 'playing' : 'paused'} at ${Math.max(0, Number.isFinite(currentTime) ? currentTime : 0).toFixed(1)}s.`
         : 'Owner/admin can set a shared TV video source for the room.';
     } else if (!isPersistedRoom) {
       this.tvHelper.textContent = 'Shared TV is available only in saved rooms. Sign in and create the room to enable it.';
@@ -272,6 +317,9 @@ export class ChatPanel {
     this.tvInput.disabled = true;
     this.tvApplyButton.disabled = true;
     this.tvClearButton.disabled = true;
+    this.tvTogglePlaybackButton.disabled = true;
+    this.tvSeekInput.disabled = true;
+    this.tvSeekButton.disabled = true;
     this.tvHelper.textContent = sourceUrl ? 'Updating shared TV...' : 'Clearing shared TV...';
 
     try {
@@ -285,6 +333,42 @@ export class ChatPanel {
       this.tvInput.disabled = !this.tvEnabled;
       this.tvApplyButton.disabled = !this.tvEnabled;
       this.tvClearButton.disabled = !this.tvEnabled;
+      this.tvTogglePlaybackButton.disabled = !this.tvEnabled || !this.tvInput.value.trim();
+      this.tvSeekInput.disabled = !this.tvEnabled || !this.tvInput.value.trim();
+      this.tvSeekButton.disabled = !this.tvEnabled || !this.tvInput.value.trim();
+    }
+  }
+
+  private async handleTvPlaybackUpdate(isPlaying: boolean): Promise<void> {
+    if (!this.tvEnabled || !this.tvInput.value.trim()) {
+      return;
+    }
+
+    const currentTime = parseFloat(this.tvSeekInput.value || '0');
+    this.tvHelper.textContent = isPlaying ? 'Resuming shared TV...' : 'Pausing shared TV...';
+    try {
+      await this.onSetTvPlayback(isPlaying, Number.isFinite(currentTime) ? currentTime : 0);
+    } catch (error) {
+      this.tvHelper.textContent = getErrorMessage(error, 'Unable to update shared TV playback right now.');
+    }
+  }
+
+  private async handleTvSeekUpdate(): Promise<void> {
+    if (!this.tvEnabled || !this.tvInput.value.trim()) {
+      return;
+    }
+
+    const currentTime = parseFloat(this.tvSeekInput.value || '0');
+    if (!Number.isFinite(currentTime) || currentTime < 0) {
+      this.tvHelper.textContent = 'Enter a valid seek time in seconds.';
+      return;
+    }
+
+    this.tvHelper.textContent = `Seeking shared TV to ${currentTime.toFixed(1)}s...`;
+    try {
+      await this.onSetTvPlayback(this.tvIsPlaying, currentTime);
+    } catch (error) {
+      this.tvHelper.textContent = getErrorMessage(error, 'Unable to seek shared TV right now.');
     }
   }
 

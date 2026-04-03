@@ -550,6 +550,28 @@ export function bootstrapApp(): void {
         });
         roomPanel.setStatus(sourceUrl ? 'Updating shared TV...' : 'Clearing shared TV...');
       },
+      onSetTvPlayback: async (isPlaying: boolean, currentTime: number) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          throw new Error('Enter a live room before updating shared TV playback.');
+        }
+        if (!activeSession.userId) {
+          throw new Error('Sign in to update shared TV playback.');
+        }
+        if (!roomState.getSnapshot().isPersisted) {
+          throw new Error('Shared TV is available only in saved rooms.');
+        }
+
+        window.__musicspaceSetTvPlayback?.(isPlaying, currentTime);
+        roomClient.send({
+          type: 'admin.setTvPlayback',
+          roomId: activeSession.roomId,
+          sessionId: activeSession.sessionId,
+          isPlaying,
+          currentTime,
+        });
+        roomPanel.setStatus(isPlaying ? 'Resuming shared TV...' : 'Pausing shared TV...');
+      },
     });
 
     authPanel.mount(sidebarPanels);
@@ -631,12 +653,19 @@ function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remo
   const participants = Object.values(snapshot.participants);
   chatPanel.setMessages(snapshot.messages.slice(-APP_CONFIG.chatHistoryLimit));
   chatPanel.setSurfaceUploadState(snapshot.selfRole, snapshot.isPersisted);
-  chatPanel.setTvMediaState(snapshot.selfRole, snapshot.isPersisted, snapshot.tvMedia?.sourceUrl ?? null);
+  chatPanel.setTvMediaState(
+    snapshot.selfRole,
+    snapshot.isPersisted,
+    snapshot.tvMedia?.sourceUrl ?? null,
+    snapshot.tvMedia?.isPlaying ?? false,
+    snapshot.tvMedia?.currentTime ?? 0,
+  );
   participantList.setParticipants(participants, snapshot.selfSessionId, snapshot.authority, snapshot.selfRole);
   Object.values(snapshot.objects).forEach((object) => window.__musicspaceApplyObjectSnapshot?.(object));
   window.__musicspaceSyncRoomSurfaces?.(Object.values(snapshot.surfaces));
   if (snapshot.tvMedia?.sourceUrl) {
     window.__musicspaceSetTvVideoSource?.(snapshot.tvMedia.sourceUrl);
+    window.__musicspaceSetTvPlayback?.(snapshot.tvMedia.isPlaying, snapshot.tvMedia.currentTime);
   } else {
     window.__musicspaceClearTvVideoSource?.();
   }

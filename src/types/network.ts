@@ -116,6 +116,14 @@ export type AdminSetTvMediaMessage = {
   sourceUrl: string | null;
 };
 
+export type AdminSetTvPlaybackMessage = {
+  type: 'admin.setTvPlayback';
+  roomId: string;
+  sessionId: string;
+  isPlaying: boolean;
+  currentTime: number;
+};
+
 export type ClientMessage =
   | RoomJoinMessage
   | RoomLeaveMessage
@@ -131,6 +139,7 @@ export type ClientMessage =
   | AdminSetRoomLockMessage
   | AdminSetSurfaceImageMessage
   | AdminSetTvMediaMessage
+  | AdminSetTvPlaybackMessage
   | PingMessage;
 
 export type RoomJoinedMessage = {

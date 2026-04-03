@@ -42,6 +42,8 @@ declare global {
     __musicspaceSyncRoomSurfaces?: (surfaces: RoomSurfaceSnapshot[]) => void;
     __musicspaceSetTvVideoSource?: (url: string) => void;
     __musicspaceClearTvVideoSource?: () => void;
+    __musicspaceSetTvPlayback?: (isPlaying: boolean, currentTime: number) => void;
+    __musicspaceGetTvPlaybackState?: () => { sourceUrl: string | null; isPlaying: boolean; currentTime: number };
   }
 }
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
@@ -106,6 +108,7 @@ let tvVideoElement: HTMLVideoElement | null = null;
 let tvVideoTexture: THREE.VideoTexture | null = null;
 let tvVideoMaterial: THREE.MeshBasicMaterial | null = null;
 const tvMeshMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+let tvCurrentSourceUrl: string | null = null;
 let tvBassLevel = 0;
 let tvMidLevel = 0;
 let tvHighLevel = 0;
@@ -2215,27 +2218,45 @@ function applyTvVisualizerMaterial() {
 
 async function setTvVideoSource(url: string) {
   const { element, material } = createTvVideoResources();
+  if (tvCurrentSourceUrl === url && tvVideoElement) {
+    applyTvMaterial(material);
+    return;
+  }
+
+  tvCurrentSourceUrl = url;
   element.pause();
   element.src = url;
   element.load();
-
-  try {
-    await element.play();
-    applyTvMaterial(material);
-    console.log('TV video texture enabled.', url);
-  } catch (error) {
-    console.warn('TV video texture unavailable, falling back to visualizer.', error);
-    applyTvVisualizerMaterial();
-  }
+  applyTvMaterial(material);
+  console.log('TV video texture source loaded.', url);
 }
 
 function clearTvVideoSource() {
+  tvCurrentSourceUrl = null;
   if (tvVideoElement) {
     tvVideoElement.pause();
     tvVideoElement.removeAttribute('src');
     tvVideoElement.load();
   }
   applyTvVisualizerMaterial();
+}
+
+function setTvPlayback(isPlaying: boolean, currentTime: number) {
+  if (!tvVideoElement || !tvCurrentSourceUrl) {
+    return;
+  }
+
+  if (Number.isFinite(currentTime) && currentTime >= 0 && Math.abs(tvVideoElement.currentTime - currentTime) > 0.25) {
+    tvVideoElement.currentTime = currentTime;
+  }
+
+  if (isPlaying) {
+    void tvVideoElement.play().catch((error) => {
+      console.warn('Unable to resume TV playback.', error);
+    });
+  } else {
+    tvVideoElement.pause();
+  }
 }
 
 window.__musicspaceSetTvVideoSource = (url: string) => {
@@ -2245,6 +2266,16 @@ window.__musicspaceSetTvVideoSource = (url: string) => {
 window.__musicspaceClearTvVideoSource = () => {
   clearTvVideoSource();
 };
+
+window.__musicspaceSetTvPlayback = (isPlaying: boolean, currentTime: number) => {
+  setTvPlayback(isPlaying, currentTime);
+};
+
+window.__musicspaceGetTvPlaybackState = () => ({
+  sourceUrl: tvCurrentSourceUrl,
+  isPlaying: Boolean(tvVideoElement && !tvVideoElement.paused),
+  currentTime: tvVideoElement?.currentTime ?? 0,
+});
 
 // TV screen with audio-reactive plasma shader
 loader.load('/models/tvscreen.glb', (gltf: any) => {

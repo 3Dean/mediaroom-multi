@@ -65,6 +65,10 @@ declare global {
     __musicspaceApplyPreferences?: (preferences: LivePreferencesSnapshot) => void;
     __musicspaceGetRemoteParticipants?: () => RemoteParticipantSnapshot[];
     __musicspaceSyncRoomSurfaces?: (surfaces: SurfaceSnapshot[]) => void;
+    __musicspaceSetTvVideoSource?: (url: string) => void;
+    __musicspaceClearTvVideoSource?: () => void;
+    __musicspaceSetTvPlayback?: (isPlaying: boolean, currentTime: number) => void;
+    __musicspaceGetTvPlaybackState?: () => { sourceUrl: string | null; isPlaying: boolean; currentTime: number };
   }
 }
 

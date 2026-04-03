@@ -215,6 +215,9 @@ async function handleClientMessage(socket, message) {
     case 'admin.setTvMedia':
       await handleAdminSetTvMedia(socket, message);
       return;
+    case 'admin.setTvPlayback':
+      await handleAdminSetTvPlayback(socket, message);
+      return;
     case 'ping':
       send(socket, { type: 'pong', ts: message.ts });
       return;
@@ -841,6 +844,8 @@ async function handleAdminSetTvMedia(socket, message) {
   const tvMedia = sourceUrl
     ? {
         sourceUrl,
+        isPlaying: true,
+        currentTime: 0,
         updatedByUserId: actor.userId,
         updatedAt: new Date().toISOString(),
       }
@@ -860,6 +865,57 @@ async function handleAdminSetTvMedia(socket, message) {
   });
   broadcast(roomId, { type: 'tv.updated', tvMedia });
   pushSystemNotice(roomId, sourceUrl ? `${actor.displayName} updated the shared TV.` : `${actor.displayName} restored the TV visualizer.`);
+}
+
+async function handleAdminSetTvPlayback(socket, message) {
+  const roomId = getSocketRoomId(socket, message.roomId);
+  const sessionId = getSocketSessionId(socket, message.sessionId);
+  if (!roomId || !sessionId) {
+    return;
+  }
+
+  const actor = getParticipant(roomId, sessionId);
+  if (!actor?.userId) {
+    send(socket, { type: 'error', code: 'forbidden', message: 'You must be signed in to update shared TV playback.' });
+    return;
+  }
+
+  const authority = ensureRoomAuthority(roomId);
+  const actorRole = resolveRole(actor.userId, authority);
+  if (actorRole !== 'owner' && actorRole !== 'admin') {
+    send(socket, { type: 'error', code: 'forbidden', message: 'Only owner/admin can control shared TV playback.' });
+    return;
+  }
+
+  const existing = roomTvMedia.get(roomId);
+  if (!existing) {
+    send(socket, { type: 'error', code: 'tv_not_set', message: 'Set a shared TV source before controlling playback.' });
+    return;
+  }
+
+  const currentTime = Number(message.currentTime);
+  if (!Number.isFinite(currentTime) || currentTime < 0) {
+    send(socket, { type: 'error', code: 'invalid_tv_time', message: 'Playback time must be a positive number.' });
+    return;
+  }
+
+  const tvMedia = {
+    ...existing,
+    isPlaying: Boolean(message.isPlaying),
+    currentTime,
+    updatedByUserId: actor.userId,
+    updatedAt: new Date().toISOString(),
+  };
+  roomTvMedia.set(roomId, tvMedia);
+
+  logEvent('info', 'tv.playback.updated', {
+    roomId,
+    actorUserId: actor.userId,
+    actorDisplayName: actor.displayName,
+    isPlaying: tvMedia.isPlaying,
+    currentTime: tvMedia.currentTime,
+  });
+  broadcast(roomId, { type: 'tv.updated', tvMedia });
 }
 
 function cleanupSocket(socket, roomId = socket.roomId, sessionId = socket.sessionId) {
