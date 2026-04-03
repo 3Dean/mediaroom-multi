@@ -40,6 +40,8 @@ declare global {
     __musicspaceSetLobbyMode?: (enabled: boolean) => void;
     __musicspaceSetLobbyOverlaySupport?: (message: string) => void;
     __musicspaceSyncRoomSurfaces?: (surfaces: RoomSurfaceSnapshot[]) => void;
+    __musicspaceSetTvVideoSource?: (url: string) => void;
+    __musicspaceClearTvVideoSource?: () => void;
   }
 }
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
@@ -100,6 +102,10 @@ let hues: number[] = [];
 let lightHelpers: THREE.Object3D[] = []; // Store light helpers
 let tvScreenObject: THREE.Object3D | null = null; // Reference to TV screen for seating view
 let tvVisualizerMaterial: THREE.ShaderMaterial | null = null;
+let tvVideoElement: HTMLVideoElement | null = null;
+let tvVideoTexture: THREE.VideoTexture | null = null;
+let tvVideoMaterial: THREE.MeshBasicMaterial | null = null;
+const tvMeshMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
 let tvBassLevel = 0;
 let tvMidLevel = 0;
 let tvHighLevel = 0;
@@ -107,6 +113,7 @@ let tvEnergyLevel = 0;
 let reactiveSignalTime = 0;
 let analyserSilentFor = 0;
 let usingSyntheticReactiveSignal = false;
+const TV_TEST_VIDEO_URL = '/video/tvscreen.mp4';
 
  // Expose function to reposition TV screen at runtime
 ;(window as any).updateTvScreenPosition = (x: number, y: number, z: number) => {
@@ -2152,6 +2159,93 @@ Nearest Seatable Object: ${nearestObjectInfo}
 Nearest Sitting Position: ${nearestSitPosInfo}`;
 }
 
+function createTvVideoResources() {
+  if (tvVideoElement && tvVideoTexture && tvVideoMaterial) {
+    return { element: tvVideoElement, texture: tvVideoTexture, material: tvVideoMaterial };
+  }
+
+  const element = document.createElement('video');
+  element.crossOrigin = 'anonymous';
+  element.loop = true;
+  element.muted = true;
+  element.playsInline = true;
+  element.preload = 'auto';
+  element.src = TV_TEST_VIDEO_URL;
+  element.style.display = 'none';
+  document.body.appendChild(element);
+
+  const texture = new THREE.VideoTexture(element);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+
+  const material = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
+
+  tvVideoElement = element;
+  tvVideoTexture = texture;
+  tvVideoMaterial = material;
+
+  return { element, texture, material };
+}
+
+function applyTvMaterial(material: THREE.Material) {
+  if (!tvScreenObject) {
+    return;
+  }
+
+  tvScreenObject.traverse((child: THREE.Object3D) => {
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      if (!tvMeshMaterials.has(mesh)) {
+        tvMeshMaterials.set(mesh, mesh.material);
+      }
+      mesh.material = material;
+    }
+  });
+}
+
+function applyTvVisualizerMaterial() {
+  if (!tvVisualizerMaterial) {
+    return;
+  }
+
+  applyTvMaterial(tvVisualizerMaterial);
+}
+
+async function setTvVideoSource(url: string) {
+  const { element, material } = createTvVideoResources();
+  element.pause();
+  element.src = url;
+  element.load();
+
+  try {
+    await element.play();
+    applyTvMaterial(material);
+    console.log('TV video texture enabled.', url);
+  } catch (error) {
+    console.warn('TV video texture unavailable, falling back to visualizer.', error);
+    applyTvVisualizerMaterial();
+  }
+}
+
+function clearTvVideoSource() {
+  if (tvVideoElement) {
+    tvVideoElement.pause();
+    tvVideoElement.removeAttribute('src');
+    tvVideoElement.load();
+  }
+  applyTvVisualizerMaterial();
+}
+
+window.__musicspaceSetTvVideoSource = (url: string) => {
+  void setTvVideoSource(url);
+};
+
+window.__musicspaceClearTvVideoSource = () => {
+  clearTvVideoSource();
+};
+
 // TV screen with audio-reactive plasma shader
 loader.load('/models/tvscreen.glb', (gltf: any) => {
   tvScreenObject = gltf.scene;
@@ -2167,6 +2261,7 @@ loader.load('/models/tvscreen.glb', (gltf: any) => {
   gltf.scene.traverse((child: THREE.Object3D) => {
     if ((child as THREE.Mesh).isMesh) {
       const mesh = child as THREE.Mesh;
+      tvMeshMaterials.set(mesh, mesh.material);
       if ((mesh.geometry as THREE.BufferGeometry).attributes.uv) {
         const uvAttribute = (mesh.geometry as THREE.BufferGeometry).attributes.uv;
         tvVisualizerMaterial!.uniforms.uResolution.value.set(
@@ -2178,6 +2273,7 @@ loader.load('/models/tvscreen.glb', (gltf: any) => {
     }
   });
   scene.add(gltf.scene);
+  applyTvVisualizerMaterial();
 });
 
 function getObjectDropTransform(objectId: string) {
