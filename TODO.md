@@ -13,6 +13,8 @@
 - Reduce bundle size from the frontend Amplify room-browser path.
 - Add a non-interactive cinematic lobby camera before room entry.
 - Clarify room lifecycle so signed-in users create saved rooms while guests enter temporary sessions.
+- Move realtime room authority persistence to direct DynamoDB reads/writes on Render.
+- Verify saved-room ownership survives Render restart while temporary guest rooms remain ownerless.
 
 ## Next
 
@@ -26,14 +28,21 @@
   - done: gate shared surfaces to saved rooms so temporary guest sessions do not imply durable ownership
   - done: merge live rooms into the room browser so active rooms show as joinable
   - done: verify Render can perform shared surface updates after widening AppSync IAM access
-  - investigate: durable room ownership still does not survive Render restart
-  - investigate: `Room` records are being written to DynamoDB, but post-restart authority hydration still returns `ownerUserId: null`
-  - investigate: compare server AppSync read path in `server/roomAuthorityRepository.js` with the persisted `Room` table contents
-  - investigate: once authority hydration is fixed, verify saved-room upload gating and `Recent` ordering again in production
+  - done: fix durable ownership by switching server authority hydration/persistence to direct DynamoDB
+  - next: re-verify shared-surface upload gating and `Recent` ordering in production after the DynamoDB authority change
 
 ## Later
 
 - Consider a future "claim/save this room" action when a guest signs in after starting a temporary room.
 - Revisit editable room titles as an owner-only room setting instead of part of the join flow.
+- Shared TV media playback
+  - done: create private S3 + CloudFront distribution path for app-managed media delivery
+  - v1: owner/admin-only TV control for saved rooms
+  - use curated or app-managed `S3`/`CloudFront` mp4 URLs
+  - next: build a local hardcoded TV-video proof of concept by swapping the current `tvscreen.glb` visualizer material to a `THREE.VideoTexture`
+  - sync media source, play/pause, and seek through room state
+  - apply video as a Three.js `VideoTexture` on the TV mesh
+  - defer uploads and YouTube support
+  - later: add `MediaConvert`/HLS if direct mp4 delivery becomes too heavy
 - Improve shared object sync beyond claim/drop authority only.
 - Evaluate voice chat after the room/session UX is stable.
