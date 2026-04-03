@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
@@ -13,10 +14,17 @@ const MAX_ROOM_NAME_LENGTH = 64;
 
 const outputs = loadAmplifyOutputs();
 const appsyncUrl = process.env.REALTIME_APPSYNC_URL?.trim() || outputs.data?.url || '';
+const roomTableName = process.env.REALTIME_ROOM_TABLE_NAME?.trim() || '';
 const region = process.env.AWS_REGION?.trim() || outputs.data?.aws_region || outputs.auth?.aws_region || 'us-east-1';
-const credentialsProvider = appsyncUrl ? defaultProvider() : null;
-const signer = appsyncUrl ? new SignatureV4({
+const credentialsProvider = appsyncUrl || roomTableName ? defaultProvider() : null;
+const appsyncSigner = appsyncUrl ? new SignatureV4({
   service: 'appsync',
+  region,
+  credentials: credentialsProvider,
+  sha256: Sha256,
+}) : null;
+const dynamodbSigner = roomTableName ? new SignatureV4({
+  service: 'dynamodb',
   region,
   credentials: credentialsProvider,
   sha256: Sha256,
@@ -59,6 +67,10 @@ export async function loadAuthorityFromBackend(roomId) {
     return null;
   }
 
+  if (roomTableName && dynamodbSigner) {
+    return loadAuthorityFromDynamo(roomId);
+  }
+
   const response = await executeGraphql(
     /* GraphQL */ `
       query ListRoomsBySlug($slug: String!) {
@@ -96,6 +108,10 @@ export async function loadAuthorityFromBackend(roomId) {
 export async function saveAuthorityToBackend(roomId, authority, options = {}) {
   if (!canUseBackendPersistence()) {
     return null;
+  }
+
+  if (roomTableName && dynamodbSigner) {
+    return saveAuthorityToDynamo(roomId, authority, options);
   }
 
   const normalized = normalizeAuthority(authority);
@@ -141,7 +157,7 @@ export async function saveAuthorityToBackend(roomId, authority, options = {}) {
 }
 
 export function canUseBackendPersistence() {
-  return Boolean(appsyncUrl && signer);
+  return Boolean((roomTableName && dynamodbSigner) || (appsyncUrl && appsyncSigner));
 }
 
 async function ensureRoomRecord(roomId, ownerUserId, maxUsers) {
@@ -184,7 +200,7 @@ async function ensureRoomRecord(roomId, ownerUserId, maxUsers) {
 }
 
 async function executeGraphql(query, variables) {
-  if (!appsyncUrl || !signer) {
+  if (!appsyncUrl || !appsyncSigner) {
     return null;
   }
 
@@ -202,7 +218,7 @@ async function executeGraphql(query, variables) {
     body,
   });
 
-  const signed = await signer.sign(request);
+  const signed = await appsyncSigner.sign(request);
   const response = await fetch(appsyncUrl, {
     method: 'POST',
     headers: signed.headers,
@@ -219,6 +235,172 @@ async function executeGraphql(query, variables) {
   }
 
   return payload.data ?? null;
+}
+
+async function loadAuthorityFromDynamo(roomId) {
+  const response = await executeDynamoRequest('DynamoDB_20120810.Scan', {
+    TableName: roomTableName,
+    FilterExpression: '#slug = :slug',
+    ExpressionAttributeNames: {
+      '#slug': 'slug',
+    },
+    ExpressionAttributeValues: {
+      ':slug': { S: roomId },
+    },
+    Limit: 1,
+  });
+
+  const room = response?.Items?.[0];
+  if (!room) {
+    return null;
+  }
+
+  return normalizeAuthority({
+    ownerUserId: readStringAttribute(room.createdBy),
+    adminUserIds: readStringListAttribute(room.adminUserIds),
+    mutedUserIds: readStringListAttribute(room.mutedUserIds),
+    isLocked: readBooleanAttribute(room.isLocked),
+    roomRecordId: readStringAttribute(room.id),
+  });
+}
+
+async function saveAuthorityToDynamo(roomId, authority, options = {}) {
+  const normalized = normalizeAuthority(authority);
+  const roomRecord = await ensureRoomRecordInDynamo(roomId, normalized.ownerUserId, options.maxUsers ?? 8);
+  if (!roomRecord?.id) {
+    return null;
+  }
+
+  await executeDynamoRequest('DynamoDB_20120810.UpdateItem', {
+    TableName: roomTableName,
+    Key: {
+      id: { S: roomRecord.id },
+    },
+    UpdateExpression: 'SET isLocked = :isLocked, adminUserIds = :adminUserIds, mutedUserIds = :mutedUserIds, updatedAt = :updatedAt',
+    ExpressionAttributeValues: {
+      ':isLocked': { BOOL: normalized.isLocked },
+      ':adminUserIds': { L: normalized.adminUserIds.map((entry) => ({ S: entry })) },
+      ':mutedUserIds': { L: normalized.mutedUserIds.map((entry) => ({ S: entry })) },
+      ':updatedAt': { S: new Date().toISOString() },
+    },
+  });
+
+  return normalizeAuthority({
+    ownerUserId: roomRecord.createdBy,
+    adminUserIds: normalized.adminUserIds,
+    mutedUserIds: normalized.mutedUserIds,
+    isLocked: normalized.isLocked,
+    roomRecordId: roomRecord.id,
+  });
+}
+
+async function ensureRoomRecordInDynamo(roomId, ownerUserId, maxUsers) {
+  if (!ownerUserId) {
+    return null;
+  }
+
+  const existing = await fetchRoomRecordFromDynamo(roomId);
+  if (existing) {
+    return existing;
+  }
+
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  const item = {
+    id: { S: id },
+    slug: { S: roomId },
+    name: { S: roomId.slice(0, MAX_ROOM_NAME_LENGTH) },
+    createdBy: { S: ownerUserId },
+    maxUsers: { N: String(maxUsers) },
+    isPrivate: { BOOL: false },
+    isLocked: { BOOL: false },
+    adminUserIds: { L: [] },
+    mutedUserIds: { L: [] },
+    createdAt: { S: now },
+    updatedAt: { S: now },
+    __typename: { S: 'Room' },
+  };
+
+  try {
+    await executeDynamoRequest('DynamoDB_20120810.PutItem', {
+      TableName: roomTableName,
+      Item: item,
+      ConditionExpression: 'attribute_not_exists(id)',
+    });
+    return {
+      id,
+      createdBy: ownerUserId,
+    };
+  } catch (error) {
+    if (isConditionalCheckFailure(error)) {
+      return fetchRoomRecordFromDynamo(roomId);
+    }
+    throw error;
+  }
+}
+
+async function fetchRoomRecordFromDynamo(roomId) {
+  const response = await executeDynamoRequest('DynamoDB_20120810.Scan', {
+    TableName: roomTableName,
+    FilterExpression: '#slug = :slug',
+    ExpressionAttributeNames: {
+      '#slug': 'slug',
+    },
+    ExpressionAttributeValues: {
+      ':slug': { S: roomId },
+    },
+    Limit: 1,
+  });
+
+  const item = response?.Items?.[0];
+  if (!item) {
+    return null;
+  }
+
+  return {
+    id: readStringAttribute(item.id),
+    createdBy: readStringAttribute(item.createdBy),
+  };
+}
+
+async function executeDynamoRequest(target, payload) {
+  if (!roomTableName || !dynamodbSigner) {
+    return null;
+  }
+
+  const endpoint = `https://dynamodb.${region}.amazonaws.com/`;
+  const body = JSON.stringify(payload);
+  const request = new HttpRequest({
+    method: 'POST',
+    protocol: 'https:',
+    hostname: `dynamodb.${region}.amazonaws.com`,
+    path: '/',
+    headers: {
+      'content-type': 'application/x-amz-json-1.0',
+      'x-amz-target': target,
+      host: `dynamodb.${region}.amazonaws.com`,
+    },
+    body,
+  });
+
+  const signed = await dynamodbSigner.sign(request);
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: signed.headers,
+    body,
+  });
+
+  const text = await response.text();
+  let parsed = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {}
+
+  if (!response.ok) {
+    throw new Error(parsed?.message || parsed?.__message || `DynamoDB request failed with status ${response.status}`);
+  }
+
+  return parsed;
 }
 
 function loadAmplifyOutputs() {
@@ -249,4 +431,22 @@ function parseJsonArray(value) {
 
 function normalizeStringArray(value) {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === 'string') : [];
+}
+
+function readStringAttribute(attribute) {
+  return typeof attribute?.S === 'string' ? attribute.S : null;
+}
+
+function readBooleanAttribute(attribute) {
+  return Boolean(attribute?.BOOL);
+}
+
+function readStringListAttribute(attribute) {
+  return Array.isArray(attribute?.L)
+    ? attribute.L.map((entry) => entry?.S).filter((entry) => typeof entry === 'string')
+    : [];
+}
+
+function isConditionalCheckFailure(error) {
+  return error instanceof Error && /ConditionalCheckFailed/i.test(error.message);
 }

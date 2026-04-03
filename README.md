@@ -67,6 +67,7 @@ Server:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_SESSION_TOKEN` (optional)
+- `REALTIME_ROOM_TABLE_NAME` (recommended for stable server-side room authority persistence)
 
 If `REALTIME_ALLOWED_ORIGINS` is empty, the websocket server accepts all origins locally. On Render, the server falls back to `RENDER_EXTERNAL_URL` automatically so the deployed app can use same-origin websocket connections without extra configuration.
 
@@ -78,7 +79,7 @@ To enable verified room ownership/admin controls, the realtime server must be ab
 - the owner can lock or unlock the room
 - muted users are blocked from sending chat messages server-side
 
-To persist room authority in the Amplify backend data model across redeploys, the realtime server also needs AWS credentials that can call the Amplify AppSync API using IAM. Without those credentials, the server falls back to the local file store in `server/data/room-authority-store.json`.
+To persist room authority in the Amplify backend data model across redeploys, the realtime server can now read and write the Amplify `Room` DynamoDB table directly. Set `REALTIME_ROOM_TABLE_NAME` to the deployed table name and provide AWS credentials that can access that table. Without those credentials, the server falls back to the local file store in `server/data/room-authority-store.json`.
 
 ## Room lifecycle
 
@@ -136,6 +137,7 @@ For durable room authority on Render, add these in addition to the Cognito env v
 - `AWS_ACCESS_KEY_ID=...`
 - `AWS_SECRET_ACCESS_KEY=...`
 - `AWS_SESSION_TOKEN=...` if you use temporary credentials
+- `REALTIME_ROOM_TABLE_NAME=Room-...`
 
 Detailed steps are in `DEPLOYMENT.md`.
 
