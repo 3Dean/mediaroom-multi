@@ -957,9 +957,28 @@ body.mouse #mobile-controls-layer {
   align-items: center;
 }
 
+.chat-tv-upload-controls {
+  display: block;
+}
+
+.chat-tv-upload-actions {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 8px;
+  justify-content: start;
+  align-items: center;
+}
+
+.chat-tv-source-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .chat-tv-controls {
   display: grid;
-  grid-template-columns: auto minmax(72px, 96px) auto auto;
+  grid-template-columns: auto minmax(52px, 72px) auto auto;
   gap: 8px;
   align-items: center;
 }

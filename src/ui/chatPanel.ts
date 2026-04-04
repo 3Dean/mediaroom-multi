@@ -5,6 +5,7 @@ type ChatPanelOptions = {
   onSend: (body: string) => void;
   onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
   onSetTvMedia: (sourceUrl: string | null) => Promise<void>;
+  onUploadTvMedia: (file: File) => Promise<void>;
   onSetTvPlayback: (isPlaying: boolean, currentTime: number) => Promise<void>;
 };
 
@@ -22,7 +23,8 @@ export class ChatPanel {
   private readonly surfaceHelper: HTMLDivElement;
   private readonly tvSection: HTMLDivElement;
   private readonly tvInput: HTMLInputElement;
-  private readonly tvApplyButton: HTMLButtonElement;
+  private readonly tvFileInput: HTMLInputElement;
+  private readonly tvUploadButton: HTMLButtonElement;
   private readonly tvClearButton: HTMLButtonElement;
   private readonly tvTogglePlaybackButton: HTMLButtonElement;
   private readonly tvSeekInput: HTMLInputElement;
@@ -31,6 +33,7 @@ export class ChatPanel {
   private readonly onSend: (body: string) => void;
   private readonly onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
   private readonly onSetTvMedia: (sourceUrl: string | null) => Promise<void>;
+  private readonly onUploadTvMedia: (file: File) => Promise<void>;
   private readonly onSetTvPlayback: (isPlaying: boolean, currentTime: number) => Promise<void>;
   private surfaceUploadEnabled = false;
   private surfaceUploadVisible = false;
@@ -42,6 +45,7 @@ export class ChatPanel {
     this.onSend = options.onSend;
     this.onUploadSurface = options.onUploadSurface;
     this.onSetTvMedia = options.onSetTvMedia;
+    this.onUploadTvMedia = options.onUploadTvMedia;
     this.onSetTvPlayback = options.onSetTvPlayback;
     this.container = document.createElement('div');
     this.container.id = 'chat-panel';
@@ -134,23 +138,21 @@ export class ChatPanel {
 
     this.tvHelper = document.createElement('div');
     this.tvHelper.className = 'chat-surface-helper';
-    this.tvHelper.textContent = 'Owner/admin can set a shared TV video source for the room.';
+    this.tvHelper.textContent = 'Owner/admin can upload an MP4 for the shared TV.';
 
     const tvControls = document.createElement('div');
-    tvControls.className = 'chat-tv-controls';
+    tvControls.className = 'chat-tv-upload-controls';
+    const tvUploadActions = document.createElement('div');
+    tvUploadActions.className = 'chat-tv-upload-actions';
 
     this.tvInput = document.createElement('input');
-    this.tvInput.type = 'text';
-    this.tvInput.placeholder = '/videos/tvscreen.mp4';
+    this.tvInput.type = 'hidden';
     this.tvInput.className = 'chat-tv-input';
 
-    this.tvApplyButton = document.createElement('button');
-    this.tvApplyButton.type = 'button';
-    this.tvApplyButton.textContent = 'Set Video';
-    this.tvApplyButton.className = 'chat-surface-upload-button';
-    this.tvApplyButton.addEventListener('click', () => {
-      void this.handleTvMediaUpdate(this.tvInput.value.trim() || null);
-    });
+    this.tvFileInput = document.createElement('input');
+    this.tvFileInput.type = 'file';
+    this.tvFileInput.accept = 'video/mp4';
+    this.tvFileInput.className = 'chat-surface-file';
 
     this.tvClearButton = document.createElement('button');
     this.tvClearButton.type = 'button';
@@ -160,7 +162,16 @@ export class ChatPanel {
       void this.handleTvMediaUpdate(null);
     });
 
-    tvControls.append(this.tvInput, this.tvApplyButton, this.tvClearButton);
+    this.tvUploadButton = document.createElement('button');
+    this.tvUploadButton.type = 'button';
+    this.tvUploadButton.textContent = 'Upload';
+    this.tvUploadButton.className = 'chat-surface-upload-button';
+    this.tvUploadButton.addEventListener('click', () => {
+      void this.handleTvUpload();
+    });
+
+    tvControls.append(this.tvFileInput);
+    tvUploadActions.append(this.tvUploadButton, this.tvClearButton);
 
     const tvPlaybackControls = document.createElement('div');
     tvPlaybackControls.className = 'chat-tv-controls';
@@ -193,7 +204,7 @@ export class ChatPanel {
     });
 
     tvPlaybackControls.append(this.tvTogglePlaybackButton, this.tvSeekInput, tvSeekLabel, this.tvSeekButton);
-    this.tvSection.append(tvTitle, this.tvHelper, tvControls, tvPlaybackControls);
+    this.tvSection.append(tvTitle, this.tvHelper, tvControls, tvUploadActions, tvPlaybackControls);
 
     header.append(title, status);
     this.container.append(header, this.log, this.form, this.surfaceSection, this.tvSection);
@@ -246,8 +257,8 @@ export class ChatPanel {
     this.tvEnabled = enabled;
     this.tvIsPlaying = isPlaying;
     this.tvSection.style.display = visible ? 'grid' : 'none';
-    this.tvInput.disabled = !enabled;
-    this.tvApplyButton.disabled = !enabled;
+    this.tvFileInput.disabled = !enabled;
+    this.tvUploadButton.disabled = !enabled;
     this.tvClearButton.disabled = !enabled;
     this.tvTogglePlaybackButton.disabled = !enabled || !sourceUrl;
     this.tvTogglePlaybackButton.textContent = isPlaying ? 'Pause' : 'Play';
@@ -258,7 +269,7 @@ export class ChatPanel {
     if (enabled) {
       this.tvHelper.textContent = sourceUrl
         ? `Shared TV is ${isPlaying ? 'playing' : 'paused'} at ${Math.max(0, Number.isFinite(currentTime) ? currentTime : 0).toFixed(1)}s.`
-        : 'Owner/admin can set a shared TV video source for the room.';
+        : 'Owner/admin can upload an MP4 for the shared TV.';
     } else if (!isPersistedRoom) {
       this.tvHelper.textContent = 'Shared TV is available only in saved rooms. Sign in and create the room to enable it.';
     } else {
@@ -314,8 +325,8 @@ export class ChatPanel {
       return;
     }
 
-    this.tvInput.disabled = true;
-    this.tvApplyButton.disabled = true;
+    this.tvFileInput.disabled = true;
+    this.tvUploadButton.disabled = true;
     this.tvClearButton.disabled = true;
     this.tvTogglePlaybackButton.disabled = true;
     this.tvSeekInput.disabled = true;
@@ -330,12 +341,52 @@ export class ChatPanel {
     } catch (error) {
       this.tvHelper.textContent = getErrorMessage(error, 'Unable to update the shared TV right now.');
     } finally {
-      this.tvInput.disabled = !this.tvEnabled;
-      this.tvApplyButton.disabled = !this.tvEnabled;
+      this.tvFileInput.disabled = !this.tvEnabled;
+      this.tvUploadButton.disabled = !this.tvEnabled;
       this.tvClearButton.disabled = !this.tvEnabled;
-      this.tvTogglePlaybackButton.disabled = !this.tvEnabled || !this.tvInput.value.trim();
-      this.tvSeekInput.disabled = !this.tvEnabled || !this.tvInput.value.trim();
-      this.tvSeekButton.disabled = !this.tvEnabled || !this.tvInput.value.trim();
+      const hasSource = Boolean(this.tvInput.value.trim());
+      this.tvTogglePlaybackButton.disabled = !this.tvEnabled || !hasSource;
+      this.tvSeekInput.disabled = !this.tvEnabled || !hasSource;
+      this.tvSeekButton.disabled = !this.tvEnabled || !hasSource;
+    }
+  }
+
+  private async handleTvUpload(): Promise<void> {
+    if (!this.tvEnabled) {
+      if (this.tvVisible) {
+        this.tvHelper.textContent = 'Shared TV is available only to owner/admin in saved rooms.';
+      }
+      return;
+    }
+
+    const file = this.tvFileInput.files?.[0];
+    if (!file) {
+      this.tvHelper.textContent = 'Choose an MP4 before uploading.';
+      return;
+    }
+
+    this.tvFileInput.disabled = true;
+    this.tvUploadButton.disabled = true;
+    this.tvClearButton.disabled = true;
+    this.tvTogglePlaybackButton.disabled = true;
+    this.tvSeekInput.disabled = true;
+    this.tvSeekButton.disabled = true;
+    this.tvHelper.textContent = `Uploading ${file.name} for the shared TV...`;
+
+    try {
+      await this.onUploadTvMedia(file);
+      this.tvHelper.textContent = `${file.name} uploaded for the shared TV.`;
+      this.tvFileInput.value = '';
+    } catch (error) {
+      this.tvHelper.textContent = getErrorMessage(error, 'Unable to upload that TV video right now.');
+    } finally {
+      this.tvFileInput.disabled = !this.tvEnabled;
+      this.tvUploadButton.disabled = !this.tvEnabled;
+      this.tvClearButton.disabled = !this.tvEnabled;
+      const hasSource = Boolean(this.tvInput.value.trim());
+      this.tvTogglePlaybackButton.disabled = !this.tvEnabled || !hasSource;
+      this.tvSeekInput.disabled = !this.tvEnabled || !hasSource;
+      this.tvSeekButton.disabled = !this.tvEnabled || !hasSource;
     }
   }
 

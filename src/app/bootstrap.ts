@@ -10,6 +10,7 @@ import {
   signUpWithEmail,
 } from '../backend/authClient';
 import { uploadRoomSurfaceImage } from '../backend/surfaceImageClient';
+import { uploadRoomTvVideo } from '../backend/tvMediaClient';
 import { RemotePlayerManager } from '../player/remotePlayerManager';
 import { RoomClient } from '../room/roomClient';
 import { applyServerMessage } from '../room/roomPresence';
@@ -549,6 +550,27 @@ export function bootstrapApp(): void {
           sourceUrl,
         });
         roomPanel.setStatus(sourceUrl ? 'Updating shared TV...' : 'Clearing shared TV...');
+      },
+      onUploadTvMedia: async (file: File) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          throw new Error('Enter a live room before uploading a shared TV video.');
+        }
+        if (!activeSession.userId) {
+          throw new Error('Sign in to upload a shared TV video.');
+        }
+        if (!roomState.getSnapshot().isPersisted) {
+          throw new Error('Shared TV is available only in saved rooms.');
+        }
+
+        const sourceUrl = await uploadRoomTvVideo(activeSession.roomId, file);
+        roomClient.send({
+          type: 'admin.setTvMedia',
+          roomId: activeSession.roomId,
+          sessionId: activeSession.sessionId,
+          sourceUrl,
+        });
+        roomPanel.setStatus(`Uploaded ${file.name}. Waiting for shared TV sync...`);
       },
       onSetTvPlayback: async (isPlaying: boolean, currentTime: number) => {
         const activeSession = sessionStore.getCurrentSession();

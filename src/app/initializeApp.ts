@@ -2223,9 +2223,21 @@ async function setTvVideoSource(url: string) {
     return;
   }
 
+  let resolvedUrl = url;
+  if (!url.startsWith('/') && !/^https?:\/\//i.test(url)) {
+    try {
+      const result = await getUrl({ path: url });
+      resolvedUrl = result.url.toString();
+    } catch (error) {
+      console.error('Failed to resolve shared TV source', error);
+      clearTvVideoSource();
+      return;
+    }
+  }
+
   tvCurrentSourceUrl = url;
   element.pause();
-  element.src = url;
+  element.src = resolvedUrl;
   element.load();
   applyTvMaterial(material);
   console.log('TV video texture source loaded.', url);
