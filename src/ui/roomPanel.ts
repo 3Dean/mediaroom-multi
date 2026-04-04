@@ -22,6 +22,8 @@ type RoomPanelOptions = {
   initialRoomSlug?: string;
   initialDisplayName?: string;
   initialIsAuthenticated?: boolean;
+  onStatusChange?: (message: string) => void;
+  onMetaChange?: (message: string) => void;
 };
 
 type RoomSortMode = 'recent' | 'name';
@@ -75,6 +77,8 @@ export class RoomPanel {
   private readonly onJoin: (values: RoomPanelValues) => void;
   private readonly generatedRoomSlug: string;
   private readonly hasUrlRoom: boolean;
+  private readonly onStatusChange?: (message: string) => void;
+  private readonly onMetaChange?: (message: string) => void;
   private rooms: RoomSummary[] = [];
   private activeRoomSlug: string | null = null;
   private activeRoomIsPersisted = false;
@@ -85,45 +89,53 @@ export class RoomPanel {
     this.generatedRoomSlug = generateRoomSlug();
     this.hasUrlRoom = !!options.initialRoomSlug?.trim();
     this.isAuthenticated = Boolean(options.initialIsAuthenticated);
+    this.onStatusChange = options.onStatusChange;
+    this.onMetaChange = options.onMetaChange;
     this.container = document.createElement('div');
     this.container.id = 'room-panel';
-    this.container.className = 'musicspace-panel musicspace-panel--primary';
+    this.container.className = 'musicspace-card musicspace-card--room';
 
     const header = document.createElement('div');
-    header.className = 'panel-header panel-header--stacked';
+    header.className = 'musicspace-card-header';
 
-    const title = document.createElement('div');
-    title.className = 'panel-title panel-title--large';
-    title.textContent = 'Room Session';
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'musicspace-card-title-wrap';
+
+    const title = document.createElement('h2');
+    title.className = 'musicspace-card-title';
+    title.textContent = 'Join a Room';
 
     const intro = document.createElement('div');
-    intro.className = 'panel-status';
+    intro.className = 'musicspace-card-subtitle';
     intro.textContent = 'Join a room from a link or pick one from the browser.';
-    header.append(title, intro);
+
+    titleWrap.appendChild(title);
+    header.append(titleWrap, intro);
 
     const formSection = document.createElement('div');
-    formSection.className = 'room-section';
+    formSection.className = 'musicspace-subsection room-section';
 
     const formHeader = document.createElement('div');
     formHeader.className = 'room-section-header';
 
     const formTitle = document.createElement('div');
-    formTitle.className = 'room-section-title';
+    formTitle.className = 'musicspace-subsection-title room-section-title';
     formTitle.textContent = 'Create / Join';
 
     const formHint = document.createElement('div');
-    formHint.className = 'room-section-hint';
+    formHint.className = 'musicspace-inline-note room-section-hint';
     formHint.textContent = 'Signed-in users create saved rooms. Guests can enter temporary sessions.';
 
     formHeader.append(formTitle, formHint);
 
     this.form = document.createElement('form');
-    this.form.className = 'room-join-form';
+    this.form.className = 'musicspace-field-stack room-join-form';
 
     this.roomInput = document.createElement('input');
     this.roomInput.type = 'text';
     this.roomInput.placeholder = 'Room link / slug';
     this.roomInput.value = options.initialRoomSlug?.trim() || this.generatedRoomSlug;
+    this.roomInput.className = 'musicspace-input';
     this.roomInput.addEventListener('input', () => this.refreshJoinIntent());
 
     const roomSlugLabel = document.createElement('label');
@@ -138,37 +150,37 @@ export class RoomPanel {
     this.nameInput.type = 'text';
     this.nameInput.placeholder = 'Display name';
     this.nameInput.value = options.initialDisplayName?.trim() || localStorage.getItem(STORAGE_KEYS.displayName) || '';
+    this.nameInput.className = 'musicspace-input';
 
     this.joinButton = document.createElement('button');
     this.joinButton.type = 'submit';
     this.joinButton.textContent = 'Create Room';
+    this.joinButton.className = 'musicspace-button musicspace-button--primary';
 
     this.joinHelper = document.createElement('div');
-    this.joinHelper.className = 'room-join-helper';
+    this.joinHelper.className = 'musicspace-inline-note room-join-helper';
     this.joinHelper.textContent = 'This link is new. A room will be created.';
 
     this.statusLabel = document.createElement('div');
-    this.statusLabel.style.color = '#c8c8c8';
-    this.statusLabel.style.fontSize = '12px';
+    this.statusLabel.className = 'musicspace-helper-text room-status';
     this.statusLabel.textContent = 'Multiplayer wiring will attach here.';
 
     this.metaLabel = document.createElement('div');
-    this.metaLabel.style.color = '#9bd5ff';
-    this.metaLabel.style.fontSize = '12px';
+    this.metaLabel.className = 'musicspace-card-meta room-meta';
     this.metaLabel.textContent = 'Connection idle';
 
     const listSection = document.createElement('div');
-    listSection.className = 'room-section room-browser';
+    listSection.className = 'musicspace-subsection room-section room-browser';
 
     const listHeader = document.createElement('div');
     listHeader.className = 'room-section-header room-browser-header';
 
     const listTitle = document.createElement('div');
-    listTitle.className = 'room-section-title';
-    listTitle.textContent = 'Browse Rooms';
+    listTitle.className = 'musicspace-subsection-title room-section-title';
+    listTitle.textContent = 'Available Rooms';
 
     this.roomListStatus = document.createElement('div');
-    this.roomListStatus.className = 'room-section-hint room-browser-status';
+    this.roomListStatus.className = 'musicspace-card-meta room-section-hint room-browser-status';
     this.roomListStatus.textContent = 'Sign in to load persisted rooms.';
 
     const listControls = document.createElement('div');
@@ -176,12 +188,12 @@ export class RoomPanel {
 
     this.roomFilterInput = document.createElement('input');
     this.roomFilterInput.type = 'text';
-    this.roomFilterInput.className = 'room-browser-filter';
+    this.roomFilterInput.className = 'musicspace-input musicspace-input--small room-browser-filter';
     this.roomFilterInput.placeholder = 'Filter rooms';
     this.roomFilterInput.addEventListener('input', () => this.renderRooms());
 
     this.roomSortSelect = document.createElement('select');
-    this.roomSortSelect.className = 'room-browser-sort';
+    this.roomSortSelect.className = 'musicspace-input musicspace-input--small room-browser-sort';
     const recentOption = document.createElement('option');
     recentOption.value = 'recent';
     recentOption.textContent = 'Recent';
@@ -212,9 +224,6 @@ export class RoomPanel {
     });
 
     formSection.append(formHeader, this.form);
-    this.statusLabel.className = 'panel-status room-status';
-    this.metaLabel.className = 'panel-meta room-meta';
-
     this.container.append(header, formSection, listSection, this.statusLabel, this.metaLabel);
     this.refreshJoinIntent();
   }
@@ -241,10 +250,12 @@ export class RoomPanel {
 
   setStatus(message: string): void {
     this.statusLabel.textContent = message;
+    this.onStatusChange?.(message);
   }
 
   setMeta(message: string): void {
     this.metaLabel.textContent = message;
+    this.onMetaChange?.(message);
   }
 
   setRoomListStatusMessage(message: string): void {
@@ -339,13 +350,13 @@ export class RoomPanel {
       badges.className = 'room-browser-item-badges';
 
       const capacityBadge = document.createElement('span');
-      capacityBadge.className = 'room-browser-badge';
+      capacityBadge.className = 'musicspace-pill room-browser-badge';
       capacityBadge.textContent = `max ${room.maxUsers}`;
       badges.appendChild(capacityBadge);
 
       if (room.isLive) {
         const liveBadge = document.createElement('span');
-        liveBadge.className = 'room-browser-badge is-live';
+        liveBadge.className = 'musicspace-pill room-browser-badge is-live';
         liveBadge.textContent = room.liveParticipantCount && room.liveParticipantCount > 0
           ? `${room.liveParticipantCount} live`
           : 'Live';
@@ -354,21 +365,21 @@ export class RoomPanel {
 
       if (!room.isPersisted) {
         const tempBadge = document.createElement('span');
-        tempBadge.className = 'room-browser-badge';
+        tempBadge.className = 'musicspace-pill room-browser-badge';
         tempBadge.textContent = 'Temp';
         badges.appendChild(tempBadge);
       }
 
       if (room.isLocked) {
         const lockedBadge = document.createElement('span');
-        lockedBadge.className = 'room-browser-badge is-warn';
+        lockedBadge.className = 'musicspace-pill room-browser-badge is-warn';
         lockedBadge.textContent = 'Locked';
         badges.appendChild(lockedBadge);
       }
 
       if (room.isPrivate) {
         const privateBadge = document.createElement('span');
-        privateBadge.className = 'room-browser-badge';
+        privateBadge.className = 'musicspace-pill room-browser-badge';
         privateBadge.textContent = 'Private';
         badges.appendChild(privateBadge);
       }
@@ -385,13 +396,13 @@ export class RoomPanel {
       actions.className = 'room-browser-actions';
 
       const joinAction = document.createElement('span');
-      joinAction.className = 'room-browser-action-link';
+      joinAction.className = 'musicspace-button musicspace-button--text room-browser-action-link';
       joinAction.textContent = 'Join';
 
       const shareButton = document.createElement('button');
       shareButton.type = 'button';
-      shareButton.className = 'room-browser-share-button';
-      shareButton.textContent = 'Copy link';
+      shareButton.className = 'musicspace-button musicspace-button--secondary musicspace-button--small room-browser-share-button';
+      shareButton.textContent = 'Copy Link';
       shareButton.addEventListener('click', async (event) => {
         event.stopPropagation();
         await copyRoomLink(room.slug, shareButton);

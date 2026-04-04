@@ -480,6 +480,7 @@ if (!audioControlsContainer) {
 // Create play/pause button
 const playButton = document.createElement('button');
 playButton.textContent = 'Play Music';
+playButton.className = 'musicspace-button musicspace-button--primary';
 playButton.style.padding = '8px 12px';
 playButton.style.backgroundColor = '#9e552f';
 playButton.style.color = 'white';
@@ -506,6 +507,7 @@ const somaStations = [
 
 // Dropdown to select station
 const stationSelect = document.createElement('select');
+stationSelect.className = 'musicspace-input';
 window.__musicspaceGetStationOptions = () => somaStations.map((station) => ({ label: station.name, mood: station.mood }));
 stationSelect.style.padding = '6px';
 stationSelect.style.borderRadius = '4px';
@@ -525,11 +527,11 @@ audioControlsContainer.appendChild(stationSelect);
 // Create volume slider
 const volumeSlider = document.createElement('input');
 volumeSlider.type = 'range';
+volumeSlider.className = 'musicspace-slider';
 volumeSlider.min = '0';
 volumeSlider.max = '1';
 volumeSlider.step = '0.1';
 volumeSlider.value = String(initialPreferences.audio.defaultVolume);
-volumeSlider.style.width = '100px';
 // volumeSlider.style.accentColor = '#007bff'; // Removed to rely on CSS for thumb
 volumeSlider.style.cursor = 'pointer';
 volumeSlider.style.pointerEvents = 'auto';
@@ -2859,3 +2861,4 @@ animate();
 //updateNowPlaying();
 //setInterval(updateNowPlaying, 30000);
 } // End of initializeApp function
+

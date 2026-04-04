@@ -7,7 +7,7 @@ type AuthPanelOptions = {
 };
 
 export class AuthPanel {
-  private readonly container: HTMLDivElement;
+  private readonly container: HTMLDetailsElement;
   private readonly loggedInView: HTMLDivElement;
   private readonly loggedOutView: HTMLDivElement;
   private readonly statusLabel: HTMLDivElement;
@@ -19,48 +19,61 @@ export class AuthPanel {
   private readonly confirmButton: HTMLButtonElement;
   private readonly signOutButton: HTMLButtonElement;
   private readonly accountLabel: HTMLDivElement;
+  private readonly summaryMeta: HTMLSpanElement;
   private readonly options: AuthPanelOptions;
   private pendingConfirmationEmail: string | null = null;
 
   constructor(options: AuthPanelOptions) {
     this.options = options;
-    this.container = document.createElement('div');
+    this.container = document.createElement('details');
     this.container.id = 'auth-panel';
-    this.container.className = 'musicspace-panel musicspace-panel--secondary';
+    this.container.className = 'musicspace-accordion musicspace-card--account';
 
-    const header = document.createElement('div');
-    header.className = 'panel-header';
+    const summary = document.createElement('summary');
+    summary.className = 'musicspace-accordion-summary';
 
-    const title = document.createElement('div');
-    title.className = 'panel-title';
-    title.textContent = 'Account';
+    const summaryLeft = document.createElement('span');
+    summaryLeft.className = 'musicspace-accordion-title-wrap';
+    summaryLeft.textContent = 'Account';
+
+    this.summaryMeta = document.createElement('span');
+    this.summaryMeta.className = 'musicspace-accordion-meta';
+    this.summaryMeta.textContent = 'Guest mode active';
+
+    summary.append(summaryLeft, this.summaryMeta);
+
+    const body = document.createElement('div');
+    body.className = 'musicspace-accordion-body';
 
     this.statusLabel = document.createElement('div');
-    this.statusLabel.className = 'panel-status auth-status';
+    this.statusLabel.className = 'musicspace-helper-text auth-status';
     this.statusLabel.textContent = 'Sign in for ownership and moderation access.';
 
     this.loggedOutView = document.createElement('div');
-    this.loggedOutView.className = 'auth-form';
+    this.loggedOutView.className = 'musicspace-field-stack auth-form';
 
     this.emailInput = document.createElement('input');
     this.emailInput.type = 'email';
     this.emailInput.placeholder = 'Email';
     this.emailInput.autocomplete = 'username';
+    this.emailInput.className = 'musicspace-input';
 
     this.passwordInput = document.createElement('input');
     this.passwordInput.type = 'password';
     this.passwordInput.placeholder = 'Password';
     this.passwordInput.autocomplete = 'current-password';
+    this.passwordInput.className = 'musicspace-input';
 
     this.codeInput = document.createElement('input');
     this.codeInput.type = 'text';
     this.codeInput.placeholder = 'Confirmation code';
+    this.codeInput.className = 'musicspace-input';
     this.codeInput.style.display = 'none';
 
     this.signInButton = document.createElement('button');
     this.signInButton.type = 'button';
     this.signInButton.textContent = 'Sign In';
-    this.signInButton.className = 'auth-primary-action';
+    this.signInButton.className = 'musicspace-button musicspace-button--primary musicspace-button--block';
     this.signInButton.addEventListener('click', () => {
       void this.handleSignIn();
     });
@@ -68,7 +81,7 @@ export class AuthPanel {
     this.signUpButton = document.createElement('button');
     this.signUpButton.type = 'button';
     this.signUpButton.textContent = 'Create account';
-    this.signUpButton.className = 'auth-secondary-action';
+    this.signUpButton.className = 'musicspace-button musicspace-button--text';
     this.signUpButton.addEventListener('click', () => {
       void this.handleSignUp();
     });
@@ -76,7 +89,7 @@ export class AuthPanel {
     this.confirmButton = document.createElement('button');
     this.confirmButton.type = 'button';
     this.confirmButton.textContent = 'Confirm Email';
-    this.confirmButton.className = 'auth-secondary-action';
+    this.confirmButton.className = 'musicspace-button musicspace-button--secondary';
     this.confirmButton.style.display = 'none';
     this.confirmButton.addEventListener('click', () => {
       void this.handleConfirm();
@@ -103,13 +116,15 @@ export class AuthPanel {
     this.signOutButton = document.createElement('button');
     this.signOutButton.type = 'button';
     this.signOutButton.textContent = 'Sign Out';
+    this.signOutButton.className = 'musicspace-button musicspace-button--secondary musicspace-button--block';
     this.signOutButton.addEventListener('click', () => {
       void this.handleSignOut();
     });
 
     this.loggedInView.append(this.accountLabel, this.signOutButton);
-    header.append(title, this.statusLabel);
-    this.container.append(header, this.loggedOutView, this.loggedInView);
+    body.append(this.statusLabel, this.loggedOutView, this.loggedInView);
+    this.container.append(summary, body);
+    this.container.open = false;
     this.setUser(options.initialLoginId ?? null);
   }
 
@@ -122,6 +137,8 @@ export class AuthPanel {
     this.loggedOutView.style.display = signedIn ? 'none' : 'grid';
     this.loggedInView.style.display = signedIn ? 'grid' : 'none';
     this.accountLabel.textContent = loginId ? `Signed in as ${loginId}` : '';
+    this.summaryMeta.textContent = loginId ? loginId : 'Guest mode active';
+    this.container.dataset.authState = signedIn ? 'signed-in' : 'guest';
     if (signedIn) {
       this.setStatus('Signed in. Re-enter only if you joined earlier as a guest.');
       this.resetConfirmationState();

@@ -13,6 +13,7 @@ const SURFACE_IDS: RoomSurfaceId[] = ['image01', 'image02', 'image03', 'image04'
 
 export class ChatPanel {
   private readonly container: HTMLDivElement;
+  private readonly sharedMediaContainer: HTMLDetailsElement;
   private readonly log: HTMLDivElement;
   private readonly form: HTMLFormElement;
   private readonly input: HTMLInputElement;
@@ -47,19 +48,24 @@ export class ChatPanel {
     this.onSetTvMedia = options.onSetTvMedia;
     this.onUploadTvMedia = options.onUploadTvMedia;
     this.onSetTvPlayback = options.onSetTvPlayback;
+
     this.container = document.createElement('div');
     this.container.id = 'chat-panel';
-    this.container.className = 'musicspace-panel musicspace-panel--utility';
+    this.container.className = 'musicspace-card musicspace-card--chat';
 
     const header = document.createElement('div');
-    header.className = 'panel-header';
+    header.className = 'musicspace-card-header';
 
-    const title = document.createElement('div');
-    title.className = 'panel-title';
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'musicspace-card-title-wrap';
+
+    const title = document.createElement('h2');
+    title.className = 'musicspace-card-title';
     title.textContent = 'Chat';
+    titleWrap.appendChild(title);
 
     const status = document.createElement('div');
-    status.className = 'panel-meta';
+    status.className = 'musicspace-card-meta';
     status.textContent = 'Room messages';
 
     this.log = document.createElement('div');
@@ -71,12 +77,12 @@ export class ChatPanel {
     this.input = document.createElement('input');
     this.input.type = 'text';
     this.input.placeholder = 'Message the room';
-    this.input.className = 'chat-input';
+    this.input.className = 'musicspace-input chat-input';
 
     const sendButton = document.createElement('button');
     sendButton.type = 'submit';
     sendButton.textContent = 'Send';
-    sendButton.className = 'chat-send-button';
+    sendButton.className = 'musicspace-button musicspace-button--primary';
 
     this.form.append(this.input, sendButton);
     this.form.addEventListener('submit', (event) => {
@@ -90,22 +96,45 @@ export class ChatPanel {
       this.input.value = '';
     });
 
+    header.append(titleWrap, status);
+    this.container.append(header, this.log, this.form);
+
+    this.sharedMediaContainer = document.createElement('details');
+    this.sharedMediaContainer.id = 'shared-media-panel';
+    this.sharedMediaContainer.className = 'musicspace-accordion musicspace-card--media-alt';
+
+    const sharedMediaSummary = document.createElement('summary');
+    sharedMediaSummary.className = 'musicspace-accordion-summary';
+
+    const sharedMediaTitle = document.createElement('span');
+    sharedMediaTitle.className = 'musicspace-accordion-title-wrap';
+    sharedMediaTitle.textContent = 'Shared Media';
+
+    const sharedMediaMeta = document.createElement('span');
+    sharedMediaMeta.className = 'musicspace-accordion-meta';
+    sharedMediaMeta.textContent = 'Saved rooms only';
+
+    sharedMediaSummary.append(sharedMediaTitle, sharedMediaMeta);
+
+    const sharedMediaBody = document.createElement('div');
+    sharedMediaBody.className = 'musicspace-accordion-body';
+
     this.surfaceSection = document.createElement('div');
-    this.surfaceSection.className = 'chat-surface-section';
+    this.surfaceSection.className = 'musicspace-subsection chat-surface-section';
 
     const surfaceTitle = document.createElement('div');
-    surfaceTitle.className = 'chat-surface-title';
-    surfaceTitle.textContent = 'Shared surfaces';
+    surfaceTitle.className = 'musicspace-subsection-title chat-surface-title';
+    surfaceTitle.textContent = 'Shared Surfaces';
 
     this.surfaceHelper = document.createElement('div');
-    this.surfaceHelper.className = 'chat-surface-helper';
+    this.surfaceHelper.className = 'musicspace-helper-text chat-surface-helper';
     this.surfaceHelper.textContent = 'Owner/admin can replace image01-image04 for everyone in the room.';
 
     const surfaceControls = document.createElement('div');
     surfaceControls.className = 'chat-surface-controls';
 
     this.surfaceSelect = document.createElement('select');
-    this.surfaceSelect.className = 'chat-surface-select';
+    this.surfaceSelect.className = 'musicspace-input chat-surface-select';
     SURFACE_IDS.forEach((surfaceId) => {
       const option = document.createElement('option');
       option.value = surfaceId;
@@ -116,12 +145,12 @@ export class ChatPanel {
     this.surfaceFileInput = document.createElement('input');
     this.surfaceFileInput.type = 'file';
     this.surfaceFileInput.accept = 'image/png,image/jpeg,image/webp';
-    this.surfaceFileInput.className = 'chat-surface-file';
+    this.surfaceFileInput.className = 'musicspace-input chat-surface-file';
 
     this.surfaceUploadButton = document.createElement('button');
     this.surfaceUploadButton.type = 'button';
     this.surfaceUploadButton.textContent = 'Upload';
-    this.surfaceUploadButton.className = 'chat-surface-upload-button';
+    this.surfaceUploadButton.className = 'musicspace-button musicspace-button--primary musicspace-button--block chat-surface-upload-button';
     this.surfaceUploadButton.addEventListener('click', () => {
       void this.handleSurfaceUpload();
     });
@@ -130,14 +159,14 @@ export class ChatPanel {
     this.surfaceSection.append(surfaceTitle, this.surfaceHelper, surfaceControls);
 
     this.tvSection = document.createElement('div');
-    this.tvSection.className = 'chat-surface-section';
+    this.tvSection.className = 'musicspace-subsection chat-surface-section';
 
     const tvTitle = document.createElement('div');
-    tvTitle.className = 'chat-surface-title';
+    tvTitle.className = 'musicspace-subsection-title chat-surface-title';
     tvTitle.textContent = 'Shared TV';
 
     this.tvHelper = document.createElement('div');
-    this.tvHelper.className = 'chat-surface-helper';
+    this.tvHelper.className = 'musicspace-helper-text chat-surface-helper';
     this.tvHelper.textContent = 'Owner/admin can upload an MP4 for the shared TV.';
 
     const tvControls = document.createElement('div');
@@ -152,12 +181,12 @@ export class ChatPanel {
     this.tvFileInput = document.createElement('input');
     this.tvFileInput.type = 'file';
     this.tvFileInput.accept = 'video/mp4';
-    this.tvFileInput.className = 'chat-surface-file';
+    this.tvFileInput.className = 'musicspace-input chat-surface-file';
 
     this.tvClearButton = document.createElement('button');
     this.tvClearButton.type = 'button';
     this.tvClearButton.textContent = 'Clear';
-    this.tvClearButton.className = 'chat-surface-upload-button';
+    this.tvClearButton.className = 'musicspace-button musicspace-button--secondary';
     this.tvClearButton.addEventListener('click', () => {
       void this.handleTvMediaUpdate(null);
     });
@@ -165,7 +194,7 @@ export class ChatPanel {
     this.tvUploadButton = document.createElement('button');
     this.tvUploadButton.type = 'button';
     this.tvUploadButton.textContent = 'Upload';
-    this.tvUploadButton.className = 'chat-surface-upload-button';
+    this.tvUploadButton.className = 'musicspace-button musicspace-button--secondary musicspace-button--block chat-tv-upload-button';
     this.tvUploadButton.addEventListener('click', () => {
       void this.handleTvUpload();
     });
@@ -179,7 +208,7 @@ export class ChatPanel {
     this.tvTogglePlaybackButton = document.createElement('button');
     this.tvTogglePlaybackButton.type = 'button';
     this.tvTogglePlaybackButton.textContent = 'Play';
-    this.tvTogglePlaybackButton.className = 'chat-surface-upload-button';
+    this.tvTogglePlaybackButton.className = 'musicspace-button musicspace-button--secondary';
     this.tvTogglePlaybackButton.addEventListener('click', () => {
       void this.handleTvPlaybackUpdate(!this.tvIsPlaying);
     });
@@ -189,16 +218,16 @@ export class ChatPanel {
     this.tvSeekInput.min = '0';
     this.tvSeekInput.step = '0.1';
     this.tvSeekInput.placeholder = '0';
-    this.tvSeekInput.className = 'chat-tv-input';
+    this.tvSeekInput.className = 'musicspace-input musicspace-input--small chat-tv-input';
 
     const tvSeekLabel = document.createElement('div');
-    tvSeekLabel.className = 'chat-tv-seek-label';
+    tvSeekLabel.className = 'musicspace-inline-unit chat-tv-seek-label';
     tvSeekLabel.textContent = 'Seconds';
 
     this.tvSeekButton = document.createElement('button');
     this.tvSeekButton.type = 'button';
     this.tvSeekButton.textContent = 'Seek';
-    this.tvSeekButton.className = 'chat-surface-upload-button';
+    this.tvSeekButton.className = 'musicspace-button musicspace-button--secondary';
     this.tvSeekButton.addEventListener('click', () => {
       void this.handleTvSeekUpdate();
     });
@@ -206,14 +235,17 @@ export class ChatPanel {
     tvPlaybackControls.append(this.tvTogglePlaybackButton, this.tvSeekInput, tvSeekLabel, this.tvSeekButton);
     this.tvSection.append(tvTitle, this.tvHelper, tvControls, tvUploadActions, tvPlaybackControls);
 
-    header.append(title, status);
-    this.container.append(header, this.log, this.form, this.surfaceSection, this.tvSection);
+    sharedMediaBody.append(this.surfaceSection, this.tvSection);
+    this.sharedMediaContainer.append(sharedMediaSummary, sharedMediaBody);
+    this.sharedMediaContainer.open = false;
+
     this.setSurfaceUploadState(null, false);
     this.setTvMediaState(null, false, null);
   }
 
-  mount(parent: HTMLElement = document.body): void {
+  mount(parent: HTMLElement = document.body, advancedParent: HTMLElement = parent): void {
     parent.appendChild(this.container);
+    advancedParent.appendChild(this.sharedMediaContainer);
   }
 
   setMessages(messages: ChatMessage[]): void {
@@ -426,7 +458,9 @@ export class ChatPanel {
   private createMessageRow(message: ChatMessage): HTMLDivElement {
     const row = document.createElement('div');
     row.className = 'chat-message';
-    row.innerHTML = `<strong>${message.displayName}:</strong> ${message.body}`;
+    const name = document.createElement('strong');
+    name.textContent = `${message.displayName}: `;
+    row.append(name, message.body);
     return row;
   }
 }
@@ -437,3 +471,4 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
   return fallback;
 }
+

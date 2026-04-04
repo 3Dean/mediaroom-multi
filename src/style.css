@@ -162,8 +162,9 @@ button:focus-visible {
 #musicspace-lobby-overlay {
   position: absolute;
   top: clamp(28px, 8vh, 72px);
-  right: clamp(28px, 6vw, 92px);
-  max-width: min(32vw, 420px);
+  left: clamp(32px, 6vw, 96px);
+  right: auto;
+  max-width: min(29vw, 400px);
   padding: 22px 24px;
   display: grid;
   gap: 10px;
@@ -186,7 +187,7 @@ button:focus-visible {
   position: absolute;
   inset: -18px -24px;
   background:
-    radial-gradient(circle at 35% 50%, rgba(210, 124, 66, 0.22), transparent 62%),
+    radial-gradient(circle at 22% 50%, rgba(210, 124, 66, 0.22), transparent 62%),
     linear-gradient(135deg, rgba(6, 8, 12, 0.56), rgba(6, 8, 12, 0));
   filter: blur(12px);
   z-index: -1;
@@ -1019,3 +1020,733 @@ body.mouse #mobile-controls-layer {
 .room-meta {
   min-height: 16px;
 }
+
+/* Experimental mobile accordion sidebar */
+#musicspace-sidebar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  left: auto;
+  bottom: 16px;
+  width: min(380px, calc(100vw - 28px));
+  padding: 0;
+  background:
+    linear-gradient(180deg, rgba(7, 9, 14, 0.9), rgba(7, 9, 14, 0.78)),
+    radial-gradient(circle at top, rgba(202, 116, 63, 0.08), transparent 52%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  overflow: hidden;
+}
+
+#musicspace-sidebar:not(.is-open) {
+  transform: translateX(calc(100% + 24px));
+}
+
+#musicspace-sidebar-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#musicspace-sidebar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 14px 14px 12px;
+  display: grid;
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(10, 12, 18, 0.96), rgba(10, 12, 18, 0.82));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#musicspace-sidebar-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+}
+
+#musicspace-primary-panels,
+#musicspace-advanced-panels {
+  display: grid;
+  gap: 14px;
+}
+
+#musicspace-advanced-group {
+  display: grid;
+  gap: 10px;
+}
+
+.musicspace-advanced-heading {
+  color: rgba(241, 242, 247, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0 4px;
+}
+
+#musicspace-sidebar-toggle {
+  right: 16px;
+  left: auto;
+  transition: right 220ms ease, background-color 220ms ease;
+}
+
+#musicspace-sidebar.is-open + #musicspace-sidebar-toggle {
+  left: auto;
+  right: calc(min(380px, calc(100vw - 28px)) + 28px);
+}
+
+#musicspace-session-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.musicspace-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: rgba(188, 196, 210, 0.7);
+  box-shadow: 0 0 0 4px rgba(188, 196, 210, 0.08);
+}
+
+.musicspace-status-dot.is-live {
+  background: #51e59f;
+  box-shadow: 0 0 12px rgba(81, 229, 159, 0.55);
+}
+
+.musicspace-status-dot.is-warn {
+  background: #ff8d66;
+  box-shadow: 0 0 12px rgba(255, 141, 102, 0.42);
+}
+
+.musicspace-status-dot.is-idle {
+  background: #aeb8c7;
+}
+
+.musicspace-status-copy {
+  min-width: 0;
+}
+
+.musicspace-status-line-1 {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.musicspace-status-line-2 {
+  color: rgba(223, 231, 242, 0.72);
+  font-size: 12px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+#musicspace-quick-nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.musicspace-quick-nav-button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(230, 235, 243, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.musicspace-quick-nav-button.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.musicspace-card,
+.musicspace-accordion {
+  position: relative !important;
+  inset: auto !important;
+  width: auto !important;
+  max-width: none !important;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.musicspace-card--standalone {
+  margin: 0;
+}
+
+.musicspace-card--room {
+  background: rgba(27, 103, 112, 0.18);
+  border-color: rgba(98, 214, 231, 0.18);
+}
+
+.musicspace-card--chat {
+  background: rgba(52, 65, 136, 0.18);
+  border-color: rgba(117, 145, 255, 0.18);
+}
+
+.musicspace-card--media,
+.musicspace-card--media-alt {
+  background: rgba(126, 79, 27, 0.18);
+  border-color: rgba(241, 175, 86, 0.18);
+}
+
+.musicspace-card--people {
+  background: rgba(42, 85, 120, 0.16);
+  border-color: rgba(110, 176, 231, 0.18);
+}
+
+.musicspace-card--account {
+  background: rgba(86, 86, 92, 0.14);
+  border-color: rgba(179, 179, 188, 0.14);
+}
+
+.musicspace-card--preferences {
+  background: rgba(80, 62, 121, 0.18);
+  border-color: rgba(193, 138, 255, 0.18);
+}
+
+.musicspace-card-header,
+.musicspace-button-row,
+.participant-row,
+.room-listing-bottom,
+.room-listing-top,
+.chat-compose {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.musicspace-card-title-wrap,
+.musicspace-accordion-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.musicspace-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 245, 232, 0.84);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.musicspace-card-title {
+  margin: 0;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.musicspace-card-subtitle,
+.musicspace-helper-text,
+.musicspace-inline-note,
+.musicspace-inline-unit,
+.musicspace-card-meta {
+  color: rgba(224, 231, 241, 0.72);
+}
+
+.musicspace-card-subtitle,
+.musicspace-helper-text,
+.musicspace-inline-note {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.musicspace-card-meta,
+.musicspace-inline-unit {
+  font-size: 11px;
+}
+
+.musicspace-subsection {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.musicspace-subsection-title {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.musicspace-field-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.musicspace-field {
+  display: grid;
+  gap: 6px;
+  color: rgba(245, 247, 250, 0.92);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.musicspace-input,
+input.musicspace-input,
+select.musicspace-input,
+.musicspace-input[type="file"] {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  box-sizing: border-box;
+}
+
+.musicspace-input--small {
+  min-height: 38px;
+  font-size: 13px;
+}
+
+.musicspace-input:focus,
+input.musicspace-input:focus,
+select.musicspace-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.musicspace-slider {
+  width: 100%;
+}
+
+.musicspace-button {
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.musicspace-button--block {
+  width: 100%;
+}
+
+.musicspace-button--small {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.musicspace-button--primary {
+  background: #c9743f;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.musicspace-button--secondary {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.musicspace-button--text {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(240, 244, 249, 0.92);
+}
+
+.musicspace-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.musicspace-accordion {
+  padding: 0;
+  overflow: hidden;
+}
+
+.musicspace-accordion-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px;
+  cursor: pointer;
+}
+
+.musicspace-accordion-summary::-webkit-details-marker {
+  display: none;
+}
+
+.musicspace-accordion-meta {
+  color: rgba(224, 231, 241, 0.72);
+  font-size: 11px;
+  text-align: right;
+}
+
+.musicspace-accordion-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+#audioControls {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  transform: none !important;
+  z-index: auto !important;
+  width: auto;
+  display: grid !important;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0;
+  background: transparent !important;
+  border: 0;
+  border-radius: 0;
+  pointer-events: auto !important;
+  box-sizing: border-box;
+}
+
+#audioControls button,
+#audioControls select,
+#audioControls input[type="range"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.participant-list-body {
+  display: grid;
+  gap: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.participant-row {
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.participant-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.participant-name {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.participant-state {
+  color: rgba(194, 223, 255, 0.82);
+  font-size: 12px;
+}
+
+.participant-actions button {
+  min-height: 34px;
+}
+
+.room-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.room-section-hint {
+  text-align: right;
+}
+
+.room-browser-list {
+  gap: 8px;
+}
+
+.room-browser-item {
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+}
+
+.room-browser-item-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.room-browser-action-link {
+  justify-self: start;
+}
+
+.room-browser-item-slug,
+.room-browser-item-meta {
+  color: #afbccd;
+  font-size: 11px;
+}
+
+.chat-log {
+  display: grid;
+  gap: 8px;
+  min-height: 128px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chat-message {
+  word-break: break-word;
+}
+
+.chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.chat-surface-controls,
+.chat-tv-upload-controls,
+.chat-tv-upload-actions,
+.chat-tv-controls,
+.room-browser-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-surface-controls,
+.room-browser-controls {
+  grid-template-columns: minmax(0, 1fr) minmax(92px, auto);
+}
+
+.chat-tv-upload-actions,
+.chat-tv-controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chat-tv-controls {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.auth-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.auth-signed-in {
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  #musicspace-sidebar {
+    top: 12px;
+    right: 12px;
+    left: auto;
+    bottom: 12px;
+    width: min(400px, calc(100vw - 24px));
+  }
+
+  #musicspace-sidebar:not(.is-open) {
+    transform: translateX(calc(100% + 24px));
+  }
+
+  #musicspace-sidebar-toggle {
+    top: 12px;
+    right: 12px;
+    left: auto;
+  }
+
+  #musicspace-sidebar.is-open + #musicspace-sidebar-toggle {
+    left: auto;
+    right: calc(min(400px, calc(100vw - 24px)) + 20px);
+  }
+}
+
+@media (max-width: 420px) {
+  #musicspace-sidebar {
+    width: calc(100vw - 16px);
+    top: 8px;
+    right: 8px;
+    bottom: 8px;
+  }
+
+  #musicspace-sidebar-toggle {
+    right: 8px;
+  }
+
+  #musicspace-sidebar.is-open + #musicspace-sidebar-toggle {
+    right: 14px;
+    top: auto;
+    bottom: 16px;
+  }
+
+  #musicspace-sidebar-scroll,
+  #musicspace-sidebar-sticky {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .musicspace-card,
+  .musicspace-accordion {
+    padding: 14px;
+  }
+
+  .musicspace-accordion-summary {
+    padding: 14px;
+  }
+
+  .musicspace-accordion-body {
+    padding: 0 14px 14px;
+  }
+
+  .musicspace-card-header,
+  .room-section-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .musicspace-button-row,
+  .chat-form,
+  .room-browser-controls,
+  .chat-surface-controls,
+  .chat-tv-upload-actions,
+  .chat-tv-controls,
+  .room-browser-actions {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+}
+
+/* Shared media readability pass */
+.chat-surface-section {
+  gap: 12px;
+}
+
+.chat-surface-helper {
+  max-width: none;
+}
+
+.chat-surface-controls {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+.chat-surface-select,
+.chat-surface-file,
+.chat-surface-upload-button {
+  width: 100%;
+}
+
+.chat-surface-file {
+  min-height: 48px;
+  padding: 8px 10px;
+  line-height: 1.35;
+  overflow: hidden;
+}
+
+.chat-surface-file::file-selector-button {
+  margin-right: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chat-surface-file::-webkit-file-upload-button {
+  margin-right: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chat-surface-upload-button {
+  margin-top: 2px;
+}
+
+.chat-tv-upload-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 420px) {
+  .chat-surface-file {
+    min-height: 52px;
+  }
+
+  .chat-surface-file::file-selector-button,
+  .chat-surface-file::-webkit-file-upload-button {
+    display: block;
+    width: 100%;
+    margin: 0 0 10px;
+  }
+}
+
+
+
+
+
+
+
+/* Preferences accordion parity */
+#preferences-panel {
+  padding: 0;
+}
+
+

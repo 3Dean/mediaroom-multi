@@ -21,29 +21,33 @@ export class ParticipantList {
     this.options = options;
     this.container = document.createElement('div');
     this.container.id = 'participant-list';
-    this.container.className = 'musicspace-panel musicspace-panel--utility';
+    this.container.className = 'musicspace-card musicspace-card--people';
 
     const header = document.createElement('div');
-    header.className = 'panel-header';
+    header.className = 'musicspace-card-header';
 
-    const title = document.createElement('div');
-    title.className = 'panel-title';
-    title.textContent = 'Participants';
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'musicspace-card-title-wrap';
+
+    const title = document.createElement('h2');
+    title.className = 'musicspace-card-title';
+    title.textContent = 'People';
+    titleWrap.appendChild(title);
 
     this.status = document.createElement('div');
-    this.status.className = 'panel-meta';
+    this.status.className = 'musicspace-card-meta';
     this.status.textContent = 'Offline';
 
     this.controls = document.createElement('div');
     this.controls.className = 'participant-controls';
 
     this.roleBadge = document.createElement('div');
-    this.roleBadge.className = 'participant-role-badge';
+    this.roleBadge.className = 'musicspace-pill participant-role-badge';
     this.roleBadge.textContent = 'Member';
 
     this.lockButton = document.createElement('button');
     this.lockButton.type = 'button';
-    this.lockButton.className = 'participant-lock-button';
+    this.lockButton.className = 'musicspace-button musicspace-button--secondary participant-lock-button';
     this.lockButton.style.display = 'none';
     this.lockButton.addEventListener('click', () => {
       const locked = this.lockButton.dataset.locked === 'true';
@@ -53,13 +57,9 @@ export class ParticipantList {
     this.controls.append(this.roleBadge, this.lockButton);
 
     this.list = document.createElement('div');
-    this.list.style.display = 'flex';
-    this.list.style.flexDirection = 'column';
-    this.list.style.gap = '6px';
-    this.list.style.maxHeight = '220px';
-    this.list.style.overflowY = 'auto';
+    this.list.className = 'participant-list-body';
 
-    header.append(title, this.status);
+    header.append(titleWrap, this.status);
     this.container.append(header, this.controls, this.list);
   }
 
@@ -85,8 +85,7 @@ export class ParticipantList {
 
     if (participants.length === 0) {
       const empty = document.createElement('div');
-      empty.style.color = '#c8c8c8';
-      empty.style.fontSize = '12px';
+      empty.className = 'musicspace-inline-note';
       empty.textContent = 'No active participants';
       this.list.replaceChildren(empty);
       return;
@@ -115,8 +114,7 @@ export class ParticipantList {
     nameLine.className = 'participant-name-line';
 
     const name = document.createElement('span');
-    name.style.color = '#fff';
-    name.style.fontSize = '12px';
+    name.className = 'participant-name';
     name.textContent = participant.sessionId === selfSessionId
       ? `${participant.displayName} (You)`
       : participant.displayName;
@@ -126,21 +124,20 @@ export class ParticipantList {
     const participantRole = resolveParticipantRole(participant.userId, authority);
     if (participantRole !== 'member') {
       const badge = document.createElement('span');
-      badge.className = 'participant-inline-badge';
+      badge.className = 'musicspace-pill participant-inline-badge';
       badge.textContent = formatRoleLabel(participantRole);
       nameLine.appendChild(badge);
     }
 
     if (authority.mutedUserIds.includes(participant.userId)) {
       const mutedBadge = document.createElement('span');
-      mutedBadge.className = 'participant-inline-badge is-muted';
+      mutedBadge.className = 'musicspace-pill participant-inline-badge is-muted';
       mutedBadge.textContent = 'Muted';
       nameLine.appendChild(mutedBadge);
     }
 
     const state = document.createElement('div');
-    state.style.color = participant.seatId ? '#9bd5ff' : '#c8c8c8';
-    state.style.fontSize = '12px';
+    state.className = 'participant-state';
     state.textContent = participant.seatId ? `Seated: ${participant.seatId}` : 'Walking';
 
     left.append(nameLine, state);
@@ -180,7 +177,7 @@ export class ParticipantList {
 
     const muteButton = document.createElement('button');
     muteButton.type = 'button';
-    muteButton.className = 'participant-action-button';
+    muteButton.className = 'musicspace-button musicspace-button--secondary participant-action-button';
     muteButton.textContent = authority.mutedUserIds.includes(participant.userId) ? 'Unmute' : 'Mute';
     muteButton.addEventListener('click', () => {
       this.options.onSetMute(participant.userId, !authority.mutedUserIds.includes(participant.userId));
@@ -190,7 +187,7 @@ export class ParticipantList {
     if (isOwner) {
       const roleButton = document.createElement('button');
       roleButton.type = 'button';
-      roleButton.className = 'participant-action-button';
+      roleButton.className = 'musicspace-button musicspace-button--secondary participant-action-button';
       roleButton.textContent = participantRole === 'admin' ? 'Remove Admin' : 'Make Admin';
       roleButton.addEventListener('click', () => {
         this.options.onSetRole(participant.userId, participantRole === 'admin' ? 'member' : 'admin');
@@ -200,7 +197,7 @@ export class ParticipantList {
 
     const kickButton = document.createElement('button');
     kickButton.type = 'button';
-    kickButton.className = 'participant-action-button is-danger';
+    kickButton.className = 'musicspace-button musicspace-button--secondary participant-action-button is-danger';
     kickButton.textContent = 'Kick';
     kickButton.addEventListener('click', () => {
       this.options.onKick(participant.sessionId);

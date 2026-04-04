@@ -110,8 +110,43 @@
     <div id="app"></div>
     <div id="ui-layer">
       <aside id="musicspace-sidebar" class="is-open">
-        <div id="audioControls"></div>
-        <div id="musicspace-panels"></div>
+        <div id="musicspace-sidebar-shell">
+          <div id="musicspace-sidebar-sticky">
+            <section id="musicspace-session-status" class="musicspace-status-card">
+              <div id="musicspace-session-indicator" class="musicspace-status-dot is-idle" aria-hidden="true"></div>
+              <div class="musicspace-status-copy">
+                <div id="musicspace-session-line-1" class="musicspace-status-line-1">Idle</div>
+                <div id="musicspace-session-line-2" class="musicspace-status-line-2">No room selected</div>
+              </div>
+            </section>
+            <nav id="musicspace-quick-nav" aria-label="Sidebar sections">
+              <button type="button" class="musicspace-quick-nav-button" data-target="music-section">Music</button>
+              <button type="button" class="musicspace-quick-nav-button" data-target="room-panel">Room</button>
+              <button type="button" class="musicspace-quick-nav-button" data-target="participant-list">People</button>
+              <button type="button" class="musicspace-quick-nav-button" data-target="chat-panel">Chat</button>
+              <button type="button" class="musicspace-quick-nav-button" data-target="musicspace-advanced-group">Advanced</button>
+            </nav>
+          </div>
+          <div id="musicspace-sidebar-scroll">
+            <section id="music-section" class="musicspace-card musicspace-card--media musicspace-card--standalone">
+              <div class="musicspace-card-header">
+                <div class="musicspace-card-title-wrap">
+                  <span class="musicspace-card-icon" aria-hidden="true">Music</span>
+                  <div>
+                    <h2 class="musicspace-card-title">Music</h2>
+                    <div class="musicspace-card-subtitle">Ambient radio and room volume</div>
+                  </div>
+                </div>
+              </div>
+              <div id="audioControls"></div>
+            </section>
+            <div id="musicspace-primary-panels"></div>
+            <section id="musicspace-advanced-group">
+              <div class="musicspace-advanced-heading">Advanced</div>
+              <div id="musicspace-advanced-panels"></div>
+            </section>
+          </div>
+        </div>
       </aside>
       <button id="musicspace-sidebar-toggle" type="button" aria-expanded="true" aria-controls="musicspace-sidebar">Hide</button>
     </div>

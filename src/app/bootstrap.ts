@@ -596,11 +596,11 @@ export function bootstrapApp(): void {
       },
     });
 
-    authPanel.mount(sidebarPanels);
-    roomPanel.mount(sidebarPanels);
-    participantList.mount(sidebarPanels);
-    chatPanel.mount(sidebarPanels);
-    preferencesPanel.mount(sidebarPanels);
+    roomPanel.mount(sidebarPanels.primaryPanels);
+    participantList.mount(sidebarPanels.primaryPanels);
+    authPanel.mount(sidebarPanels.advancedPanels);
+    chatPanel.mount(sidebarPanels.primaryPanels, sidebarPanels.advancedPanels);
+    preferencesPanel.mount(sidebarPanels.advancedPanels);
     syncRoomUi(chatPanel, participantList, remotePlayerManager);
     roomPanel.setMeta('Idle');
     participantList.setConnectionStatus('Idle');
@@ -628,19 +628,39 @@ export function bootstrapApp(): void {
   });
 }
 
-function initializeSidebarLayout(): HTMLElement {
+type SidebarLayout = {
+  primaryPanels: HTMLElement;
+  advancedPanels: HTMLElement;
+};
+
+function initializeSidebarLayout(): SidebarLayout {
   const sidebar = document.getElementById('musicspace-sidebar');
   const toggle = document.getElementById('musicspace-sidebar-toggle') as HTMLButtonElement | null;
-  const panels = document.getElementById('musicspace-panels');
+  const primaryPanels = document.getElementById('musicspace-primary-panels');
+  const advancedPanels = document.getElementById('musicspace-advanced-panels');
+  const scrollContainer = document.getElementById('musicspace-sidebar-scroll');
+  const statusIndicator = document.getElementById('musicspace-session-indicator');
+  const statusLine1 = document.getElementById('musicspace-session-line-1');
+  const statusLine2 = document.getElementById('musicspace-session-line-2');
+  const quickNavButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('#musicspace-quick-nav [data-target]'));
 
-  if (!sidebar || !toggle || !panels) {
+  if (
+    !sidebar
+    || !toggle
+    || !primaryPanels
+    || !advancedPanels
+    || !scrollContainer
+    || !statusIndicator
+    || !statusLine1
+    || !statusLine2
+  ) {
     throw new Error('Sidebar UI shell is missing from the DOM.');
   }
 
   const applyState = (isOpen: boolean) => {
     sidebar.classList.toggle('is-open', isOpen);
     toggle.setAttribute('aria-expanded', String(isOpen));
-    toggle.textContent = isOpen ? '< Hide' : 'Show >';
+    toggle.textContent = isOpen ? 'Hide >' : '< Show';
   };
 
   applyState(true);
@@ -648,9 +668,94 @@ function initializeSidebarLayout(): HTMLElement {
     applyState(!sidebar.classList.contains('is-open'));
   });
 
-  return panels;
-}
+  const setActiveQuickNav = (targetId: string) => {
+    quickNavButtons.forEach((button) => {
+      button.classList.toggle('is-active', button.dataset.target === targetId);
+    });
+  };
 
+  quickNavButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const targetId = button.dataset.target;
+      if (!targetId) {
+        return;
+      }
+
+      const target = document.getElementById(targetId);
+      if (!target) {
+        return;
+      }
+
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setActiveQuickNav(targetId);
+    });
+  });
+
+  const observedSections = quickNavButtons
+    .map((button) => button.dataset.target)
+    .filter((value): value is string => Boolean(value))
+    .map((id) => document.getElementById(id))
+    .filter((value): value is HTMLElement => Boolean(value));
+
+  const observer = new IntersectionObserver((entries) => {
+    const visibleEntry = entries
+      .filter((entry) => entry.isIntersecting)
+      .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+
+    if (visibleEntry?.target.id) {
+      setActiveQuickNav(visibleEntry.target.id);
+    }
+  }, {
+    root: scrollContainer,
+    threshold: [0.2, 0.45, 0.7],
+  });
+
+  observedSections.forEach((section) => observer.observe(section));
+  setActiveQuickNav('music-section');
+
+  const syncSessionHeader = () => {
+    const roomMeta = document.querySelector<HTMLElement>('#room-panel .room-meta')?.textContent?.trim() || 'Idle';
+    const roomStatus = document.querySelector<HTMLElement>('#room-panel .room-status')?.textContent?.trim() || 'Join a room to start a session.';
+    const roomSlug = document.querySelector<HTMLInputElement>('#room-panel input[placeholder="Room link / slug"]')?.value.trim() || 'No room selected';
+    const displayName = document.querySelector<HTMLInputElement>('#room-panel input[placeholder="Display name"]')?.value.trim()
+      || document.querySelector<HTMLElement>('#auth-panel .musicspace-accordion-meta')?.textContent?.trim()
+      || 'Guest';
+
+    statusLine1.textContent = roomMeta;
+    statusLine2.textContent = `${roomSlug} · ${displayName}`;
+
+    statusIndicator.classList.remove('is-idle', 'is-live', 'is-warn');
+    if (/live|connected/i.test(roomMeta)) {
+      statusIndicator.classList.add('is-live');
+    } else if (/retry|offline|disconnected|failed/i.test(roomStatus) || /offline|retry/i.test(roomMeta)) {
+      statusIndicator.classList.add('is-warn');
+    } else {
+      statusIndicator.classList.add('is-idle');
+    }
+  };
+
+  const mutationObserver = new MutationObserver(() => {
+    syncSessionHeader();
+  });
+
+  const mutationConfig = {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['value', 'data-auth-state'],
+  };
+
+  mutationObserver.observe(primaryPanels, mutationConfig);
+  mutationObserver.observe(advancedPanels, mutationConfig);
+  scrollContainer.addEventListener('input', () => {
+    syncSessionHeader();
+  });
+
+  syncSessionHeader();
+
+  return { primaryPanels, advancedPanels };
+}
 function applyInitialSpawnTransform(message: ServerMessage): void {
   if (message.type !== 'room.joined') {
     return;

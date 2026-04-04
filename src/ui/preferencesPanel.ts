@@ -34,7 +34,7 @@ const AVATAR_OPTIONS = [
 ];
 
 export class PreferencesPanel {
-  private readonly container: HTMLDivElement;
+  private readonly container: HTMLDetailsElement;
   private readonly displayNameInput: HTMLInputElement;
   private readonly roomInput: HTMLInputElement;
   private readonly stationSelect: HTMLSelectElement;
@@ -44,37 +44,31 @@ export class PreferencesPanel {
   private readonly avatarSelect: HTMLSelectElement;
   private readonly noteLabel: HTMLDivElement;
   private readonly content: HTMLDivElement;
-  private readonly toggleButton: HTMLButtonElement;
-  private collapsed = false;
+  private readonly summaryMeta: HTMLSpanElement;
   private readonly onSave: (preferences: UserPreferences) => void;
   private readonly onReset: () => UserPreferences;
 
   constructor(options: PreferencesPanelOptions) {
     this.onSave = options.onSave;
     this.onReset = options.onReset;
-    this.container = document.createElement('div');
+    this.container = document.createElement('details');
     this.container.id = 'preferences-panel';
-    this.container.className = 'musicspace-panel musicspace-panel--utility';
+    this.container.className = 'musicspace-accordion musicspace-card--preferences';
 
-    const header = document.createElement('div');
-    header.className = 'preferences-header panel-header';
+    const summary = document.createElement('summary');
+    summary.className = 'musicspace-accordion-summary';
 
-    const title = document.createElement('div');
-    title.className = 'panel-title';
-    title.textContent = 'Preferences';
+    const summaryLeft = document.createElement('span');
+    summaryLeft.className = 'musicspace-accordion-title-wrap';
+    summaryLeft.textContent = 'Preferences';
 
-    this.toggleButton = document.createElement('button');
-    this.toggleButton.type = 'button';
-    this.toggleButton.className = 'preferences-toggle';
-    this.toggleButton.addEventListener('click', () => {
-      this.setCollapsed(!this.collapsed);
-    });
-
-    header.append(title, this.toggleButton);
+    this.summaryMeta = document.createElement('span');
+    this.summaryMeta.className = 'musicspace-accordion-meta';
+    this.summaryMeta.textContent = 'Avatar · Volume · Background';
+    summary.append(summaryLeft, this.summaryMeta);
 
     const form = document.createElement('form');
-    form.style.display = 'grid';
-    form.style.gap = '10px';
+    form.className = 'musicspace-field-stack';
 
     this.displayNameInput = this.createTextInput('Default display name');
     this.roomInput = this.createTextInput('Default room name');
@@ -84,13 +78,12 @@ export class PreferencesPanel {
     this.volumeInput.min = '0';
     this.volumeInput.max = '1';
     this.volumeInput.step = '0.05';
-    this.volumeInput.className = 'preferences-range';
+    this.volumeInput.className = 'musicspace-slider';
     this.volumeValue = document.createElement('span');
-    this.volumeValue.style.color = '#c8c8c8';
-    this.volumeValue.style.fontSize = '12px';
+    this.volumeValue.className = 'musicspace-inline-note';
 
     const volumeWrap = document.createElement('label');
-    volumeWrap.className = 'preferences-field';
+    volumeWrap.className = 'musicspace-field';
     const volumeLabel = document.createElement('span');
     volumeLabel.textContent = 'Default volume';
     volumeWrap.append(volumeLabel, this.volumeInput, this.volumeValue);
@@ -99,17 +92,19 @@ export class PreferencesPanel {
     this.avatarSelect = this.createSelect(AVATAR_OPTIONS, 'Avatar preset');
 
     const avatarNote = document.createElement('div');
-    avatarNote.className = 'preferences-note';
+    avatarNote.className = 'musicspace-inline-note';
     avatarNote.textContent = 'Re-enter the room after changing avatars so others see it.';
 
     const actions = document.createElement('div');
-    actions.className = 'preferences-actions';
+    actions.className = 'musicspace-button-row';
     const saveButton = document.createElement('button');
     saveButton.type = 'submit';
     saveButton.textContent = 'Save Preferences';
+    saveButton.className = 'musicspace-button musicspace-button--primary';
     const resetButton = document.createElement('button');
     resetButton.type = 'button';
     resetButton.textContent = 'Reset';
+    resetButton.className = 'musicspace-button musicspace-button--secondary';
     resetButton.addEventListener('click', () => {
       const reset = this.onReset();
       this.setValues(reset);
@@ -118,7 +113,7 @@ export class PreferencesPanel {
     actions.append(saveButton, resetButton);
 
     this.noteLabel = document.createElement('div');
-    this.noteLabel.className = 'preferences-note';
+    this.noteLabel.className = 'musicspace-inline-note';
     this.noteLabel.textContent = 'Saved locally. Leave fields blank to keep using the live join form.';
 
     this.volumeInput.addEventListener('input', () => {
@@ -160,23 +155,16 @@ export class PreferencesPanel {
     });
 
     this.content = document.createElement('div');
-    this.content.className = 'preferences-content';
+    this.content.className = 'musicspace-accordion-body';
     this.content.append(form, this.noteLabel);
 
-    this.container.append(header, this.content);
+    this.container.append(summary, this.content);
+    this.container.open = false;
     this.setValues(options.initialPreferences);
-    this.setCollapsed(window.matchMedia('(max-width: 768px), (pointer: coarse)').matches);
   }
 
   mount(parent: HTMLElement = document.body): void {
     parent.appendChild(this.container);
-  }
-
-  private setCollapsed(collapsed: boolean): void {
-    this.collapsed = collapsed;
-    this.container.classList.toggle('is-collapsed', collapsed);
-    this.toggleButton.textContent = collapsed ? 'Show' : 'Hide';
-    this.toggleButton.setAttribute('aria-expanded', String(!collapsed));
   }
 
   setValues(preferences: UserPreferences): void {
@@ -193,11 +181,13 @@ export class PreferencesPanel {
     const input = document.createElement('input');
     input.type = 'text';
     input.placeholder = placeholder;
+    input.className = 'musicspace-input';
     return input;
   }
 
   private createSelect(options: Array<{ value: string; label: string }>, ariaLabel: string): HTMLSelectElement {
     const select = document.createElement('select');
+    select.className = 'musicspace-input';
     select.setAttribute('aria-label', ariaLabel);
     options.forEach((option) => {
       const optionElement = document.createElement('option');
@@ -210,7 +200,7 @@ export class PreferencesPanel {
 
   private wrapField(labelText: string, element: HTMLElement): HTMLLabelElement {
     const label = document.createElement('label');
-    label.className = 'preferences-field';
+    label.className = 'musicspace-field';
     const caption = document.createElement('span');
     caption.textContent = labelText;
     label.append(caption, element);

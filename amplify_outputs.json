@@ -601,6 +601,18 @@
               "write",
               "delete"
             ]
+          },
+          "room-tv/*": {
+            "guest": [
+              "get",
+              "list"
+            ],
+            "authenticated": [
+              "get",
+              "list",
+              "write",
+              "delete"
+            ]
           }
         }
       }
