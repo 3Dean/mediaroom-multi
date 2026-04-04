@@ -2182,6 +2182,10 @@ function createTvVideoResources() {
   texture.minFilter = THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
   texture.generateMipmaps = false;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.repeat.y = -1;
+  texture.offset.y = 1;
 
   const material = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
 
