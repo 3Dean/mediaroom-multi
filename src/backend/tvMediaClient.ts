@@ -1,10 +1,12 @@
-import { uploadData } from 'aws-amplify/storage';
+import { ensureAmplifyConfigured } from './amplifyClient';
 
 const MAX_TV_VIDEO_BYTES = 150 * 1024 * 1024;
 const ALLOWED_VIDEO_TYPES = new Set(['video/mp4']);
 
 export async function uploadRoomTvVideo(roomId: string, file: File): Promise<string> {
   validateTvVideo(file);
+  await ensureAmplifyConfigured();
+  const { uploadData } = await import('aws-amplify/storage');
   const safeName = sanitizeFilename(file.name || 'tv-video.mp4');
   const path = `room-tv/${roomId}/${Date.now()}-${safeName}`;
   await uploadData({

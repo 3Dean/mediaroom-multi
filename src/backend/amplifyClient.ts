@@ -1,12 +1,22 @@
-import { Amplify } from 'aws-amplify';
-
 let isConfigured = false;
+let configurePromise: Promise<void> | null = null;
 
-export function configureAmplify(outputs?: Record<string, unknown>): void {
-  if (!outputs || isConfigured) {
+export async function ensureAmplifyConfigured(): Promise<void> {
+  if (isConfigured) {
     return;
   }
 
-  Amplify.configure(outputs);
-  isConfigured = true;
+  if (!configurePromise) {
+    configurePromise = (async () => {
+      const [{ Amplify }, { default: outputs }] = await Promise.all([
+        import('aws-amplify'),
+        import('../../amplify_outputs.json'),
+      ]);
+
+      Amplify.configure(outputs as Record<string, unknown>);
+      isConfigured = true;
+    })();
+  }
+
+  await configurePromise;
 }

@@ -1,20 +1,29 @@
-import { generateClient } from 'aws-amplify/data';
+import { ensureAmplifyConfigured } from './amplifyClient';
 import type { Schema } from '../../amplify/data/resource';
 import type { RoomSummary } from '../types/room';
 
-const dataClient = generateClient<Schema>();
+let dataClientPromise: Promise<any> | null = null;
 
-export function getDataClient() {
-  return dataClient;
+export async function getDataClient() {
+  if (!dataClientPromise) {
+    dataClientPromise = (async () => {
+      await ensureAmplifyConfigured();
+      const { generateClient } = await import('aws-amplify/data');
+      return generateClient<Schema>();
+    })();
+  }
+
+  return await dataClientPromise;
 }
 
 export async function listRooms(): Promise<RoomSummary[]> {
+  const dataClient = await getDataClient();
   const response = await dataClient.models.Room.list();
   const rooms = Array.isArray(response.data) ? response.data : [];
 
   return rooms
-    .filter((room) => typeof room?.slug === 'string' && typeof room?.name === 'string' && typeof room?.maxUsers === 'number')
-    .map((room) => ({
+    .filter((room: any) => typeof room?.slug === 'string' && typeof room?.name === 'string' && typeof room?.maxUsers === 'number')
+    .map((room: any) => ({
       id: room.id,
       slug: room.slug,
       name: room.name,
@@ -27,7 +36,7 @@ export async function listRooms(): Promise<RoomSummary[]> {
       createdAt: room.createdAt ?? undefined,
       updatedAt: room.updatedAt ?? undefined,
     }))
-    .sort((a, b) => {
+    .sort((a: RoomSummary, b: RoomSummary) => {
       const aTime = a.updatedAt ? Date.parse(a.updatedAt) : 0;
       const bTime = b.updatedAt ? Date.parse(b.updatedAt) : 0;
       return bTime - aTime;
@@ -95,6 +104,7 @@ export function mergeRoomSummaries(savedRooms: RoomSummary[], liveRooms: RoomSum
 }
 
 export async function listRecentRoomMessages(roomId: string) {
+  const dataClient = await getDataClient();
   return dataClient.models.RoomMessage.list({
     filter: {
       roomId: {

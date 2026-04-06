@@ -1,4 +1,4 @@
-import { uploadData } from 'aws-amplify/storage';
+import { ensureAmplifyConfigured } from './amplifyClient';
 import type { RoomSurfaceId } from '../types/room';
 
 const MAX_SURFACE_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -6,6 +6,8 @@ const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export async function uploadRoomSurfaceImage(roomId: string, surfaceId: RoomSurfaceId, file: File): Promise<string> {
   validateSurfaceImage(file);
+  await ensureAmplifyConfigured();
+  const { uploadData } = await import('aws-amplify/storage');
   const safeName = sanitizeFilename(file.name || `${surfaceId}.png`);
   const path = `room-surfaces/${roomId}/${surfaceId}/${Date.now()}-${safeName}`;
   await uploadData({
