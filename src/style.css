@@ -1617,8 +1617,35 @@ select.musicspace-input:focus {
 }
 
 @media (max-width: 768px), (pointer: coarse) {
+  :root {
+    --musicspace-mobile-toggle-right: max(12px, calc(env(safe-area-inset-right, 0px) + 12px));
+  }
+
+  #musicspace-lobby-overlay {
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: calc(var(--musicspace-mobile-toggle-right) + 64px);
+    bottom: auto;
+    left: 16px;
+    max-width: none;
+    padding: 14px 16px 12px;
+    gap: 8px;
+  }
+
+  #musicspace-lobby-overlay::before {
+    inset: -10px -14px;
+  }
+
+  .lobby-overlay-headline {
+    font-size: clamp(20px, 6vw, 30px);
+  }
+
+  .lobby-overlay-support {
+    max-width: 30ch;
+    font-size: 12px;
+  }
+
   #musicspace-sidebar {
-    top: 12px;
+    top: calc(env(safe-area-inset-top, 0px) + 154px);
     right: 12px;
     left: auto;
     bottom: 12px;
@@ -1630,33 +1657,60 @@ select.musicspace-input:focus {
   }
 
   #musicspace-sidebar-toggle {
-    top: 12px;
-    right: 12px;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: var(--musicspace-mobile-toggle-right);
     left: auto;
   }
 
   #musicspace-sidebar.is-open + #musicspace-sidebar-toggle {
     left: auto;
-    right: calc(min(400px, calc(100vw - 24px)) + 20px);
+    right: var(--musicspace-mobile-toggle-right);
   }
 }
 
 @media (max-width: 420px) {
+  :root {
+    --musicspace-mobile-toggle-right: max(8px, calc(env(safe-area-inset-right, 0px) + 8px));
+  }
+
+  #musicspace-lobby-overlay {
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    left: 12px;
+    right: calc(var(--musicspace-mobile-toggle-right) + 56px);
+    padding: 10px 12px 8px;
+    gap: 6px;
+  }
+
+  #musicspace-lobby-overlay::before {
+    inset: -8px -10px;
+  }
+
+  .lobby-overlay-headline {
+    font-size: clamp(18px, 8vw, 24px);
+  }
+
+  .lobby-overlay-support {
+    max-width: 24ch;
+    font-size: 11px;
+    line-height: 1.34;
+  }
+
   #musicspace-sidebar {
     width: calc(100vw - 16px);
-    top: 8px;
+    top: calc(env(safe-area-inset-top, 0px) + 140px);
     right: 8px;
     bottom: 8px;
   }
 
   #musicspace-sidebar-toggle {
-    right: 8px;
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    right: var(--musicspace-mobile-toggle-right);
   }
 
   #musicspace-sidebar.is-open + #musicspace-sidebar-toggle {
-    right: 14px;
-    top: auto;
-    bottom: 16px;
+    right: var(--musicspace-mobile-toggle-right);
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    bottom: auto;
   }
 
   #musicspace-sidebar-scroll,
