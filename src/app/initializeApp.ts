@@ -25,7 +25,7 @@
 // Extend the Window interface to include customLights
 declare global {
   interface Window {
-    customLights?: THREE.PointLight[];
+    customLights?: PointLight[];
     __musicspaceGetSeatState?: () => { nearbySeatId: string | null; currentSeatId: string | null; isSitting: boolean };
     __musicspaceOccupySeat?: (seatId: string) => boolean;
     __musicspaceReleaseSeat?: () => void;
@@ -49,12 +49,11 @@ declare global {
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
 let controls: any;
-import { addVaporToCoffee } from '../addingVapor.js'; // Import the vapor function
-import { animateFlowers, initializeWindEffectOnModel } from '../wind'; // Import wind animation
 import { loadPreferences } from '../preferences/preferencesStore';
 import type { RoomSurfaceSnapshot } from '../types/room';
 import type { MobileControlsFeature } from './mobileControlsFeature';
-import * as THREE from 'three';
+import type { AmbientSceneFeature } from './scene/ambientSceneFeature';
+import { AnimationClip, AnimationMixer, Audio, AudioAnalyser, AudioListener, Clock, Color, DirectionalLight, EquirectangularReflectionMapping, Euler, HemisphereLight, LoadingManager, MathUtils, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PerspectiveCamera, PointLight, Quaternion, Raycaster, RepeatWrapping, SRGBColorSpace, Scene, SphereGeometry, Texture, TextureLoader, Vector2, Vector3, WebGLRenderer } from 'three';
 
 // --- TOUCH CONTROL VARIABLES ---
 const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
@@ -69,7 +68,7 @@ let previousMouseY = 0;
 type SceneMode = 'lobby' | 'room';
 let sceneMode: SceneMode | null = null;
 let lobbyCameraTime = 0;
-const lobbyCameraPosition = new THREE.Vector3(0, -10, 0);
+const lobbyCameraPosition = new Vector3(0, -10, 0);
 const lobbyCameraYawSpeed = Math.PI / 90;
 const FRAME_SURFACE_IDS = ['image01', 'image02', 'image03', 'image04'] as const;
 
@@ -77,14 +76,16 @@ export function initializeApp() {
   console.log(`isTouchDevice: ${isTouchDevice}`); // Diagnostic log
   const initialPreferences = loadPreferences();
 
-let pointLights: THREE.PointLight[] = [];
+let pointLights: PointLight[] = [];
 let hues: number[] = [];
-let lightHelpers: THREE.Object3D[] = []; // Store light helpers
+let lightHelpers: Object3D[] = []; // Store light helpers
 let tvFeature: any = null;
 let tvFeaturePromise: Promise<any> | null = null;
 let surfaceFeature: any = null;
 let surfaceFeaturePromise: Promise<any> | null = null;
 let mobileControlsFeature: MobileControlsFeature | null = null;
+let ambientSceneFeature: AmbientSceneFeature | null = null;
+let ambientSceneFeaturePromise: Promise<AmbientSceneFeature> | null = null;
 
  // Expose function to reposition TV screen at runtime
 ;(window as any).updateTvScreenPosition = (x: number, y: number, z: number) => {
@@ -99,8 +100,8 @@ let mobileControlsFeature: MobileControlsFeature | null = null;
 };
 
 // Scene + Camera + Renderer
-const scene = new THREE.Scene();
-const backgroundTextureLoader = new THREE.TextureLoader();
+const scene = new Scene();
+const backgroundTextureLoader = new TextureLoader();
 type BackgroundConfig = {
   path: string;
   rotationDegrees: number;
@@ -121,7 +122,7 @@ const moodBackgroundConfigs: Record<string, BackgroundConfig> = {
   metal: { path: '/images/equirectangular-metal.jpg', rotationDegrees: 20 },
   space: { path: '/images/equirectangular-space.jpg', rotationDegrees: -110 },
 };
-const backgroundTextureCache = new Map<string, THREE.Texture>();
+const backgroundTextureCache = new Map<string, Texture>();
 
 async function resolveStorageAssetUrl(path: string) {
   const { getUrl } = await import('aws-amplify/storage');
@@ -138,7 +139,7 @@ function resolveBackgroundMood(mood: string) {
 function applyMoodBackground(mood: string) {
   const effectiveMood = resolveBackgroundMood(mood);
   const config = moodBackgroundConfigs[effectiveMood] ?? defaultBackgroundConfig;
-  (scene as any).backgroundRotation = new THREE.Euler(0, THREE.MathUtils.degToRad(config.rotationDegrees), 0);
+  (scene as any).backgroundRotation = new Euler(0, MathUtils.degToRad(config.rotationDegrees), 0);
 
   const cachedTexture = backgroundTextureCache.get(config.path);
   if (cachedTexture) {
@@ -147,23 +148,23 @@ function applyMoodBackground(mood: string) {
   }
 
   backgroundTextureLoader.load(config.path, (texture) => {
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.mapping = THREE.EquirectangularReflectionMapping;
+    texture.colorSpace = SRGBColorSpace;
+    texture.mapping = EquirectangularReflectionMapping;
     backgroundTextureCache.set(config.path, texture);
     scene.background = texture;
   });
 }
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 0, 0); // Keep camera at local FPS origin
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 //(renderer as any).outputEncoding = (THREE as any).sRGBEncoding;
 
 //document.body.appendChild(renderer.domElement);
 renderer.setPixelRatio(window.devicePixelRatio);
-renderer.outputColorSpace = THREE.SRGBColorSpace; // if not already set
+renderer.outputColorSpace = SRGBColorSpace; // if not already set
 
 const appDiv = document.getElementById('app');
 if (appDiv) {
@@ -218,16 +219,16 @@ renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
 (window as any).renderer = renderer;
 // Make updateModelPosition available globally
 (window as any).updateModelPosition = (modelUrl: string, x: number, y: number, z: number) => {
-  updateModelPosition(modelUrl, new THREE.Vector3(x, y, z));
+  updateModelPosition(modelUrl, new Vector3(x, y, z));
 };
 // Function to get current seatable object positions
 (window as any).getSeatingPositions = () => {
-  const positions: {[key: string]: THREE.Vector3} = {};
-  scene.traverse((object: THREE.Object3D) => { // Added type
+  const positions: {[key: string]: Vector3} = {};
+  scene.traverse((object: Object3D) => { // Added type
     if (object.userData && object.userData.type) {
       const type = object.userData.type;
       if (type === 'couch_left' || type === 'couch_right' || type === 'chair') {
-        const position = new THREE.Vector3();
+        const position = new Vector3();
         object.getWorldPosition(position);
         positions[type] = position;
       }
@@ -242,10 +243,10 @@ renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
 
 // Function to reset seatable object positions to default values
 (window as any).resetSeatingPositions = () => {
-  updateModelPosition('/models/couch_left.glb', new THREE.Vector3(-3.7, 0, .8));
-  updateModelPosition('/models/couch_right.glb', new THREE.Vector3(2.5, 0, .8));
-  updateModelPosition('/models/chair.glb', new THREE.Vector3(0, 0, 0));
-  updateModelPosition('/models/boss.glb', new THREE.Vector3(-0.8, 0, 1.89));
+  updateModelPosition('/models/couch_left.glb', new Vector3(-3.7, 0, .8));
+  updateModelPosition('/models/couch_right.glb', new Vector3(2.5, 0, .8));
+  updateModelPosition('/models/chair.glb', new Vector3(0, 0, 0));
+  updateModelPosition('/models/boss.glb', new Vector3(-0.8, 0, 1.89));
   console.log('Seating positions reset to default values');
 };
 
@@ -315,11 +316,11 @@ are still available for backward compatibility.
 console.log('Type "seatingHelp()" in the console to see available seating position functions');
 
 // Lights
-const hemi = new THREE.HemisphereLight(0xfff3e6, 0x444444, 1.2);
+const hemi = new HemisphereLight(0xfff3e6, 0x444444, 1.2);
 hemi.position.set(0, 20, 0);
 scene.add(hemi);
 
-const dir = new THREE.DirectionalLight(0xfde6ff, 0.2);
+const dir = new DirectionalLight(0xfde6ff, 0.2);
 dir.position.set(5, 10, 7.5);
 scene.add(dir);
 
@@ -332,7 +333,7 @@ scene.add(dir);
   lightHelpers = [];
 
 // Add directional light helper
-/*   const directionalHelper = new THREE.DirectionalLightHelper(dir, 5);
+/*   const directionalHelper = new DirectionalLightHelper(dir, 5);
   scene.add(directionalHelper);
   lightHelpers.push(directionalHelper); */
 
@@ -340,28 +341,28 @@ scene.add(dir);
 
   // Point lights (original array for color cycling)
   const positions = [
-    new THREE.Vector3(-1, 4, 0),     // Light 1
-    new THREE.Vector3(1, 4, 2),     // Light 2
-    //new THREE.Vector3(-6.7, 5, 3.17),    // Light 3
-  //new THREE.Vector3(-11, 5, 3.13)     // Light 4
+    new Vector3(-1, 4, 0),     // Light 1
+    new Vector3(1, 4, 2),     // Light 2
+    //new Vector3(-6.7, 5, 3.17),    // Light 3
+  //new Vector3(-11, 5, 3.13)     // Light 4
   ];
   
   positions.forEach((pos /*, i // Removed unused index 'i' */) => {
-    const light = new THREE.PointLight(0xff00ff, 100, 40, 3);
+    const light = new PointLight(0xff00ff, 100, 40, 3);
     light.position.copy(pos);
     scene.add(light);
     pointLights.push(light);
     hues.push(Math.random()); // optional: gives each light a different starting color
     
     // Add point light helper
-    /* const pointLightHelper = new THREE.PointLightHelper(light, 1);
+    /* const pointLightHelper = new PointLightHelper(light, 1);
     scene.add(pointLightHelper);
     lightHelpers.push(pointLightHelper); */
   });
   
 
 // Music
-const listener = new THREE.AudioListener();
+const listener = new AudioListener();
 camera.add(listener);
 
 
@@ -462,9 +463,9 @@ audioElement.crossOrigin = 'anonymous';
 audioElement.preload = 'none'; // Don't preload until user clicks play
 
 // Connect the HTML audio element to Three.js audio system
-const sound = new THREE.Audio(listener);
+const sound = new Audio(listener);
 sound.setMediaElementSource(audioElement);
-const audioAnalyser = new THREE.AudioAnalyser(sound, 128);
+const audioAnalyser = new AudioAnalyser(sound, 128);
 
 
 // Track playing state
@@ -775,18 +776,18 @@ if (isTouchDevice) {
 }
 
 // Navmesh collision collector
-const collidableMeshList: THREE.Mesh[] = [];
+const collidableMeshList: Mesh[] = [];
 
 // Sitting position model and interaction
-const sittingPositionObjects: THREE.Object3D[] = [];
-const couchObjects: THREE.Object3D[] = [];
-let nearCouch: THREE.Object3D | null = null;
-let nearSittingPosition: THREE.Object3D | null = null;
+const sittingPositionObjects: Object3D[] = [];
+const couchObjects: Object3D[] = [];
+let nearCouch: Object3D | null = null;
+let nearSittingPosition: Object3D | null = null;
 let currentSeatId: string | null = null;
 let isSitting = false;
-// let sittingPosition = new THREE.Vector3(); // Replaced by direct calculation
-// let sittingRotation = new THREE.Euler(); // Replaced by direct calculation
-let standingPosition = new THREE.Vector3(); // Stores the full (x,y,z) position before sitting
+// let sittingPosition = new Vector3(); // Replaced by direct calculation
+// let sittingRotation = new Euler(); // Replaced by direct calculation
+let standingPosition = new Vector3(); // Stores the full (x,y,z) position before sitting
 // standingYaw and standingPitch are no longer needed as we retain current seated orientation when standing.
 let standingHeight = 1.6; // Default standing height - this is effectively eye height
 const sittingEyeHeight = 1.0; // Eye height when sitting
@@ -800,7 +801,7 @@ console.log("Couch interaction system initialized");
 
 // Create loading screen overlay
 
-const manager = new THREE.LoadingManager();
+const manager = new LoadingManager();
 manager.onStart = function (url, itemsLoaded, itemsTotal) {
   console.log(`Started loading: ${url}`);
   console.log(`Progress: ${itemsLoaded} of ${itemsTotal}`);
@@ -830,16 +831,16 @@ manager.onError = function (url) {
 };
 
 // Preload emission textures
-const emitLoader = new THREE.TextureLoader(manager);
+const emitLoader = new TextureLoader(manager);
 const EMIT_COUNT = 24;
-const emitTextures: THREE.Texture[] = [];
+const emitTextures: Texture[] = [];
 for (let i = 0; i < EMIT_COUNT; i++) {
   const idx = i.toString().padStart(5, '0');
   const tex = emitLoader.load(`/images/mixingboardemit/mixingboard_emit_${idx}.jpg`);
   tex.flipY = false;
   // Ensure UV coordinates are used directly
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
+  tex.wrapS = RepeatWrapping;
+  tex.wrapT = RepeatWrapping;
   emitTextures.push(tex);
 }
 
@@ -932,22 +933,10 @@ window.__musicspaceSyncRoomSurfaces = (surfaces) => {
 };
 loadDropAnchors();
 
-// Vapor effect material
-let vaporEffectMaterial: THREE.ShaderMaterial | null = null;
-
-// Store mixing-board meshes for animation
-const mixingBoardMeshes: THREE.Mesh[] = [];
-
-// Animation timing
-let emitFrame = 0;
-let emitAccumulator = 0;
-const EMIT_BASE_FPS = 3;
-const emitClock = new THREE.Clock();
-
 // Custom rotations for specific models (in radians)
-const modelRotations: {[key: string]: THREE.Euler} = {
-  '/models/leakstereo.glb': new THREE.Euler(0, -3.3, 0), // 90 degrees around Y axis
-  //'/models/chair.glb': new THREE.Euler(0, Math.PI, 0),          // 180 degrees around Y axis
+const modelRotations: {[key: string]: Euler} = {
+  '/models/leakstereo.glb': new Euler(0, -3.3, 0), // 90 degrees around Y axis
+  //'/models/chair.glb': new Euler(0, Math.PI, 0),          // 180 degrees around Y axis
   // Add more model rotations as needed
 };
 
@@ -956,9 +945,9 @@ loader.load('/models/navmesh.glb', (gltf: any) => {
   const nav = gltf.scene;
   nav.visible = false;
   scene.add(nav);
-  nav.traverse((child: THREE.Object3D) => {
-    if ((child as THREE.Mesh).isMesh) {
-      const mesh = child as THREE.Mesh;
+  nav.traverse((child: Object3D) => {
+    if ((child as Mesh).isMesh) {
+      const mesh = child as Mesh;
       mesh.visible = false;
       collidableMeshList.push(mesh);
       
@@ -966,47 +955,15 @@ loader.load('/models/navmesh.glb', (gltf: any) => {
   });
 });
 
-loader.load('/models/mixingboard.glb', (gltf: any) => {
-  const board = gltf.scene;
-  board.traverse((child: THREE.Object3D) => {
-    if ((child as THREE.Mesh).isMesh) {
-      const mesh = child as THREE.Mesh;
-      const stdMat = (mesh.material as THREE.MeshStandardMaterial).clone();
-      stdMat.emissive = new THREE.Color(0xffffff);
-      stdMat.emissiveIntensity = 1;
-      stdMat.emissiveMap = emitTextures[0];
-      mesh.material = stdMat;
-      mixingBoardMeshes.push(mesh);
-      
-    }
+ambientSceneFeaturePromise = import('./scene/ambientSceneFeature').then(({ createAmbientSceneFeature }) => {
+  const feature = createAmbientSceneFeature({
+    scene,
+    loader,
+    emitTextures,
   });
-  scene.add(board);
-});
-
-// 1) Load, add, clone & offset the plant stand
-loader.load('/models/plantstand2_L.glb', (gltf: any) => {
-  const originalStand = gltf.scene;
-  scene.add(originalStand);
-
-  const standClone = originalStand.clone(true);
-  standClone.position.x += 6.1;      // move clone 2.8 units (≈6 m) on X
-  scene.add(standClone);
-});
-
-// 2) Load, add, clone & offset the plant leaves
-loader.load('/models/plantleaves2_L.glb', (gltf: any) => {
-  const originalLeaves = gltf.scene;
-  scene.add(originalLeaves);
-
-    // **Init wind on the *original* leaves**
-  initializeWindEffectOnModel(originalLeaves, 'plantleaves2_L');
-
-  const leavesClone = originalLeaves.clone(true);
-  leavesClone.position.x += 6.1;      // same offset on X
-  scene.add(leavesClone);
-
-  // if you still want the wind effect on the clone:
-  initializeWindEffectOnModel(leavesClone, 'plantleaves2_L');
+  ambientSceneFeature = feature;
+  feature.loadAmbientModels();
+  return feature;
 });
 
 // Load other models into scene
@@ -1034,46 +991,46 @@ const staticModelUrls = [
 ];
 
 const pickableUrls = ['/models/boss.glb', '/models/leakstereo.glb', '/models/vinylrecord.glb', '/models/coffee.glb'];
-const interactiveObjects: THREE.Mesh[] = []; // Will store child meshes of pickable objects
-const animationMixers: {[key: string]: THREE.AnimationMixer} = {};
-const modelAnimations: {[key: string]: THREE.AnimationClip[]} = {};
-const pickableObjectMap = new Map<string, THREE.Object3D>();
-let heldObject: THREE.Object3D | null = null; // Can now be a Group/Scene (GLB root)
+const interactiveObjects: Mesh[] = []; // Will store child meshes of pickable objects
+const animationMixers: {[key: string]: AnimationMixer} = {};
+const modelAnimations: {[key: string]: AnimationClip[]} = {};
+const pickableObjectMap = new Map<string, Object3D>();
+let heldObject: Object3D | null = null; // Can now be a Group/Scene (GLB root)
 let heldObjectId: string | null = null;
 const spinSpeed = 1.0; // radians per second
-const heldObjectOffset = new THREE.Vector3(0, -0.28, -0.9);
-const raycaster = new THREE.Raycaster();
+const heldObjectOffset = new Vector3(0, -0.28, -0.9);
+const raycaster = new Raycaster();
 const pickupDistance = 3;
-let hoveredObject: THREE.Mesh | null = null;
-const mouseForHover = new THREE.Vector2(); // For hover detection based on mouse/touch position
+let hoveredObject: Mesh | null = null;
+const mouseForHover = new Vector2(); // For hover detection based on mouse/touch position
 
-function clearMeshHighlight(mesh: THREE.Mesh | null) {
+function clearMeshHighlight(mesh: Mesh | null) {
   if (!mesh) {
     return;
   }
 
-  const material = mesh.material as THREE.MeshStandardMaterial;
+  const material = mesh.material as MeshStandardMaterial;
   material.emissive.setHex(0x000000);
   material.emissiveIntensity = 0;
 }
 
-function clearObjectRootHighlight(objectRoot: THREE.Object3D) {
-  objectRoot.traverse((child: THREE.Object3D) => {
-    if ((child as THREE.Mesh).isMesh) {
-      clearMeshHighlight(child as THREE.Mesh);
+function clearObjectRootHighlight(objectRoot: Object3D) {
+  objectRoot.traverse((child: Object3D) => {
+    if ((child as Mesh).isMesh) {
+      clearMeshHighlight(child as Mesh);
     }
   });
 }
 
 function getClickedPickableObjectId(): string | null {
   raycaster.setFromCamera(mouseForHover, camera);
-  const hits = raycaster.intersectObjects<THREE.Mesh>(interactiveObjects, true);
+  const hits = raycaster.intersectObjects<Mesh>(interactiveObjects, true);
   const hit = hits[0];
   if (!hit || hit.distance > pickupDistance) {
     return null;
   }
 
-  const intersectedMesh = hit.object as THREE.Mesh;
+  const intersectedMesh = hit.object as Mesh;
   if (!intersectedMesh.userData.pickableGLBRoot) {
     return null;
   }
@@ -1087,27 +1044,27 @@ const objectDropTypeAliases: Record<string, string> = {
 type DropAnchor = {
   anchorId: string;
   objectType: string;
-  position: THREE.Vector3;
+  position: Vector3;
   yaw: number;
 };
 type ObjectReleaseAnimation = {
   objectId: string;
-  objectRoot: THREE.Object3D;
+  objectRoot: Object3D;
   startTime: number;
   durationMs: number;
-  startPosition: THREE.Vector3;
-  endPosition: THREE.Vector3;
-  startQuaternion: THREE.Quaternion;
-  endQuaternion: THREE.Quaternion;
+  startPosition: Vector3;
+  endPosition: Vector3;
+  startQuaternion: Quaternion;
+  endQuaternion: Quaternion;
 };
 const dropAnchorMap = new Map<string, DropAnchor[]>();
 const activeObjectAnimations = new Map<string, ObjectReleaseAnimation>();
 const releaseAnimationDurationMs = 220;
 
 // Define positions for couch models
-const modelPositions: { [key: string]: THREE.Vector3 } = {
-  '/models/couch_left.glb': new THREE.Vector3(-3.7, 0, .8),  // Adjust these values as needed
-  '/models/couch_right.glb': new THREE.Vector3(2.5, 0, .8)   // Adjust these values as needed
+const modelPositions: { [key: string]: Vector3 } = {
+  '/models/couch_left.glb': new Vector3(-3.7, 0, .8),  // Adjust these values as needed
+  '/models/couch_right.glb': new Vector3(2.5, 0, .8)   // Adjust these values as needed
 };
 
 function getDropObjectType(objectId: string) {
@@ -1128,7 +1085,7 @@ function findBestDropAnchor(objectId: string): DropAnchor | null {
     return null;
   }
 
-  const cameraDirection = new THREE.Vector3();
+  const cameraDirection = new Vector3();
   camera.getWorldDirection(cameraDirection);
   const origin = camera.position.clone();
   let bestAnchor: DropAnchor | null = null;
@@ -1160,17 +1117,17 @@ function findBestDropAnchor(objectId: string): DropAnchor | null {
 function loadDropAnchors() {
   loader.load('/models/drop_anchors.glb', (gltf: any) => {
     gltf.scene.updateMatrixWorld(true);
-    gltf.scene.traverse((child: THREE.Object3D) => {
+    gltf.scene.traverse((child: Object3D) => {
       const match = child.name.match(/^drop_([a-z0-9]+)_(\d+)$/i);
       if (!match) {
         return;
       }
 
-      const worldPosition = new THREE.Vector3();
-      const worldQuaternion = new THREE.Quaternion();
+      const worldPosition = new Vector3();
+      const worldQuaternion = new Quaternion();
       child.getWorldPosition(worldPosition);
       child.getWorldQuaternion(worldQuaternion);
-      const euler = new THREE.Euler().setFromQuaternion(worldQuaternion, 'YXZ');
+      const euler = new Euler().setFromQuaternion(worldQuaternion, 'YXZ');
 
       registerDropAnchor({
         anchorId: child.name,
@@ -1188,8 +1145,8 @@ function startObjectReleaseAnimation(snapshot: { objectId: string; ownerSessionI
     return;
   }
 
-  const startPosition = new THREE.Vector3();
-  const startQuaternion = new THREE.Quaternion();
+  const startPosition = new Vector3();
+  const startQuaternion = new Quaternion();
   objectRoot.updateMatrixWorld(true);
   objectRoot.getWorldPosition(startPosition);
   objectRoot.getWorldQuaternion(startQuaternion);
@@ -1203,14 +1160,14 @@ function startObjectReleaseAnimation(snapshot: { objectId: string; ownerSessionI
   objectRoot.position.copy(startPosition);
   objectRoot.quaternion.copy(startQuaternion);
 
-  const endQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, snapshot.rotation?.yaw ?? 0, 0, 'YXZ'));
+  const endQuaternion = new Quaternion().setFromEuler(new Euler(0, snapshot.rotation?.yaw ?? 0, 0, 'YXZ'));
   activeObjectAnimations.set(snapshot.objectId, {
     objectId: snapshot.objectId,
     objectRoot,
     startTime: performance.now(),
     durationMs: releaseAnimationDurationMs,
     startPosition,
-    endPosition: new THREE.Vector3(snapshot.position.x, snapshot.position.y, snapshot.position.z),
+    endPosition: new Vector3(snapshot.position.x, snapshot.position.y, snapshot.position.z),
     startQuaternion,
     endQuaternion,
   });
@@ -1246,7 +1203,7 @@ function createSittingPositions() {
   
   // Create new sitting position objects based on seatable object positions
   couchObjects.forEach(seatable => {
-    const objectPosition = new THREE.Vector3();
+    const objectPosition = new Vector3();
     seatable.getWorldPosition(objectPosition);
     const objectType = seatable.userData.type;
     
@@ -1267,8 +1224,8 @@ function createSittingPositions() {
         sittingModel.position.set(objectPosition.x - 0.1, objectPosition.y + 0.5, objectPosition.z + 0.5);
         
         // Calculate rotation to face the center of the room
-        const centerPoint = new THREE.Vector3(0, sittingModel.position.y, 0);
-        const direction = new THREE.Vector3().subVectors(centerPoint, sittingModel.position).normalize();
+        const centerPoint = new Vector3(0, sittingModel.position.y, 0);
+        const direction = new Vector3().subVectors(centerPoint, sittingModel.position).normalize();
         const angle = Math.atan2(direction.x, direction.z) + Math.PI;
         sittingModel.rotation.set(0, angle, 0);
       } else { // couch_right
@@ -1276,8 +1233,8 @@ function createSittingPositions() {
         sittingModel.position.set(objectPosition.x + 0.1, objectPosition.y + 0.5, objectPosition.z + 0.5);
         
         // Calculate rotation to face the center of the room
-        const centerPoint = new THREE.Vector3(0, sittingModel.position.y, 0);
-        const direction = new THREE.Vector3().subVectors(centerPoint, sittingModel.position).normalize();
+        const centerPoint = new Vector3(0, sittingModel.position.y, 0);
+        const direction = new Vector3().subVectors(centerPoint, sittingModel.position).normalize();
         const angle = Math.atan2(direction.x, direction.z) + Math.PI;
         sittingModel.rotation.set(0, angle, 0);
       }
@@ -1290,10 +1247,10 @@ function createSittingPositions() {
       };
       
       // Make the model invisible but keep it in the scene for interaction
-      sittingModel.traverse((child: THREE.Object3D) => {
-        if ((child as THREE.Mesh).isMesh) {
+      sittingModel.traverse((child: Object3D) => {
+        if ((child as Mesh).isMesh) {
           // Set to false to make invisible, true for debugging
-          (child as THREE.Mesh).visible = false;
+          (child as Mesh).visible = false;
         }
       });
       
@@ -1347,12 +1304,12 @@ function applyRemoteAvatarSeparation() {
   }
 }
 
-function updateModelPosition(modelUrl: string, position: THREE.Vector3) {
+function updateModelPosition(modelUrl: string, position: Vector3) {
   // Update the position in the modelPositions object
   modelPositions[modelUrl] = position;
   
   // Find the model in the scene and update its position
-  scene.traverse((object: THREE.Object3D) => { // Added type
+  scene.traverse((object: Object3D) => { // Added type
     if (object.userData && object.userData.type) {
       const type = object.userData.type;
       if ((type === 'couch_left' && modelUrl === '/models/couch_left.glb') || 
@@ -1364,11 +1321,11 @@ function updateModelPosition(modelUrl: string, position: THREE.Vector3) {
         object.position.copy(position);
         
         // Update helper sphere position
-        const objectPosition = new THREE.Vector3();
+        const objectPosition = new Vector3();
         object.getWorldPosition(objectPosition);
         
         // Find the helper sphere for this object
-        scene.traverse((child: THREE.Object3D) => { // Added type
+        scene.traverse((child: Object3D) => { // Added type
           if (child.userData && child.userData.helperFor === type) {
             child.position.copy(objectPosition);
             child.position.y += 2; // Position above the object for visibility
@@ -1394,47 +1351,38 @@ function updateModelPosition(modelUrl: string, position: THREE.Vector3) {
 
 
 // Add model position to modelPositions
-modelPositions['/models/chair.glb'] = new THREE.Vector3(0, 0, 0); // Default chair position
-modelPositions['/models/boss.glb'] = new THREE.Vector3(-0.847, 0, -2.02); // Default audio equipment position
-modelPositions['/models/leakstereo.glb'] = new THREE.Vector3(1.4933, -0.011, 4.558); // Default Stereo position
-modelPositions['/models/vinylrecord.glb'] = new THREE.Vector3(1.523, 0.23, -2.28); // Default record position
-modelPositions['/models/coffee.glb'] = new THREE.Vector3(-0.051, 1.069, -1.1182); // Default coffee mug position
+modelPositions['/models/chair.glb'] = new Vector3(0, 0, 0); // Default chair position
+modelPositions['/models/boss.glb'] = new Vector3(-0.847, 0, -2.02); // Default audio equipment position
+modelPositions['/models/leakstereo.glb'] = new Vector3(1.4933, -0.011, 4.558); // Default Stereo position
+modelPositions['/models/vinylrecord.glb'] = new Vector3(1.523, 0.23, -2.28); // Default record position
+modelPositions['/models/coffee.glb'] = new Vector3(-0.051, 1.069, -1.1182); // Default coffee mug position
 
 // Example usage:
-// updateModelPosition('/models/couch_left.glb', new THREE.Vector3(-5, 0, 3));
+// updateModelPosition('/models/couch_left.glb', new Vector3(-5, 0, 3));
 
-modelRotations['/models/vinylrecord.glb'] = new THREE.Euler(Math.PI / 2, 0, 0); // example: rotate 90° around Y
-modelRotations['/models/coffee.glb'] = new THREE.Euler(0, 30, 0); // example: rotate 90° around Y
+modelRotations['/models/vinylrecord.glb'] = new Euler(Math.PI / 2, 0, 0); // example: rotate 90° around Y
+modelRotations['/models/coffee.glb'] = new Euler(0, 30, 0); // example: rotate 90° around Y
 
 staticModelUrls.forEach(url => {
   loader.load(url, (gltf: any) => {
     const modelScene = gltf.scene;
-    if (url === '/models/coffee.glb') {
-  vaporEffectMaterial = addVaporToCoffee(modelScene);
-}
-
     // ✅ Extract filename and assign it as the name
     const parts = url.split('/');
     const filename = parts[parts.length - 1]; // "image01.glb"
-    const modelName = filename.replace('.glb', ''); // "image01"
-
-    modelScene.name = modelName;
+    const modelName = filename.replace('.glb', ''); // "image01"    modelScene.name = modelName;
 
     scene.add(modelScene);
+    if (ambientSceneFeature) {
+      ambientSceneFeature.registerStaticModel(url, modelScene);
+    } else if (ambientSceneFeaturePromise) {
+      void ambientSceneFeaturePromise.then((feature) => feature.registerStaticModel(url, modelScene));
+    }
     if ((FRAME_SURFACE_IDS as readonly string[]).includes(modelName)) {
       if (surfaceFeature) {
         surfaceFeature.applyActiveSurfaceSource(modelName);
       } else if (surfaceFeaturePromise) {
         void surfaceFeaturePromise.then((feature) => feature.applyActiveSurfaceSource(modelName));
       }
-    }
-
-    // Initialize wind effect for plant leaves
-    if (url === '/models/plantleaves2_L.glb') {
-      initializeWindEffectOnModel(modelScene, 'plantleaves_l');
-    }
-    if (url === '/models/plantleaves_r.glb') {
-      initializeWindEffectOnModel(modelScene, 'plantleaves_r');
     }
     
     // Set position for specific models if defined
@@ -1455,7 +1403,7 @@ staticModelUrls.forEach(url => {
       // Store animations if any
       if (gltf.animations && gltf.animations.length > 0) {
         modelAnimations[url] = gltf.animations;
-        const mixer = new THREE.AnimationMixer(gltf.scene);
+        const mixer = new AnimationMixer(gltf.scene);
         animationMixers[url] = mixer;
       }
     
@@ -1471,16 +1419,16 @@ staticModelUrls.forEach(url => {
       }
       
       // Log position for debugging
-      const objectPosition = new THREE.Vector3();
+      const objectPosition = new Vector3();
       modelScene.getWorldPosition(objectPosition);
       console.log(`Loaded ${modelScene.userData.type} at position:`, objectPosition);
       
       // Add a helper sphere to visualize the position
-      const sphereGeometry = new THREE.SphereGeometry(.2, 16, 16);
-      const sphereMaterial = new THREE.MeshBasicMaterial({ 
+      const sphereGeometry = new SphereGeometry(.2, 16, 16);
+      const sphereMaterial = new MeshBasicMaterial({ 
         color: url === '/models/chair.glb' ? 0x00ff00 : 0xff0000 // Green for chair, red for couches
       });
-      const sphereHelper = new THREE.Mesh(sphereGeometry, sphereMaterial);
+      const sphereHelper = new Mesh(sphereGeometry, sphereMaterial);
       sphereHelper.position.copy(objectPosition);
       sphereHelper.position.y += 2; // Position above the object for visibility
       // Store reference to which object this helper belongs to
@@ -1497,11 +1445,11 @@ staticModelUrls.forEach(url => {
       modelScene.userData.objectId = modelName;
       pickableObjectMap.set(modelName, modelScene);
 
-      modelScene.traverse((child: THREE.Object3D) => {
-        if ((child as THREE.Mesh).isMesh) {
+      modelScene.traverse((child: Object3D) => {
+        if ((child as Mesh).isMesh) {
           child.userData.pickableGLBRoot = modelScene;
           child.userData.objectId = modelName;
-          interactiveObjects.push(child as THREE.Mesh);
+          interactiveObjects.push(child as Mesh);
         }
       });
     }
@@ -1640,7 +1588,7 @@ function triggerSitAction(targetSeatId?: string) {
   currentSeatId = (nearSittingPosition.userData.seatId as string | undefined) ?? null;
   standingPosition.copy(controls.object.position);
 
-  const seatBaseWorldPosition = new THREE.Vector3();
+  const seatBaseWorldPosition = new Vector3();
   nearSittingPosition.getWorldPosition(seatBaseWorldPosition);
 
   controls.object.position.set(
@@ -1715,14 +1663,14 @@ function updateDebugDisplay() {
   let nearestSitPosInfo = 'None';
   
   if (nearCouch) {
-    const objPos = new THREE.Vector3();
+    const objPos = new Vector3();
     nearCouch.getWorldPosition(objPos);
     const distance = playerPos.distanceTo(objPos);
     nearestObjectInfo = `${nearCouch.userData.type}\nPosition: ${objPos.x.toFixed(2)}, ${objPos.y.toFixed(2)}, ${objPos.z.toFixed(2)}\nDistance: ${distance.toFixed(2)}`;
   }
   
   if (nearSittingPosition) {
-    const sitPos = new THREE.Vector3();
+    const sitPos = new Vector3();
     nearSittingPosition.getWorldPosition(sitPos);
     const distance = playerPos.distanceTo(sitPos);
     nearestSitPosInfo = `For: ${nearSittingPosition.userData.forCouch}\nPosition: ${sitPos.x.toFixed(2)}, ${sitPos.y.toFixed(2)}, ${sitPos.z.toFixed(2)}\nDistance: ${distance.toFixed(2)}`;
@@ -1754,19 +1702,19 @@ function getObjectDropTransform(objectId: string) {
     };
   }
 
-  const dropRaycaster = new THREE.Raycaster();
-  const cameraDirection = new THREE.Vector3();
+  const dropRaycaster = new Raycaster();
+  const cameraDirection = new Vector3();
   camera.getWorldDirection(cameraDirection);
   dropRaycaster.set(camera.position, cameraDirection);
 
   const intersectsNavmesh = dropRaycaster.intersectObjects(collidableMeshList, false);
-  let dropPosition: THREE.Vector3;
+  let dropPosition: Vector3;
 
   if (intersectsNavmesh.length > 0 && intersectsNavmesh[0].distance < pickupDistance * 1.5) {
     dropPosition = intersectsNavmesh[0].point.clone();
     dropPosition.y += 0.1;
   } else {
-    const forwardVector = new THREE.Vector3(0, 0, -1);
+    const forwardVector = new Vector3(0, 0, -1);
     forwardVector.applyQuaternion(camera.quaternion);
     dropPosition = camera.position.clone().add(forwardVector.multiplyScalar(pickupDistance * 0.75));
     dropPosition.y = camera.position.y - standingHeight + 0.01;
@@ -1807,7 +1755,7 @@ function applyObjectSnapshot(snapshot: { objectId: string; ownerSessionId: strin
 
   if (activeAnimation) {
     activeAnimation.endPosition.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
-    activeAnimation.endQuaternion.setFromEuler(new THREE.Euler(0, snapshot.rotation?.yaw ?? 0, 0, 'YXZ'));
+    activeAnimation.endQuaternion.setFromEuler(new Euler(0, snapshot.rotation?.yaw ?? 0, 0, 'YXZ'));
     return;
   }
 
@@ -1859,8 +1807,8 @@ function dropHeldObjectLocally() {
     return;
   }
 
-  const worldPosition = new THREE.Vector3();
-  const worldQuaternion = new THREE.Quaternion();
+  const worldPosition = new Vector3();
+  const worldQuaternion = new Quaternion();
   heldObject.getWorldPosition(worldPosition);
   heldObject.getWorldQuaternion(worldQuaternion);
   heldObject.parent?.remove(heldObject);
@@ -1973,9 +1921,9 @@ window.__musicspaceApplyObjectSnapshot = applyObjectSnapshot;
 
 // WASD movement + collision
 const moveState = { forward: false, backward: false, left: false, right: false };
-const velocity = new THREE.Vector3();
-const direction = new THREE.Vector3();
-const clock = new THREE.Clock();
+const velocity = new Vector3();
+const direction = new Vector3();
+const clock = new Clock();
 
 function resetMovementState() {
   moveState.forward = false;
@@ -2093,7 +2041,7 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
   
   // Update custom cycling lights
   if (window.customLights && window.customLights.length > 0) {
-    window.customLights.forEach((light: THREE.PointLight) => { // Added type
+    window.customLights.forEach((light: PointLight) => { // Added type
       if (light.userData) {
         light.userData.hue += light.userData.cycleSpeed || 0.001;
         if (light.userData.hue > 1) light.userData.hue = 0;
@@ -2122,10 +2070,10 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
   // Hover highlight detection - uses mouseForHover updated by pointermove
   if (sceneMode === 'room') {
     raycaster.setFromCamera(mouseForHover, camera);
-    const hoverHits = raycaster.intersectObjects<THREE.Mesh>(interactiveObjects, true);
+    const hoverHits = raycaster.intersectObjects<Mesh>(interactiveObjects, true);
 
     if (hoverHits.length > 0 && hoverHits[0].distance <= pickupDistance) {
-      const intersectedMesh = hoverHits[0].object as THREE.Mesh;
+      const intersectedMesh = hoverHits[0].object as Mesh;
       // Ensure we are highlighting a mesh that is part of a pickable GLB root
       if (intersectedMesh.userData.pickableGLBRoot) {
         const pickablePart = intersectedMesh; // The mesh itself is what gets the emissive color
@@ -2140,8 +2088,8 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
             clearMeshHighlight(hoveredObject);
           }
           hoveredObject = pickablePart;
-          const mat = hoveredObject.material as THREE.MeshStandardMaterial;
-          mat.emissive = new THREE.Color(0x00ff00); // Highlight current
+          const mat = hoveredObject.material as MeshStandardMaterial;
+          mat.emissive = new Color(0x00ff00); // Highlight current
           mat.emissiveIntensity = 0.5;
         }
       } else if (hoveredObject) { // If hovering over something not pickable, or too far
@@ -2155,22 +2103,6 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
   } else if (hoveredObject) {
     clearMeshHighlight(hoveredObject);
     hoveredObject = null;
-  }
-
-  // Animate emissive map
-  if (mixingBoardMeshes.length > 0) {
-    emitAccumulator += emitClock.getDelta();
-    const emitFps = EMIT_BASE_FPS * (0.72 + tvReactiveLevels.energy * 2.2 + tvReactiveLevels.bass * 0.95 + tvReactiveLevels.high * 0.4);
-    const emitInterval = 1 / Math.max(emitFps, 0.6);
-    while (emitAccumulator >= emitInterval) {
-      emitFrame = (emitFrame + 1) % emitTextures.length;
-      mixingBoardMeshes.forEach(mesh => {
-        const mat = mesh.material as THREE.MeshStandardMaterial;
-        mat.emissiveMap = emitTextures[emitFrame];
-        mat.needsUpdate = true;
-      });
-      emitAccumulator -= emitInterval;
-    }
   }
 
   // Movement & collision
@@ -2197,7 +2129,7 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
 
     const rayOrigin = controls.object.position.clone();
     rayOrigin.y += 10;
-    const downRay = new THREE.Raycaster(rayOrigin, new THREE.Vector3(0, -1, 0));
+    const downRay = new Raycaster(rayOrigin, new Vector3(0, -1, 0));
     const hits = downRay.intersectObjects(collidableMeshList);
     if (hits.length > 0) {
       controls.object.position.y = hits[0].point.y + standingHeight;
@@ -2211,11 +2143,11 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
     let isNearAnySittingPosition = false;
     if (sittingPositionObjects.length > 0) {
       const playerPosition = controls.object.position.clone();
-      const cameraDir = new THREE.Vector3();
+      const cameraDir = new Vector3();
       camera.getWorldDirection(cameraDir);
       
       for (const sitPos of sittingPositionObjects) {
-        const sitPosition = new THREE.Vector3();
+        const sitPosition = new Vector3();
         sitPos.getWorldPosition(sitPosition);
         
         const toSit = sitPosition.clone().sub(playerPosition).normalize();
@@ -2228,7 +2160,7 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
           
           // Find the associated couch for reference
           const couchType = sitPos.userData.forCouch;
-          scene.traverse((object: THREE.Object3D) => {
+          scene.traverse((object: Object3D) => {
             if (object.userData && object.userData.type === couchType) {
               nearCouch = object;
             }
@@ -2256,13 +2188,7 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
   // Update debug display
   updateDebugDisplay();
 
-  // Update vapor animation
-  if (vaporEffectMaterial) {
-    vaporEffectMaterial.uniforms.time.value += 0.003; // Adjust speed as needed
-  }
-
-  // Animate flowers/plants
-  animateFlowers(performance.now());
+  ambientSceneFeature?.update(tvReactiveLevels);
   
   renderer.render(scene, camera);
 }

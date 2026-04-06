@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import { BufferGeometry, ClampToEdgeWrapping, LinearFilter, Material, MathUtils, Mesh, MeshBasicMaterial, Object3D, SRGBColorSpace, Scene, ShaderMaterial, Vector2, VideoTexture } from 'three';
 
 type ReactiveLevels = {
   bass: number;
@@ -34,7 +34,7 @@ type TvFeatureDeps = {
   getViewportSize: () => { width: number; height: number };
   loader: any;
   resolveStorageUrl: (path: string) => Promise<string>;
-  scene: THREE.Scene;
+  scene: Scene;
 };
 
 const defaultTvVisualizerPreset: TvVisualizerPreset = {
@@ -81,12 +81,12 @@ function averageFrequencyRange(data: Uint8Array, startRatio: number, endRatio: n
 }
 
 export function createTvFeature({ getViewportSize, loader, resolveStorageUrl, scene }: TvFeatureDeps) {
-  let tvScreenObject: THREE.Object3D | null = null;
-  let tvVisualizerMaterial: THREE.ShaderMaterial | null = null;
+  let tvScreenObject: Object3D | null = null;
+  let tvVisualizerMaterial: ShaderMaterial | null = null;
   let tvVideoElement: HTMLVideoElement | null = null;
-  let tvVideoTexture: THREE.VideoTexture | null = null;
-  let tvVideoMaterial: THREE.MeshBasicMaterial | null = null;
-  const tvMeshMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+  let tvVideoTexture: VideoTexture | null = null;
+  let tvVideoMaterial: MeshBasicMaterial | null = null;
+  const tvMeshMaterials = new Map<Mesh, Material | Material[]>();
   let tvCurrentSourceUrl: string | null = null;
   let tvBassLevel = 0;
   let tvMidLevel = 0;
@@ -97,7 +97,7 @@ export function createTvFeature({ getViewportSize, loader, resolveStorageUrl, sc
   let usingSyntheticReactiveSignal = false;
 
   function createTvVisualizerMaterial() {
-    return new THREE.ShaderMaterial({
+    return new ShaderMaterial({
       transparent: false,
       depthWrite: true,
       toneMapped: false,
@@ -107,7 +107,7 @@ export function createTvFeature({ getViewportSize, loader, resolveStorageUrl, sc
         uMid: { value: 0 },
         uHigh: { value: 0 },
         uEnergy: { value: 0 },
-        uResolution: { value: new THREE.Vector2(1, 1) },
+        uResolution: { value: new Vector2(1, 1) },
         uSlices: { value: defaultTvVisualizerPreset.symmetrySlices },
         uFieldScale: { value: defaultTvVisualizerPreset.fieldScale },
         uSecondaryScale: { value: defaultTvVisualizerPreset.secondaryScale },
@@ -268,10 +268,10 @@ export function createTvFeature({ getViewportSize, loader, resolveStorageUrl, sc
     const shimmer = 0.5 + 0.5 * Math.sin(t * 4.9 + Math.sin(t * 1.7) * 0.9);
     const accent = Math.pow(Math.max(0, Math.sin(t * 3.35 + 1.1) * 0.5 + 0.5), 6.0);
 
-    const bass = THREE.MathUtils.clamp(0.16 + pulse * 0.72 + slowNoise * 0.22, 0, 1);
-    const mid = THREE.MathUtils.clamp(0.18 + midWave * 0.54 + slowNoise * 0.16 + accent * 0.18, 0, 1);
-    const high = THREE.MathUtils.clamp(0.14 + shimmer * 0.48 + accent * 0.24, 0, 1);
-    const energy = THREE.MathUtils.clamp(bass * 0.46 + mid * 0.32 + high * 0.22, 0, 1);
+    const bass = MathUtils.clamp(0.16 + pulse * 0.72 + slowNoise * 0.22, 0, 1);
+    const mid = MathUtils.clamp(0.18 + midWave * 0.54 + slowNoise * 0.16 + accent * 0.18, 0, 1);
+    const high = MathUtils.clamp(0.14 + shimmer * 0.48 + accent * 0.24, 0, 1);
+    const energy = MathUtils.clamp(bass * 0.46 + mid * 0.32 + high * 0.22, 0, 1);
 
     return { bass, mid, high, energy };
   }
@@ -291,17 +291,17 @@ export function createTvFeature({ getViewportSize, loader, resolveStorageUrl, sc
     element.style.display = 'none';
     document.body.appendChild(element);
 
-    const texture = new THREE.VideoTexture(element);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
+    const texture = new VideoTexture(element);
+    texture.colorSpace = SRGBColorSpace;
+    texture.minFilter = LinearFilter;
+    texture.magFilter = LinearFilter;
     texture.generateMipmaps = false;
-    texture.wrapS = THREE.ClampToEdgeWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.wrapS = ClampToEdgeWrapping;
+    texture.wrapT = ClampToEdgeWrapping;
     texture.repeat.y = -1;
     texture.offset.y = 1;
 
-    const material = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
+    const material = new MeshBasicMaterial({ map: texture, toneMapped: false });
 
     tvVideoElement = element;
     tvVideoTexture = texture;
@@ -310,14 +310,14 @@ export function createTvFeature({ getViewportSize, loader, resolveStorageUrl, sc
     return { element, texture, material };
   }
 
-  function applyTvMaterial(material: THREE.Material) {
+  function applyTvMaterial(material: Material) {
     if (!tvScreenObject) {
       return;
     }
 
-    tvScreenObject.traverse((child: THREE.Object3D) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
+    tvScreenObject.traverse((child: Object3D) => {
+      if ((child as Mesh).isMesh) {
+        const mesh = child as Mesh;
         if (!tvMeshMaterials.has(mesh)) {
           tvMeshMaterials.set(mesh, mesh.material);
         }
@@ -398,19 +398,19 @@ export function createTvFeature({ getViewportSize, loader, resolveStorageUrl, sc
 
   function loadScreen(initialMood: string) {
     loader.load('/models/tvscreen.glb', (gltf: any) => {
-      const screen = gltf.scene as THREE.Object3D;
+      const screen = gltf.scene as Object3D;
       tvScreenObject = screen;
       screen.position.set(0, 0, 0);
       console.log(`Initial TV screen position: ${screen.position.x}, ${screen.position.y}, ${screen.position.z}`);
 
       tvVisualizerMaterial = createTvVisualizerMaterial();
       applyVisualizerPreset(initialMood);
-      gltf.scene.traverse((child: THREE.Object3D) => {
-        if ((child as THREE.Mesh).isMesh) {
-          const mesh = child as THREE.Mesh;
+      gltf.scene.traverse((child: Object3D) => {
+        if ((child as Mesh).isMesh) {
+          const mesh = child as Mesh;
           tvMeshMaterials.set(mesh, mesh.material);
-          if ((mesh.geometry as THREE.BufferGeometry).attributes.uv) {
-            const uvAttribute = (mesh.geometry as THREE.BufferGeometry).attributes.uv;
+          if ((mesh.geometry as BufferGeometry).attributes.uv) {
+            const uvAttribute = (mesh.geometry as BufferGeometry).attributes.uv;
             tvVisualizerMaterial!.uniforms.uResolution.value.set(
               Math.max(uvAttribute.count, 1),
               Math.max(uvAttribute.count * 0.5625, 1),
@@ -444,10 +444,10 @@ export function createTvFeature({ getViewportSize, loader, resolveStorageUrl, sc
       ? getSyntheticReactiveLevels(delta, input.mood)
       : analyserLevels;
 
-    tvBassLevel = THREE.MathUtils.lerp(tvBassLevel, activeLevels.bass, 0.14);
-    tvMidLevel = THREE.MathUtils.lerp(tvMidLevel, activeLevels.mid, 0.12);
-    tvHighLevel = THREE.MathUtils.lerp(tvHighLevel, activeLevels.high, 0.18);
-    tvEnergyLevel = THREE.MathUtils.lerp(tvEnergyLevel, activeLevels.energy, 0.1);
+    tvBassLevel = MathUtils.lerp(tvBassLevel, activeLevels.bass, 0.14);
+    tvMidLevel = MathUtils.lerp(tvMidLevel, activeLevels.mid, 0.12);
+    tvHighLevel = MathUtils.lerp(tvHighLevel, activeLevels.high, 0.18);
+    tvEnergyLevel = MathUtils.lerp(tvEnergyLevel, activeLevels.energy, 0.1);
 
     if (!tvVisualizerMaterial) {
       return;

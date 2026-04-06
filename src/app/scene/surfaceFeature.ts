@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import { Mesh, MeshStandardMaterial, SRGBColorSpace, TextureLoader } from 'three';
 import type { LoadingManager, Scene, Texture } from 'three';
 import type { RoomSurfaceSnapshot } from '../../types/room';
 
@@ -10,17 +10,17 @@ type SurfaceFeatureDeps = {
 };
 
 export function createSurfaceFeature({ frameSurfaceIds, manager, resolveStorageUrl, scene }: SurfaceFeatureDeps) {
-  const frameTextureLoader = new THREE.TextureLoader(manager);
+  const frameTextureLoader = new TextureLoader(manager);
   const moodSurfaceSources = new Map<string, string>();
   const roomSurfaceSources = new Map<string, RoomSurfaceSnapshot>();
   const appliedSurfaceSources = new Map<string, string>();
   const surfaceRequestTokens = new Map<string, number>();
 
-  function findFrameMesh(surfaceId: string): THREE.Mesh | null {
-    let meshToUpdate: THREE.Mesh | null = null;
+  function findFrameMesh(surfaceId: string): Mesh | null {
+    let meshToUpdate: Mesh | null = null;
     scene.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh && obj.name === surfaceId) {
-        meshToUpdate = obj as THREE.Mesh;
+      if ((obj as Mesh).isMesh && obj.name === surfaceId) {
+        meshToUpdate = obj as Mesh;
       }
     });
     return meshToUpdate;
@@ -28,9 +28,9 @@ export function createSurfaceFeature({ frameSurfaceIds, manager, resolveStorageU
 
   function buildSurfaceMaterial(texture: Texture) {
     texture.flipY = false;
-    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.colorSpace = SRGBColorSpace;
 
-    const updatedMaterial = new THREE.MeshStandardMaterial({
+    const updatedMaterial = new MeshStandardMaterial({
       map: texture,
       metalness: 0.0,
       roughness: 1.0,
