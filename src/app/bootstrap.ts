@@ -666,10 +666,16 @@ function initializeSidebarLayout(): SidebarLayout {
     toggle.textContent = isOpen ? 'Hide >' : '< Show';
   };
 
-  applyState(true);
-  toggle.addEventListener('click', () => {
+  const toggleSidebar = () => {
     applyState(!sidebar.classList.contains('is-open'));
-  });
+  };
+
+  applyState(true);
+  toggle.addEventListener('click', toggleSidebar);
+  toggle.addEventListener('touchend', (event) => {
+    event.preventDefault();
+    toggleSidebar();
+  }, { passive: false });
 
   const setActiveQuickNav = (targetId: string) => {
     quickNavButtons.forEach((button) => {

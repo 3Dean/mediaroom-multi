@@ -143,6 +143,7 @@ button:focus-visible {
   left: 16px;
   z-index: 10001;
   pointer-events: auto;
+  touch-action: manipulation;
   padding: 10px 14px;
   background: rgba(0, 0, 0, 0.84);
   color: #fff;

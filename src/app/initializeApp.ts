@@ -53,31 +53,14 @@ import { addVaporToCoffee } from '../addingVapor.js'; // Import the vapor functi
 import { animateFlowers, initializeWindEffectOnModel } from '../wind'; // Import wind animation
 import { loadPreferences } from '../preferences/preferencesStore';
 import type { RoomSurfaceSnapshot } from '../types/room';
+import type { MobileControlsFeature } from './mobileControlsFeature';
 import * as THREE from 'three';
 
 // --- TOUCH CONTROL VARIABLES ---
 const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
 document.body.classList.add(isTouchDevice ? 'touch' : 'mouse');
-// touchLookStartX and touchLookStartY are unused as touchLookPreviousX/Y capture initial values.
-let touchLookPreviousX = 0;
-let touchLookPreviousY = 0;
-let lookingTouchId: number | null = null;
 const desktopLookSensitivity = 0.002; // Adjust as needed
-const mobileLookSensitivity = 0.0032;
 const mobileMoveSpeedScale = 0.58;
-
-let touchMoveStartX = 0;
-let touchMoveStartY = 0;
-let movingTouchId: number | null = null;
-const mobileJoystickRadius = 42;
-const moveTouchVector = { x: 0, y: 0 };
-let mobileControlLayer: HTMLDivElement | null = null;
-let mobileMoveZone: HTMLDivElement | null = null;
-let mobileJoystickKnob: HTMLDivElement | null = null;
-let mobileLookZone: HTMLDivElement | null = null;
-// const touchMoveSensitivity = 0.05; // This variable was declared but not used.
-
-// --- END TOUCH CONTROL VARIABLES ---
 
 // For desktop click-and-drag view
 let isDraggingView = false;
@@ -101,6 +84,7 @@ let tvFeature: any = null;
 let tvFeaturePromise: Promise<any> | null = null;
 let surfaceFeature: any = null;
 let surfaceFeaturePromise: Promise<any> | null = null;
+let mobileControlsFeature: MobileControlsFeature | null = null;
 
  // Expose function to reposition TV screen at runtime
 ;(window as any).updateTvScreenPosition = (x: number, y: number, z: number) => {
@@ -219,23 +203,6 @@ if (appDiv) {
 window.__musicspaceSetLobbyOverlaySupport = (message: string) => {
   lobbyOverlaySupport.textContent = message;
 };
-
-if (isTouchDevice) {
-  mobileControlLayer = document.createElement('div');
-  mobileControlLayer.id = 'mobile-controls-layer';
-
-  mobileMoveZone = document.createElement('div');
-  mobileMoveZone.id = 'mobile-move-zone';
-  mobileMoveZone.innerHTML = '<div class="mobile-control-label">Move</div><div class="mobile-joystick-base"><div class="mobile-joystick-knob"></div></div>';
-  mobileJoystickKnob = mobileMoveZone.querySelector('.mobile-joystick-knob') as HTMLDivElement | null;
-
-  mobileLookZone = document.createElement('div');
-  mobileLookZone.id = 'mobile-look-zone';
-  mobileLookZone.innerHTML = '<div class="mobile-control-label">Look</div><div class="mobile-look-pad"></div>';
-
-  mobileControlLayer.append(mobileMoveZone, mobileLookZone);
-  document.body.appendChild(mobileControlLayer);
-}
 
 // Listen for pointer move to update hover detection coordinates
 renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
@@ -740,116 +707,22 @@ renderer.domElement.addEventListener('click', () => {
     // For touch devices, this click listener might not be relevant if touch events are primary.
 });
 
-function isPointInsideElement(element: HTMLElement | null, clientX: number, clientY: number) {
-    if (!element) {
-        return false;
-    }
-
-    const rect = element.getBoundingClientRect();
-    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
-}
-
 function isSidebarUiTarget(target: EventTarget | null) {
     return target instanceof HTMLElement && !!target.closest('#musicspace-sidebar, #musicspace-sidebar-toggle, #audioControls, #interactionButton, #closeButton');
 }
 
-function updateMobileJoystickVisual(deltaX: number, deltaY: number) {
-    if (!mobileJoystickKnob) {
-        return;
-    }
-
-    const distance = Math.hypot(deltaX, deltaY);
-    const clampedDistance = Math.min(distance, mobileJoystickRadius);
-    const angle = Math.atan2(deltaY, deltaX);
-    const x = Math.cos(angle) * clampedDistance;
-    const y = Math.sin(angle) * clampedDistance;
-    mobileJoystickKnob.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
-    moveTouchVector.x = x / mobileJoystickRadius;
-    moveTouchVector.y = -y / mobileJoystickRadius;
-}
-
-function resetMobileMoveTouch() {
-    moveTouchVector.x = 0;
-    moveTouchVector.y = 0;
-    if (mobileJoystickKnob) {
-        mobileJoystickKnob.style.transform = 'translate(0px, 0px)';
-    }
-}
-
- if (isTouchDevice) {
+if (isTouchDevice) {
     controls.disconnect(); // Disconnect PointerLockControls' own event listeners for mouse/pointerlock
-    console.log("Touch device detected. Disconnected PointerLockControls listeners and initializing touch controls.");
-    resetMobileMoveTouch();
-
-    window.addEventListener('touchstart', (event: TouchEvent) => {
-        if (sceneMode !== 'room') {
-            return;
-        }
-        for (let i = 0; i < event.changedTouches.length; i++) {
-            const touch = event.changedTouches[i];
-            if (isSidebarUiTarget(touch.target)) {
-                continue;
-            }
-
-            if (movingTouchId === null && isPointInsideElement(mobileMoveZone, touch.clientX, touch.clientY)) {
-                movingTouchId = touch.identifier;
-                const rect = mobileMoveZone?.getBoundingClientRect();
-                touchMoveStartX = rect ? rect.left + rect.width / 2 : touch.clientX;
-                touchMoveStartY = rect ? rect.top + rect.height / 2 : touch.clientY;
-                updateMobileJoystickVisual(touch.clientX - touchMoveStartX, touch.clientY - touchMoveStartY);
-                event.preventDefault();
-            } else if (lookingTouchId === null && isPointInsideElement(mobileLookZone, touch.clientX, touch.clientY)) {
-                lookingTouchId = touch.identifier;
-                touchLookPreviousX = touch.clientX;
-                touchLookPreviousY = touch.clientY;
-                event.preventDefault();
-            }
-        }
-    }, { passive: false });
-
-    window.addEventListener('touchmove', (event: TouchEvent) => {
-        if (sceneMode !== 'room') {
-            return;
-        }
-        for (let i = 0; i < event.changedTouches.length; i++) {
-            const touch = event.changedTouches[i];
-            if (touch.identifier === movingTouchId) {
-                const deltaX = touch.clientX - touchMoveStartX;
-                const deltaY = touch.clientY - touchMoveStartY;
-                updateMobileJoystickVisual(deltaX, deltaY);
-                event.preventDefault();
-            } else if (touch.identifier === lookingTouchId) {
-                const deltaX = touch.clientX - touchLookPreviousX;
-                const deltaY = touch.clientY - touchLookPreviousY;
-                controls.object.rotation.y -= deltaX * mobileLookSensitivity;
-                camera.rotation.x -= deltaY * mobileLookSensitivity;
-                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
-                touchLookPreviousX = touch.clientX;
-                touchLookPreviousY = touch.clientY;
-                event.preventDefault();
-            }
-        }
-    }, { passive: false });
-
-    const releaseTouch = (touch: Touch) => {
-        if (touch.identifier === movingTouchId) {
-            movingTouchId = null;
-            resetMobileMoveTouch();
-        } else if (touch.identifier === lookingTouchId) {
-            lookingTouchId = null;
-        }
-    };
-
-    window.addEventListener('touchend', (event: TouchEvent) => {
-        for (let i = 0; i < event.changedTouches.length; i++) {
-            releaseTouch(event.changedTouches[i]);
-        }
-    });
-
-    window.addEventListener('touchcancel', (event: TouchEvent) => {
-        for (let i = 0; i < event.changedTouches.length; i++) {
-            releaseTouch(event.changedTouches[i]);
-        }
+    void import('./mobileControlsFeature').then(({ setupMobileControlsFeature }) => {
+        const feature = setupMobileControlsFeature({
+            camera,
+            controls,
+            getSceneMode: () => sceneMode,
+            isSidebarUiTarget,
+        });
+        mobileControlsFeature = feature;
+        feature.setVisible(sceneMode === 'room');
+        return feature;
     });
 } else {
     // Desktop click-and-drag view controls
@@ -1665,8 +1538,9 @@ const closeButton = document.createElement('button');
 closeButton.id = 'closeButton';
 closeButton.textContent = 'Stand';
 closeButton.style.position = 'absolute';
-closeButton.style.top = '10px';
-closeButton.style.right = '10px';
+closeButton.style.top = '16px';
+closeButton.style.left = '16px';
+closeButton.style.right = 'auto';
 closeButton.style.padding = '8px 12px';
 closeButton.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
 closeButton.style.color = 'white';
@@ -2015,8 +1889,7 @@ function setSceneMode(nextMode: SceneMode) {
   sceneMode = nextMode;
   resetMovementState();
   isDraggingView = false;
-  lookingTouchId = null;
-  movingTouchId = null;
+  mobileControlsFeature?.reset();
 
   if (nextMode === 'lobby') {
     if (isSitting) {
@@ -2034,17 +1907,13 @@ function setSceneMode(nextMode: SceneMode) {
     }
     dropHeldObjectLocally();
     renderer.domElement.style.cursor = 'auto';
-    if (mobileControlLayer) {
-      mobileControlLayer.style.display = 'none';
-    }
+    mobileControlsFeature?.setVisible(false);
     lobbyOverlay.classList.add('is-visible');
     applyLobbyCamera(0);
     return;
   }
 
-  if (mobileControlLayer) {
-    mobileControlLayer.style.display = '';
-  }
+  mobileControlsFeature?.setVisible(true);
   lobbyOverlay.classList.remove('is-visible');
   renderer.domElement.style.cursor = isTouchDevice ? 'auto' : 'grab';
 }
@@ -2113,7 +1982,7 @@ function resetMovementState() {
   moveState.backward = false;
   moveState.left = false;
   moveState.right = false;
-  resetMobileMoveTouch();
+  mobileControlsFeature?.reset();
   velocity.x = 0;
   velocity.z = 0;
 }
@@ -2310,9 +2179,10 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
     velocity.x -= velocity.x * 10.0 * delta;
     velocity.z -= velocity.z * 10.0 * delta;
 
-    direction.x = isTouchDevice ? moveTouchVector.x : Number(moveState.right) - Number(moveState.left);
-    direction.z = isTouchDevice ? moveTouchVector.y : Number(moveState.forward) - Number(moveState.backward);
-    const inputStrength = isTouchDevice ? Math.min(1, Math.hypot(moveTouchVector.x, moveTouchVector.y)) : Math.min(1, direction.length());
+    const mobileMoveVector = mobileControlsFeature?.getMoveVector() ?? { x: 0, y: 0 };
+    direction.x = isTouchDevice ? mobileMoveVector.x : Number(moveState.right) - Number(moveState.left);
+    direction.z = isTouchDevice ? mobileMoveVector.y : Number(moveState.forward) - Number(moveState.backward);
+    const inputStrength = isTouchDevice ? Math.min(1, Math.hypot(mobileMoveVector.x, mobileMoveVector.y)) : Math.min(1, direction.length());
     if (direction.lengthSq() > 1) {
       direction.normalize();
     }
