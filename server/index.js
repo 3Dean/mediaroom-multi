@@ -63,29 +63,32 @@ const persistenceHealth = {
   surface: createPersistenceStatus(canUseSurfaceBackendPersistence(), 'memory-only'),
 };
 
+function writeHealthResponse(response) {
+  response.writeHead(200, { 'Content-Type': 'application/json' });
+  response.end(JSON.stringify({
+    ok: true,
+    host: HOST ?? 'default',
+    port: PORT,
+    roomCount: roomParticipants.size,
+    maxRoomSize: MAX_ROOM_SIZE,
+    allowedOrigins: ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS,
+    servingDist: HAS_DIST,
+    spawnPoints: SPAWN_POINTS.length,
+    authorityRooms: roomAuthorities.size,
+    surfaceRooms: roomSurfaces.size,
+    authorityPersistence: describePersistenceStatus(persistenceHealth.authority, 'backend+fallback'),
+    surfacePersistence: describePersistenceStatus(persistenceHealth.surface, 'backend'),
+    authorityPersistenceStatus: persistenceHealth.authority,
+    surfacePersistenceStatus: persistenceHealth.surface,
+    cognitoIssuer: COGNITO_ISSUER || null,
+  }));
+}
+
 const server = createServer((request, response) => {
-  if (request.url === '/health') {
-    response.writeHead(200, { 'Content-Type': 'application/json' });
-    response.end(JSON.stringify({
-      ok: true,
-      host: HOST ?? 'default',
-      port: PORT,
-      roomCount: roomParticipants.size,
-      maxRoomSize: MAX_ROOM_SIZE,
-      allowedOrigins: ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS,
-      servingDist: HAS_DIST,
-      spawnPoints: SPAWN_POINTS.length,
-      authorityRooms: roomAuthorities.size,
-      surfaceRooms: roomSurfaces.size,
-      authorityPersistence: describePersistenceStatus(persistenceHealth.authority, 'backend+fallback'),
-      surfacePersistence: describePersistenceStatus(persistenceHealth.surface, 'backend'),
-      authorityPersistenceStatus: persistenceHealth.authority,
-      surfacePersistenceStatus: persistenceHealth.surface,
-      cognitoIssuer: COGNITO_ISSUER || null,
-    }));
+  if (request.url === '/health' || request.url === '/healthz') {
+    writeHealthResponse(response);
     return;
   }
-
   if (request.url === '/api/rooms/live') {
     response.writeHead(200, { 'Content-Type': 'application/json' });
     response.end(JSON.stringify({
