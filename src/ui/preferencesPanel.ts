@@ -117,7 +117,7 @@ export class PreferencesPanel {
 
     this.noteLabel = document.createElement('div');
     this.noteLabel.className = 'musicspace-inline-note';
-    this.noteLabel.textContent = 'Saved locally. Leave fields blank to keep using the live join form.';
+    this.noteLabel.textContent = 'These saved defaults prefill your room and audio settings, but you can still change them before joining.';
 
     this.volumeInput.addEventListener('input', () => {
       this.volumeValue.textContent = `${Math.round(Number(this.volumeInput.value) * 100)}%`;
@@ -210,6 +210,3 @@ export class PreferencesPanel {
     return label;
   }
 }
-
-
-

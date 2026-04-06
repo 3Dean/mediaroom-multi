@@ -754,8 +754,9 @@ body.mouse #mobile-controls-layer {
 .room-section-hint {
   color: #9eacbe;
   font-size: 11px;
-  text-align: right;
+  text-align: left;
   line-height: 1.4;
+  text-wrap: pretty;
 }
 
 .room-join-form {
@@ -780,6 +781,7 @@ body.mouse #mobile-controls-layer {
   color: #90a0b4;
   font-size: 11px;
   line-height: 1.45;
+  text-align: left;
 }
 
 .room-browser {
@@ -790,6 +792,8 @@ body.mouse #mobile-controls-layer {
 }
 
 .room-browser-status {
+  text-align: left;
+  text-wrap: pretty;
 }
 
 .room-browser-list {
@@ -1529,10 +1533,6 @@ select.musicspace-input:focus {
   gap: 8px;
 }
 
-.room-section-hint {
-  text-align: right;
-}
-
 .room-browser-list {
   gap: 8px;
   margin-top: 10px;
@@ -1736,6 +1736,12 @@ select.musicspace-input:focus {
   .room-section-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .room-section-hint,
+  .room-browser-status {
+    width: 100%;
+    max-width: none;
   }
 
   .musicspace-button-row,
