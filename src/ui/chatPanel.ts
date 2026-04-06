@@ -1,5 +1,6 @@
 import type { ChatMessage } from '../types/chat';
 import type { RoomRole, RoomSurfaceId } from '../types/room';
+import { createSectionIcon } from './sectionIcons';
 
 type ChatPanelOptions = {
   onSend: (body: string) => void;
@@ -62,7 +63,7 @@ export class ChatPanel {
     const title = document.createElement('h2');
     title.className = 'musicspace-card-title';
     title.textContent = 'Chat';
-    titleWrap.appendChild(title);
+    titleWrap.append(createSectionIcon('chat'), title);
 
     const status = document.createElement('div');
     status.className = 'musicspace-card-meta';
@@ -108,7 +109,9 @@ export class ChatPanel {
 
     const sharedMediaTitle = document.createElement('span');
     sharedMediaTitle.className = 'musicspace-accordion-title-wrap';
-    sharedMediaTitle.textContent = 'Shared Media';
+    const sharedMediaLabel = document.createElement('span');
+    sharedMediaLabel.textContent = 'Shared Media';
+    sharedMediaTitle.append(createSectionIcon('shared'), sharedMediaLabel);
 
     const sharedMediaMeta = document.createElement('span');
     sharedMediaMeta.className = 'musicspace-accordion-meta';
@@ -471,4 +474,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+
+
 

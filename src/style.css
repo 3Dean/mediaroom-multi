@@ -795,6 +795,7 @@ body.mouse #mobile-controls-layer {
 .room-browser-list {
   display: grid;
   gap: 6px;
+  margin-top: 6px;
   max-height: 224px;
   overflow-y: auto;
 }
@@ -1265,6 +1266,32 @@ body.mouse #mobile-controls-layer {
   text-transform: uppercase;
 }
 
+.musicspace-card-icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.musicspace-card-icon--section {
+  padding: 0;
+}
+
+.musicspace-card-icon--section svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.musicspace-card-icon--account svg {
+  width: 14px;
+  height: 20px;
+}
+
+.musicspace-card-icon--shared svg {
+  width: 18px;
+  height: 16px;
+}
+
 .musicspace-card-title {
   margin: 0;
   color: #fff;
@@ -1508,6 +1535,7 @@ select.musicspace-input:focus {
 
 .room-browser-list {
   gap: 8px;
+  margin-top: 10px;
 }
 
 .room-browser-item {
@@ -1748,5 +1776,7 @@ select.musicspace-input:focus {
 #preferences-panel {
   padding: 0;
 }
+
+
 
 

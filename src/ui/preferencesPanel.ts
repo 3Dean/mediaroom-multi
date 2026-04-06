@@ -1,4 +1,5 @@
 import type { UserPreferences } from '../preferences/preferencesModel';
+import { createSectionIcon } from './sectionIcons';
 
 type StationOption = {
   label: string;
@@ -60,7 +61,9 @@ export class PreferencesPanel {
 
     const summaryLeft = document.createElement('span');
     summaryLeft.className = 'musicspace-accordion-title-wrap';
-    summaryLeft.textContent = 'Preferences';
+    const summaryLabel = document.createElement('span');
+    summaryLabel.textContent = 'Preferences';
+    summaryLeft.append(createSectionIcon('preferences'), summaryLabel);
 
     this.summaryMeta = document.createElement('span');
     this.summaryMeta.className = 'musicspace-accordion-meta';
@@ -207,3 +210,6 @@ export class PreferencesPanel {
     return label;
   }
 }
+
+
+

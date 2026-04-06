@@ -1,3 +1,4 @@
+import { createSectionIcon } from './sectionIcons';
 type AuthPanelOptions = {
   initialLoginId?: string | null;
   onSignIn: (email: string, password: string) => Promise<void>;
@@ -34,7 +35,9 @@ export class AuthPanel {
 
     const summaryLeft = document.createElement('span');
     summaryLeft.className = 'musicspace-accordion-title-wrap';
-    summaryLeft.textContent = 'Account';
+    const summaryLabel = document.createElement('span');
+    summaryLabel.textContent = 'Account';
+    summaryLeft.append(createSectionIcon('account'), summaryLabel);
 
     this.summaryMeta = document.createElement('span');
     this.summaryMeta.className = 'musicspace-accordion-meta';
@@ -249,3 +252,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+
+

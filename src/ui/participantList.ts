@@ -1,5 +1,6 @@
 import type { PlayerPresence } from '../types/player';
 import type { RoomAuthority, RoomRole } from '../types/room';
+import { createSectionIcon } from './sectionIcons';
 
 type ParticipantListOptions = {
   onKick: (targetSessionId: string) => void;
@@ -32,7 +33,7 @@ export class ParticipantList {
     const title = document.createElement('h2');
     title.className = 'musicspace-card-title';
     title.textContent = 'People';
-    titleWrap.appendChild(title);
+    titleWrap.append(createSectionIcon('people'), title);
 
     this.status = document.createElement('div');
     this.status.className = 'musicspace-card-meta';
@@ -227,3 +228,4 @@ function formatRoleLabel(role: RoomRole | null): string {
   }
   return 'Member';
 }
+

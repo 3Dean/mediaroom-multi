@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from '../app/config';
 import type { RoomSummary } from '../types/room';
+import { createSectionIcon } from './sectionIcons';
 
 const ROOM_ADJECTIVES = ['amber', 'brisk', 'crimson', 'electric', 'golden', 'hidden', 'ivory', 'lunar', 'neon', 'quiet', 'silver', 'velvet'];
 const ROOM_MODIFIERS = ['aurora', 'breeze', 'echo', 'forest', 'harbor', 'meadow', 'midnight', 'signal', 'solar', 'violet', 'whisper', 'willow'];
@@ -109,7 +110,7 @@ export class RoomPanel {
     intro.className = 'musicspace-card-subtitle';
     intro.textContent = 'Join a room from a link or pick one from the browser.';
 
-    titleWrap.appendChild(title);
+    titleWrap.append(createSectionIcon('room'), title);
     header.append(titleWrap, intro);
 
     const formSection = document.createElement('div');
@@ -508,3 +509,4 @@ function flashShareButton(button: HTMLButtonElement, label: string): void {
     button.textContent = previousLabel;
   }, 1200);
 }
+
