@@ -48,12 +48,10 @@ declare global {
 }
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
-import { getUrl } from 'aws-amplify/storage';
 let controls: any;
 import { addVaporToCoffee } from '../addingVapor.js'; // Import the vapor function
 import { animateFlowers, initializeWindEffectOnModel } from '../wind'; // Import wind animation
 import { loadPreferences } from '../preferences/preferencesStore';
-import { createTvFeature } from './scene/tvFeature';
 import type { RoomSurfaceSnapshot } from '../types/room';
 import * as THREE from 'three';
 
@@ -99,11 +97,21 @@ export function initializeApp() {
 let pointLights: THREE.PointLight[] = [];
 let hues: number[] = [];
 let lightHelpers: THREE.Object3D[] = []; // Store light helpers
-let tvFeature: ReturnType<typeof createTvFeature> | null = null;
+let tvFeature: any = null;
+let tvFeaturePromise: Promise<any> | null = null;
+let surfaceFeature: any = null;
+let surfaceFeaturePromise: Promise<any> | null = null;
 
  // Expose function to reposition TV screen at runtime
 ;(window as any).updateTvScreenPosition = (x: number, y: number, z: number) => {
-  tvFeature?.updateScreenPosition(x, y, z);
+  if (tvFeature) {
+    tvFeature.updateScreenPosition(x, y, z);
+    return;
+  }
+
+  if (tvFeaturePromise) {
+    void tvFeaturePromise.then((feature) => feature.updateScreenPosition(x, y, z));
+  }
 };
 
 // Scene + Camera + Renderer
@@ -130,6 +138,12 @@ const moodBackgroundConfigs: Record<string, BackgroundConfig> = {
   space: { path: '/images/equirectangular-space.jpg', rotationDegrees: -110 },
 };
 const backgroundTextureCache = new Map<string, THREE.Texture>();
+
+async function resolveStorageAssetUrl(path: string) {
+  const { getUrl } = await import('aws-amplify/storage');
+  const result = await getUrl({ path });
+  return result.url.toString();
+}
 
 let activeBackgroundOverrideMood = initialPreferences.visuals.backgroundOverrideMood;
 
@@ -562,7 +576,11 @@ function applyStationSelection(nextIndex: number) {
     playButton.style.backgroundColor = '#dc3545';
   }
 
-  switchMoodTextures(selected.mood);
+  if (surfaceFeature) {
+    surfaceFeature.setMood(selected.mood);
+  } else if (surfaceFeaturePromise) {
+    void surfaceFeaturePromise.then((feature) => feature.setMood(selected.mood));
+  }
   applyMoodBackground(selected.mood);
   tvFeature?.applyVisualizerPreset(selected.mood);
 }
@@ -957,33 +975,88 @@ for (let i = 0; i < EMIT_COUNT; i++) {
 
 // GLTF Loader
 const loader = new GLTFLoader(manager);
-tvFeature = createTvFeature({
-  scene,
-  loader,
-  resolveStorageUrl: async (path) => {
-    const result = await getUrl({ path });
-    return result.url.toString();
-  },
-  getViewportSize: () => ({
-    width: renderer.domElement.width,
-    height: renderer.domElement.height,
-  }),
-});
+tvFeaturePromise = (async () => {
+  const { createTvFeature } = await import('./scene/tvFeature');
+  const feature = createTvFeature({
+    scene,
+    loader,
+    resolveStorageUrl: resolveStorageAssetUrl,
+    getViewportSize: () => ({
+      width: renderer.domElement.width,
+      height: renderer.domElement.height,
+    }),
+  });
+  feature.loadScreen(somaStations[selectedStationIndex].mood);
+  tvFeature = feature;
+  return feature;
+})();
 window.__musicspaceSetTvVideoSource = (url: string) => {
-  void tvFeature?.setVideoSource(url);
+  if (tvFeature) {
+    void tvFeature.setVideoSource(url);
+    return;
+  }
+
+  if (tvFeaturePromise) {
+    void tvFeaturePromise.then((feature) => feature.setVideoSource(url));
+  }
 };
 window.__musicspaceClearTvVideoSource = () => {
-  tvFeature?.clearVideoSource();
+  if (tvFeature) {
+    tvFeature.clearVideoSource();
+    return;
+  }
+
+  if (tvFeaturePromise) {
+    void tvFeaturePromise.then((feature) => feature.clearVideoSource());
+  }
 };
 window.__musicspaceSetTvPlayback = (isPlaying: boolean, currentTime: number) => {
-  tvFeature?.setPlayback(isPlaying, currentTime);
+  if (tvFeature) {
+    tvFeature.setPlayback(isPlaying, currentTime);
+    return;
+  }
+
+  if (tvFeaturePromise) {
+    void tvFeaturePromise.then((feature) => feature.setPlayback(isPlaying, currentTime));
+  }
 };
 window.__musicspaceGetTvPlaybackState = () => tvFeature?.getPlaybackState() ?? ({
   sourceUrl: null,
   isPlaying: false,
   currentTime: 0,
 });
-tvFeature.loadScreen(somaStations[selectedStationIndex].mood);
+surfaceFeaturePromise = (async () => {
+  const { createSurfaceFeature } = await import('./scene/surfaceFeature');
+  const feature = createSurfaceFeature({
+    scene,
+    manager,
+    frameSurfaceIds: FRAME_SURFACE_IDS,
+    resolveStorageUrl: resolveStorageAssetUrl,
+  });
+  feature.setMood(somaStations[selectedStationIndex].mood);
+  surfaceFeature = feature;
+  return feature;
+})();
+window.__musicspaceSyncRoomSurfaces = (surfaces) => {
+  if (surfaceFeature) {
+    surfaceFeature.syncRoomSurfaces(surfaces);
+    return;
+  }
+
+  if (surfaceFeaturePromise) {
+    void surfaceFeaturePromise.then((feature) => feature.syncRoomSurfaces(surfaces));
+  }
+};
+(window as any).switchMoodTextures = (mood: string) => {
+  if (surfaceFeature) {
+    surfaceFeature.setMood(mood);
+    return;
+  }
+
+  if (surfaceFeaturePromise) {
+    void surfaceFeaturePromise.then((feature) => feature.setMood(mood));
+  }
+};
 loadDropAnchors();
 
 // Vapor effect material
@@ -1476,7 +1549,11 @@ staticModelUrls.forEach(url => {
 
     scene.add(modelScene);
     if ((FRAME_SURFACE_IDS as readonly string[]).includes(modelName)) {
-      applyActiveSurfaceSource(modelName);
+      if (surfaceFeature) {
+        surfaceFeature.applyActiveSurfaceSource(modelName);
+      } else if (surfaceFeaturePromise) {
+        void surfaceFeaturePromise.then((feature) => feature.applyActiveSurfaceSource(modelName));
+      }
     }
 
     // Initialize wind effect for plant leaves
@@ -1557,113 +1634,6 @@ staticModelUrls.forEach(url => {
     }
   });
 });
-const frameTextureLoader = new THREE.TextureLoader(manager);
-const moodSurfaceSources = new Map<string, string>();
-const roomSurfaceSources = new Map<string, RoomSurfaceSnapshot>();
-const appliedSurfaceSources = new Map<string, string>();
-const surfaceRequestTokens = new Map<string, number>();
-
-function findFrameMesh(surfaceId: string): THREE.Mesh | null {
-  let meshToUpdate: THREE.Mesh | null = null;
-  scene.traverse((obj) => {
-    if ((obj as THREE.Mesh).isMesh && obj.name === surfaceId) {
-      meshToUpdate = obj as THREE.Mesh;
-    }
-  });
-  return meshToUpdate;
-}
-
-function buildSurfaceMaterial(texture: THREE.Texture) {
-  texture.flipY = false;
-  texture.colorSpace = THREE.SRGBColorSpace;
-
-  const updatedMaterial = new THREE.MeshStandardMaterial({
-    map: texture,
-    metalness: 0.0,
-    roughness: 1.0,
-    toneMapped: true,
-  });
-  updatedMaterial.needsUpdate = true;
-  return updatedMaterial;
-}
-
-function applySurfaceTextureFromUrl(surfaceId: string, textureUrl: string) {
-  const meshToUpdate = findFrameMesh(surfaceId);
-  if (!meshToUpdate) {
-    console.warn(`Mesh not found: ${surfaceId}`);
-    return;
-  }
-
-  const currentSource = appliedSurfaceSources.get(surfaceId);
-  if (currentSource === textureUrl) {
-    return;
-  }
-
-  const requestToken = (surfaceRequestTokens.get(surfaceId) ?? 0) + 1;
-  surfaceRequestTokens.set(surfaceId, requestToken);
-  frameTextureLoader.load(textureUrl, (newTexture) => {
-    if (surfaceRequestTokens.get(surfaceId) !== requestToken) {
-      newTexture.dispose();
-      return;
-    }
-
-    const previousMaterial = meshToUpdate.material;
-    meshToUpdate.material = buildSurfaceMaterial(newTexture);
-    appliedSurfaceSources.set(surfaceId, textureUrl);
-    if (Array.isArray(previousMaterial)) {
-      previousMaterial.forEach((material) => material.dispose?.());
-    } else {
-      previousMaterial?.dispose?.();
-    }
-  });
-}
-
-async function applySurfaceTexture(surfaceId: string, imagePath: string) {
-  try {
-    const result = await getUrl({ path: imagePath });
-    applySurfaceTextureFromUrl(surfaceId, result.url.toString());
-  } catch (error) {
-    console.error(`Failed to resolve room surface ${surfaceId}`, error);
-    const fallbackSource = moodSurfaceSources.get(surfaceId);
-    if (fallbackSource) {
-      applySurfaceTextureFromUrl(surfaceId, fallbackSource);
-    }
-  }
-}
-
-function applyActiveSurfaceSource(surfaceId: string) {
-  const roomSurface = roomSurfaceSources.get(surfaceId);
-  if (roomSurface) {
-    void applySurfaceTexture(surfaceId, roomSurface.imagePath);
-    return;
-  }
-
-  const moodSource = moodSurfaceSources.get(surfaceId);
-  if (moodSource) {
-    applySurfaceTextureFromUrl(surfaceId, moodSource);
-  }
-}
-
-// Function to switch mood textures
-function switchMoodTextures(mood: string) {
-  FRAME_SURFACE_IDS.forEach((frameName) => {
-    moodSurfaceSources.set(frameName, `/images/moods/${mood}/${frameName}.png`);
-    applyActiveSurfaceSource(frameName);
-  });
-}
-
-window.__musicspaceSyncRoomSurfaces = (surfaces) => {
-  roomSurfaceSources.clear();
-  surfaces.forEach((surface) => {
-    roomSurfaceSources.set(surface.surfaceId, surface);
-  });
-
-  FRAME_SURFACE_IDS.forEach((surfaceId) => {
-    applyActiveSurfaceSource(surfaceId);
-  });
-};
-
-(window as any).switchMoodTextures = switchMoodTextures;
 
 
 // Initialize vapor effect
