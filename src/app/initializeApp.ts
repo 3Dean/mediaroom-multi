@@ -53,7 +53,8 @@ import { loadPreferences } from '../preferences/preferencesStore';
 import type { RoomSurfaceSnapshot } from '../types/room';
 import type { MobileControlsFeature } from './mobileControlsFeature';
 import type { AmbientSceneFeature } from './scene/ambientSceneFeature';
-import { AnimationClip, AnimationMixer, Audio, AudioAnalyser, AudioListener, Clock, Color, DirectionalLight, EquirectangularReflectionMapping, Euler, HemisphereLight, LoadingManager, MathUtils, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PerspectiveCamera, PointLight, Quaternion, Raycaster, RepeatWrapping, SRGBColorSpace, Scene, SphereGeometry, Texture, TextureLoader, Vector2, Vector3, WebGLRenderer } from 'three';
+import type { SceneInteractionFeature } from './scene/sceneInteractionFeature';
+import { Audio, AudioAnalyser, AudioListener, Clock, DirectionalLight, EquirectangularReflectionMapping, Euler, HemisphereLight, LoadingManager, MathUtils, Mesh, Object3D, PerspectiveCamera, PointLight, Raycaster, RepeatWrapping, SRGBColorSpace, Scene, Texture, TextureLoader, Vector3, WebGLRenderer } from 'three';
 
 // --- TOUCH CONTROL VARIABLES ---
 const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
@@ -86,6 +87,8 @@ let surfaceFeaturePromise: Promise<any> | null = null;
 let mobileControlsFeature: MobileControlsFeature | null = null;
 let ambientSceneFeature: AmbientSceneFeature | null = null;
 let ambientSceneFeaturePromise: Promise<AmbientSceneFeature> | null = null;
+let sceneInteractionFeature: SceneInteractionFeature | null = null;
+let sceneInteractionFeaturePromise: Promise<SceneInteractionFeature> | null = null;
 
  // Expose function to reposition TV screen at runtime
 ;(window as any).updateTvScreenPosition = (x: number, y: number, z: number) => {
@@ -210,8 +213,7 @@ renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
     if (sceneMode !== 'room') {
         return;
     }
-    mouseForHover.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouseForHover.y = - (event.clientY / window.innerHeight) * 2 + 1;
+    sceneInteractionFeature?.updatePointer(event.clientX, event.clientY);
 }, false);
 
 (window as any).scene = scene;
@@ -778,17 +780,7 @@ if (isTouchDevice) {
 // Navmesh collision collector
 const collidableMeshList: Mesh[] = [];
 
-// Sitting position model and interaction
-const sittingPositionObjects: Object3D[] = [];
-const couchObjects: Object3D[] = [];
-let nearCouch: Object3D | null = null;
-let nearSittingPosition: Object3D | null = null;
-let currentSeatId: string | null = null;
-let isSitting = false;
-// let sittingPosition = new Vector3(); // Replaced by direct calculation
-// let sittingRotation = new Euler(); // Replaced by direct calculation
-let standingPosition = new Vector3(); // Stores the full (x,y,z) position before sitting
-// standingYaw and standingPitch are no longer needed as we retain current seated orientation when standing.
+// Interaction movement thresholds
 let standingHeight = 1.6; // Default standing height - this is effectively eye height
 const sittingEyeHeight = 1.0; // Eye height when sitting
 const proximityDistance = 2.01; // Increased from 2 to make detection easier
@@ -931,7 +923,37 @@ window.__musicspaceSyncRoomSurfaces = (surfaces) => {
     void surfaceFeaturePromise.then((feature) => feature.setMood(mood));
   }
 };
-loadDropAnchors();
+const pendingInteractionModels: Array<{ url: string; modelScene: Object3D }> = [];
+sceneInteractionFeaturePromise = import('./scene/sceneInteractionFeature').then(({ createSceneInteractionFeature }) => {
+  const feature = createSceneInteractionFeature({
+    scene,
+    camera,
+    controls,
+    loader,
+    rendererElement: renderer.domElement,
+    collidableMeshList,
+    getSceneMode: () => sceneMode,
+    clearMotionState: resetMovementState,
+    isTypingIntoUi,
+    heldObjectOffset: new Vector3(0, -0.28, -0.9),
+    pickupDistance: 3,
+    releaseAnimationDurationMs: 220,
+    standingHeight,
+    sittingEyeHeight,
+    proximityDistance,
+    avatarSeparationRadius,
+    avatarSeparationStrength,
+    seatedAvatarSeparationScale,
+  });
+  sceneInteractionFeature = feature;
+  pendingInteractionModels.forEach(({ url, modelScene }) => feature.registerStaticModel(url, modelScene));
+  pendingInteractionModels.length = 0;
+  if (sceneMode) {
+    feature.handleSceneModeChange(sceneMode);
+  }
+  return feature;
+});
+void sceneInteractionFeaturePromise;
 
 // Custom rotations for specific models (in radians)
 const modelRotations: {[key: string]: Euler} = {
@@ -990,357 +1012,11 @@ const staticModelUrls = [
   '/models/coffee.glb' // Add coffee model
 ];
 
-const pickableUrls = ['/models/boss.glb', '/models/leakstereo.glb', '/models/vinylrecord.glb', '/models/coffee.glb'];
-const interactiveObjects: Mesh[] = []; // Will store child meshes of pickable objects
-const animationMixers: {[key: string]: AnimationMixer} = {};
-const modelAnimations: {[key: string]: AnimationClip[]} = {};
-const pickableObjectMap = new Map<string, Object3D>();
-let heldObject: Object3D | null = null; // Can now be a Group/Scene (GLB root)
-let heldObjectId: string | null = null;
-const spinSpeed = 1.0; // radians per second
-const heldObjectOffset = new Vector3(0, -0.28, -0.9);
-const raycaster = new Raycaster();
-const pickupDistance = 3;
-let hoveredObject: Mesh | null = null;
-const mouseForHover = new Vector2(); // For hover detection based on mouse/touch position
-
-function clearMeshHighlight(mesh: Mesh | null) {
-  if (!mesh) {
-    return;
-  }
-
-  const material = mesh.material as MeshStandardMaterial;
-  material.emissive.setHex(0x000000);
-  material.emissiveIntensity = 0;
-}
-
-function clearObjectRootHighlight(objectRoot: Object3D) {
-  objectRoot.traverse((child: Object3D) => {
-    if ((child as Mesh).isMesh) {
-      clearMeshHighlight(child as Mesh);
-    }
-  });
-}
-
-function getClickedPickableObjectId(): string | null {
-  raycaster.setFromCamera(mouseForHover, camera);
-  const hits = raycaster.intersectObjects<Mesh>(interactiveObjects, true);
-  const hit = hits[0];
-  if (!hit || hit.distance > pickupDistance) {
-    return null;
-  }
-
-  const intersectedMesh = hit.object as Mesh;
-  if (!intersectedMesh.userData.pickableGLBRoot) {
-    return null;
-  }
-
-  return (intersectedMesh.userData.objectId as string | undefined) ?? null;
-}
-
-const objectDropTypeAliases: Record<string, string> = {
-  coffee: 'mug',
-};
-type DropAnchor = {
-  anchorId: string;
-  objectType: string;
-  position: Vector3;
-  yaw: number;
-};
-type ObjectReleaseAnimation = {
-  objectId: string;
-  objectRoot: Object3D;
-  startTime: number;
-  durationMs: number;
-  startPosition: Vector3;
-  endPosition: Vector3;
-  startQuaternion: Quaternion;
-  endQuaternion: Quaternion;
-};
-const dropAnchorMap = new Map<string, DropAnchor[]>();
-const activeObjectAnimations = new Map<string, ObjectReleaseAnimation>();
-const releaseAnimationDurationMs = 220;
-
 // Define positions for couch models
 const modelPositions: { [key: string]: Vector3 } = {
-  '/models/couch_left.glb': new Vector3(-3.7, 0, .8),  // Adjust these values as needed
-  '/models/couch_right.glb': new Vector3(2.5, 0, .8)   // Adjust these values as needed
+  '/models/couch_left.glb': new Vector3(-3.7, 0, .8),
+  '/models/couch_right.glb': new Vector3(2.5, 0, .8)
 };
-
-function getDropObjectType(objectId: string) {
-  return objectDropTypeAliases[objectId] ?? objectId;
-}
-
-function registerDropAnchor(anchor: DropAnchor) {
-  const anchors = dropAnchorMap.get(anchor.objectType) ?? [];
-  anchors.push(anchor);
-  anchors.sort((left, right) => left.anchorId.localeCompare(right.anchorId));
-  dropAnchorMap.set(anchor.objectType, anchors);
-}
-
-function findBestDropAnchor(objectId: string): DropAnchor | null {
-  const objectType = getDropObjectType(objectId);
-  const anchors: DropAnchor[] = dropAnchorMap.get(objectType) ?? dropAnchorMap.get('any') ?? [];
-  if (anchors.length === 0) {
-    return null;
-  }
-
-  const cameraDirection = new Vector3();
-  camera.getWorldDirection(cameraDirection);
-  const origin = camera.position.clone();
-  let bestAnchor: DropAnchor | null = null;
-  let bestScore = Number.POSITIVE_INFINITY;
-
-  anchors.forEach((anchor) => {
-    const toAnchor = anchor.position.clone().sub(origin);
-    const distance = toAnchor.length();
-    if (distance > pickupDistance * 2) {
-      return;
-    }
-
-    const directionToAnchor = toAnchor.clone().normalize();
-    const facingScore = cameraDirection.dot(directionToAnchor);
-    if (facingScore < 0.1) {
-      return;
-    }
-
-    const score = distance - facingScore * 1.25;
-    if (score < bestScore) {
-      bestScore = score;
-      bestAnchor = anchor;
-    }
-  });
-
-  return bestAnchor;
-}
-
-function loadDropAnchors() {
-  loader.load('/models/drop_anchors.glb', (gltf: any) => {
-    gltf.scene.updateMatrixWorld(true);
-    gltf.scene.traverse((child: Object3D) => {
-      const match = child.name.match(/^drop_([a-z0-9]+)_(\d+)$/i);
-      if (!match) {
-        return;
-      }
-
-      const worldPosition = new Vector3();
-      const worldQuaternion = new Quaternion();
-      child.getWorldPosition(worldPosition);
-      child.getWorldQuaternion(worldQuaternion);
-      const euler = new Euler().setFromQuaternion(worldQuaternion, 'YXZ');
-
-      registerDropAnchor({
-        anchorId: child.name,
-        objectType: match[1].toLowerCase(),
-        position: worldPosition.clone(),
-        yaw: euler.y,
-      });
-    });
-  });
-}
-
-function startObjectReleaseAnimation(snapshot: { objectId: string; ownerSessionId: string | null; position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } | null }) {
-  const objectRoot = pickableObjectMap.get(snapshot.objectId);
-  if (!objectRoot) {
-    return;
-  }
-
-  const startPosition = new Vector3();
-  const startQuaternion = new Quaternion();
-  objectRoot.updateMatrixWorld(true);
-  objectRoot.getWorldPosition(startPosition);
-  objectRoot.getWorldQuaternion(startQuaternion);
-
-  if (objectRoot.parent !== scene) {
-    objectRoot.parent?.remove(objectRoot);
-    scene.add(objectRoot);
-  }
-
-  objectRoot.visible = true;
-  objectRoot.position.copy(startPosition);
-  objectRoot.quaternion.copy(startQuaternion);
-
-  const endQuaternion = new Quaternion().setFromEuler(new Euler(0, snapshot.rotation?.yaw ?? 0, 0, 'YXZ'));
-  activeObjectAnimations.set(snapshot.objectId, {
-    objectId: snapshot.objectId,
-    objectRoot,
-    startTime: performance.now(),
-    durationMs: releaseAnimationDurationMs,
-    startPosition,
-    endPosition: new Vector3(snapshot.position.x, snapshot.position.y, snapshot.position.z),
-    startQuaternion,
-    endQuaternion,
-  });
-
-  if (heldObjectId === snapshot.objectId) {
-    heldObject = null;
-    heldObjectId = null;
-  }
-}
-
-function updateObjectReleaseAnimations(now: number) {
-  activeObjectAnimations.forEach((animation, objectId) => {
-    const progress = Math.min((now - animation.startTime) / animation.durationMs, 1);
-    const eased = 1 - Math.pow(1 - progress, 3);
-    animation.objectRoot.position.lerpVectors(animation.startPosition, animation.endPosition, eased);
-    animation.objectRoot.quaternion.copy(animation.startQuaternion).slerp(animation.endQuaternion, eased);
-
-    if (progress >= 1) {
-      animation.objectRoot.position.copy(animation.endPosition);
-      animation.objectRoot.quaternion.copy(animation.endQuaternion);
-      activeObjectAnimations.delete(objectId);
-    }
-  });
-}
-
-// Function to create sitting position models at couch and chair locations
-function createSittingPositions() {
-  // Clear existing sitting position objects
-  sittingPositionObjects.forEach(obj => {
-    scene.remove(obj);
-  });
-  sittingPositionObjects.length = 0;
-  
-  // Create new sitting position objects based on seatable object positions
-  couchObjects.forEach(seatable => {
-    const objectPosition = new Vector3();
-    seatable.getWorldPosition(objectPosition);
-    const objectType = seatable.userData.type;
-    
-    // Load and clone the sitting position model
-    loader.load('/models/sittingposition.glb', (gltf: any) => {
-      const sittingModel = gltf.scene.clone();
-      
-      // Position the sitting model relative to the object type
-      if (objectType === 'chair') {
-        // Position for chair - centered on the chair with appropriate height
-        sittingModel.position.set(objectPosition.x + 0.1, objectPosition.y + 0.5, objectPosition.z -.4);
-        
-        // For chair, we want to face forward (assuming chair faces -Z direction)
-        // You may need to adjust this angle based on the chair's orientation
-        sittingModel.rotation.set(0, 0, 0);
-      } else if (objectType === 'couch_left') {
-        // Position for left couch
-        sittingModel.position.set(objectPosition.x - 0.1, objectPosition.y + 0.5, objectPosition.z + 0.5);
-        
-        // Calculate rotation to face the center of the room
-        const centerPoint = new Vector3(0, sittingModel.position.y, 0);
-        const direction = new Vector3().subVectors(centerPoint, sittingModel.position).normalize();
-        const angle = Math.atan2(direction.x, direction.z) + Math.PI;
-        sittingModel.rotation.set(0, angle, 0);
-      } else { // couch_right
-        // Position for right couch
-        sittingModel.position.set(objectPosition.x + 0.1, objectPosition.y + 0.5, objectPosition.z + 0.5);
-        
-        // Calculate rotation to face the center of the room
-        const centerPoint = new Vector3(0, sittingModel.position.y, 0);
-        const direction = new Vector3().subVectors(centerPoint, sittingModel.position).normalize();
-        const angle = Math.atan2(direction.x, direction.z) + Math.PI;
-        sittingModel.rotation.set(0, angle, 0);
-      }
-      
-      // Store reference to which object this sitting position belongs to
-      sittingModel.userData = { 
-        type: 'sitting_position',
-        forCouch: objectType,
-        seatId: `seat-${objectType}`
-      };
-      
-      // Make the model invisible but keep it in the scene for interaction
-      sittingModel.traverse((child: Object3D) => {
-        if ((child as Mesh).isMesh) {
-          // Set to false to make invisible, true for debugging
-          (child as Mesh).visible = false;
-        }
-      });
-      
-      scene.add(sittingModel);
-      sittingPositionObjects.push(sittingModel);
-      
-      console.log(`Created sitting position for ${objectType} at:`, sittingModel.position);
-    });
-  });
-}
-
-// Function to update model position
-function applyRemoteAvatarSeparation() {
-  if (!window.__musicspaceGetRemoteParticipants) {
-    return;
-  }
-
-  const localPosition = controls.object.position;
-  const remoteParticipants = window.__musicspaceGetRemoteParticipants();
-  let offsetX = 0;
-  let offsetZ = 0;
-
-  remoteParticipants.forEach((participant) => {
-    const dx = localPosition.x - participant.position.x;
-    const dz = localPosition.z - participant.position.z;
-    const distanceSq = dx * dx + dz * dz;
-    if (distanceSq <= 0.0001) {
-      return;
-    }
-
-    const separationScale = participant.isSitting ? seatedAvatarSeparationScale : 1;
-    const minDistance = avatarSeparationRadius * separationScale;
-    if (minDistance <= 0) {
-      return;
-    }
-
-    const distance = Math.sqrt(distanceSq);
-    if (distance >= minDistance) {
-      return;
-    }
-
-    const overlap = minDistance - distance;
-    const push = (overlap / distance) * avatarSeparationStrength;
-    offsetX += dx * push;
-    offsetZ += dz * push;
-  });
-
-  if (offsetX !== 0 || offsetZ !== 0) {
-    controls.object.position.x += offsetX;
-    controls.object.position.z += offsetZ;
-  }
-}
-
-function updateModelPosition(modelUrl: string, position: Vector3) {
-  // Update the position in the modelPositions object
-  modelPositions[modelUrl] = position;
-  
-  // Find the model in the scene and update its position
-  scene.traverse((object: Object3D) => { // Added type
-    if (object.userData && object.userData.type) {
-      const type = object.userData.type;
-      if ((type === 'couch_left' && modelUrl === '/models/couch_left.glb') || 
-          (type === 'couch_right' && modelUrl === '/models/couch_right.glb') ||
-          (type === 'boss' && modelUrl === '/models/boss.glb') ||
-          (type === 'album' && modelUrl === '/models/vinylrecord.glb') ||
-          (type === 'coffee' && modelUrl === '/models/coffee.glb') ||
-          (type === 'chair' && modelUrl === '/models/chair.glb')) {
-        object.position.copy(position);
-        
-        // Update helper sphere position
-        const objectPosition = new Vector3();
-        object.getWorldPosition(objectPosition);
-        
-        // Find the helper sphere for this object
-        scene.traverse((child: Object3D) => { // Added type
-          if (child.userData && child.userData.helperFor === type) {
-            child.position.copy(objectPosition);
-            child.position.y += 2; // Position above the object for visibility
-          }
-        });
-        
-        console.log(`Updated ${type} position to:`, objectPosition);
-        
-        // Update sitting positions when seatable objects move
-        createSittingPositions();
-      }
-    }
-  });
-}
-
 // List model names
 (window as any).listSceneObjects = function() {
   console.log('--- Scene Graph ---');
@@ -1363,6 +1039,34 @@ modelPositions['/models/coffee.glb'] = new Vector3(-0.051, 1.069, -1.1182); // D
 modelRotations['/models/vinylrecord.glb'] = new Euler(Math.PI / 2, 0, 0); // example: rotate 90° around Y
 modelRotations['/models/coffee.glb'] = new Euler(0, 30, 0); // example: rotate 90° around Y
 
+function updateModelPosition(modelUrl: string, position: Vector3) {
+  modelPositions[modelUrl] = position;
+
+  scene.traverse((object: Object3D) => {
+    if (!object.userData || !object.userData.type) {
+      return;
+    }
+
+    const type = object.userData.type;
+    if ((type === 'couch_left' && modelUrl === '/models/couch_left.glb') ||
+        (type === 'couch_right' && modelUrl === '/models/couch_right.glb') ||
+        (type === 'boss' && modelUrl === '/models/boss.glb') ||
+        (type === 'album' && modelUrl === '/models/vinylrecord.glb') ||
+        (type === 'coffee' && modelUrl === '/models/coffee.glb') ||
+        (type === 'chair' && modelUrl === '/models/chair.glb') ||
+        (type === 'stereo' && modelUrl === '/models/leakstereo.glb')) {
+      object.position.copy(position);
+      sceneInteractionFeature?.refreshSeatPositions();
+    }
+  });
+}
+
+function applyLobbyCamera(delta: number) {
+  lobbyCameraTime += delta;
+  controls.object.position.copy(lobbyCameraPosition);
+  controls.object.rotation.set(0, lobbyCameraTime * lobbyCameraYawSpeed, 0);
+  camera.rotation.x = 0;
+}
 staticModelUrls.forEach(url => {
   loader.load(url, (gltf: any) => {
     const modelScene = gltf.scene;
@@ -1394,64 +1098,11 @@ staticModelUrls.forEach(url => {
     if (url in modelRotations) {
       gltf.scene.rotation.copy(modelRotations[url]);
     }
-    // Store animations if this is an interactive model
-    if (pickableUrls.includes(url)) {
-      gltf.scene.userData.modelUrl = url;
-      interactiveObjects.push(gltf.scene);
-    }
-      
-      // Store animations if any
-      if (gltf.animations && gltf.animations.length > 0) {
-        modelAnimations[url] = gltf.animations;
-        const mixer = new AnimationMixer(gltf.scene);
-        animationMixers[url] = mixer;
-      }
-    
-// Track couch and chair objects for sitting interaction
-    if (url === '/models/couch_left.glb' || url === '/models/couch_right.glb' || url === '/models/chair.glb') {
-      couchObjects.push(modelScene);
-      
-      // Set the type based on the model
-      if (url === '/models/chair.glb') {
-        modelScene.userData.type = 'chair';
-      } else {
-        modelScene.userData.type = url.includes('left') ? 'couch_left' : 'couch_right';
-      }
-      
-      // Log position for debugging
-      const objectPosition = new Vector3();
-      modelScene.getWorldPosition(objectPosition);
-      console.log(`Loaded ${modelScene.userData.type} at position:`, objectPosition);
-      
-      // Add a helper sphere to visualize the position
-      const sphereGeometry = new SphereGeometry(.2, 16, 16);
-      const sphereMaterial = new MeshBasicMaterial({ 
-        color: url === '/models/chair.glb' ? 0x00ff00 : 0xff0000 // Green for chair, red for couches
-      });
-      const sphereHelper = new Mesh(sphereGeometry, sphereMaterial);
-      sphereHelper.position.copy(objectPosition);
-      sphereHelper.position.y += 2; // Position above the object for visibility
-      // Store reference to which object this helper belongs to
-      sphereHelper.userData = { helperFor: modelScene.userData.type };
-      //scene.add(sphereHelper);
-      
-      // Create sitting positions after all seatable objects are loaded
-      createSittingPositions();
-    }
-    
-    if (pickableUrls.includes(url)) {
-      modelScene.userData.isPickableRoot = true;
-      modelScene.userData.url = url;
-      modelScene.userData.objectId = modelName;
-      pickableObjectMap.set(modelName, modelScene);
 
-      modelScene.traverse((child: Object3D) => {
-        if ((child as Mesh).isMesh) {
-          child.userData.pickableGLBRoot = modelScene;
-          child.userData.objectId = modelName;
-          interactiveObjects.push(child as Mesh);
-        }
-      });
+    if (sceneInteractionFeature) {
+      sceneInteractionFeature.registerStaticModel(url, modelScene);
+    } else {
+      pendingInteractionModels.push({ url, modelScene });
     }
   });
 });
@@ -1460,371 +1111,23 @@ staticModelUrls.forEach(url => {
 // Initialize vapor effect
 //vaporEffectMaterial = addVaporToCoffee(scene, loader);
 
-
-// Create a button element for sitting interaction
-const interactionPrompt = document.createElement('button'); // Changed to button
-interactionPrompt.id = 'interactionButton'; // Added ID for styling/selection
-interactionPrompt.style.position = 'absolute';
-interactionPrompt.style.top = '50%';
-interactionPrompt.style.left = '50%';
-interactionPrompt.style.transform = 'translate(-50%, -50%)';
-interactionPrompt.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'; // Slightly darker background
-interactionPrompt.style.color = 'white';
-interactionPrompt.style.padding = '12px 20px'; // Larger padding
-interactionPrompt.style.border = '1px solid #fff'; // White border
-interactionPrompt.style.borderRadius = '8px'; // More rounded corners
-interactionPrompt.style.fontFamily = 'Arial, sans-serif';
-interactionPrompt.style.fontSize = '16px';
-interactionPrompt.style.cursor = 'pointer'; // Add pointer cursor
-interactionPrompt.style.display = 'none';
-interactionPrompt.style.zIndex = '10020'; // Keep above mobile controls and sidebar overlays
-// interactionPrompt.style.pointerEvents = 'none'; // Removed, button needs pointer events
-document.body.appendChild(interactionPrompt);
-
-
-const closeButton = document.createElement('button');
-closeButton.id = 'closeButton';
-closeButton.textContent = 'Stand';
-closeButton.style.position = 'absolute';
-closeButton.style.top = '16px';
-closeButton.style.left = '16px';
-closeButton.style.right = 'auto';
-closeButton.style.padding = '8px 12px';
-closeButton.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-closeButton.style.color = 'white';
-closeButton.style.border = '1px solid #fff';
-closeButton.style.borderRadius = '5px';
-closeButton.style.cursor = 'pointer';
-closeButton.style.display = 'none';
-closeButton.style.zIndex = '10020';
-document.body.appendChild(closeButton);
-
-function performStandAction() {
-  isSitting = false;
-  currentSeatId = null;
-  controls.object.position.copy(standingPosition);
-  interactionPrompt.style.display = 'none';
-  closeButton.style.display = 'none';
-  moveState.forward = moveState.backward = moveState.left = moveState.right = false;
-  velocity.x = 0;
-  velocity.z = 0;
-}
-
-function requestSeatClaim() {
-  if (sceneMode !== 'room') {
-    return;
-  }
-
-  if (!nearSittingPosition || isSitting) {
-    return;
-  }
-
-  const seatId = nearSittingPosition.userData.seatId as string | undefined;
-  if (seatId && window.__musicspaceRequestSeatClaim) {
-    window.__musicspaceRequestSeatClaim(seatId);
-    return;
-  }
-
-  triggerSitAction();
-}
-
-function requestSeatRelease() {
-  if (sceneMode !== 'room') {
-    return;
-  }
-
-  if (!isSitting) {
-    return;
-  }
-
-  if (currentSeatId && window.__musicspaceRequestSeatRelease) {
-    window.__musicspaceRequestSeatRelease(currentSeatId);
-    return;
-  }
-
-  performStandAction();
-}
-
-function handleCloseButtonPress(event: Event) {
-  event.stopPropagation();
-  event.preventDefault();
-  if (isSitting) {
-    requestSeatRelease();
-    console.log('Standing via close button', controls.object.position);
-  }
-}
-
-// Close button click handler to stand up
-closeButton.addEventListener('click', handleCloseButtonPress);
-closeButton.addEventListener('touchend', handleCloseButtonPress, { passive: false });
-
-function handleInteractionButtonPress(event: Event) {
-  if (sceneMode === 'room' && nearSittingPosition && !isSitting) {
-    requestSeatClaim();
-  }
-  event.stopPropagation();
-  event.preventDefault();
-}
-
- // Add event listener to the interaction button
- interactionPrompt.addEventListener('click', handleInteractionButtonPress);
- interactionPrompt.addEventListener('touchend', handleInteractionButtonPress, { passive: false });
-
-// Function to handle the sitting action
-function triggerSitAction(targetSeatId?: string) {
-  if (targetSeatId) {
-    const matchingSeat = sittingPositionObjects.find((seat) => seat.userData.seatId === targetSeatId);
-    if (!matchingSeat) {
-      return false;
-    }
-    nearSittingPosition = matchingSeat;
-  }
-
-  if (!nearSittingPosition) {
-    return false;
-  }
-
-  isSitting = true;
-  currentSeatId = (nearSittingPosition.userData.seatId as string | undefined) ?? null;
-  standingPosition.copy(controls.object.position);
-
-  const seatBaseWorldPosition = new Vector3();
-  nearSittingPosition.getWorldPosition(seatBaseWorldPosition);
-
-  controls.object.position.set(
-    seatBaseWorldPosition.x,
-    seatBaseWorldPosition.y + sittingEyeHeight,
-    seatBaseWorldPosition.z
-  );
-  const sitRot = nearSittingPosition.rotation;
-  controls.object.rotation.set(0, sitRot.y, 0);
-  camera.rotation.x = 0;
-
-  console.log(`Sitting via button. Player at:`, controls.object.position, `Facing Yaw:`, controls.object.rotation.y);
-
-  moveState.forward = false;
-  moveState.backward = false;
-  moveState.left = false;
-  moveState.right = false;
-
-  interactionPrompt.style.display = 'none';
-  closeButton.style.display = 'block';
-  return true;
-}
-
-window.__musicspaceGetSeatState = () => ({
-  nearbySeatId: sceneMode === 'room' ? (nearSittingPosition?.userData.seatId as string | undefined) ?? null : null,
-  currentSeatId: sceneMode === 'room' ? currentSeatId : null,
-  isSitting: sceneMode === 'room' ? isSitting : false,
-});
-window.__musicspaceOccupySeat = (seatId: string) => sceneMode === 'room' ? triggerSitAction(seatId) : false;
-window.__musicspaceReleaseSeat = () => {
-  performStandAction();
+window.__musicspaceGetSeatState = () => sceneInteractionFeature?.getSeatState() ?? {
+  nearbySeatId: null,
+  currentSeatId: null,
+  isSitting: false,
 };
-
-// Create debug display for position information
-const debugDisplay = document.createElement('div');
-debugDisplay.style.position = 'absolute';
-debugDisplay.style.top = '74px';
-debugDisplay.style.left = '350px';
-debugDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-debugDisplay.style.color = 'white';
-debugDisplay.style.padding = '10px';
-debugDisplay.style.borderRadius = '5px';
-debugDisplay.style.fontFamily = 'monospace';
-debugDisplay.style.fontSize = '12px';
-debugDisplay.style.pointerEvents = 'none'; // Prevent interaction with the debug display
-debugDisplay.style.maxWidth = '300px';
-debugDisplay.style.overflow = 'hidden';
-debugDisplay.style.whiteSpace = 'pre-wrap';
-debugDisplay.style.zIndex = '1000';
-debugDisplay.style.display = 'none'; // Hide the debug display by default
-document.body.appendChild(debugDisplay);
-
-// Add debug display toggle functionality (press 'I' to toggle)
-window.addEventListener('keydown', (e) => {
-  if (isTypingIntoUi(e.target)) {
-    return;
-  }
-
-  if (e.code === 'KeyI') {
-    debugDisplay.style.display = debugDisplay.style.display === 'none' ? 'block' : 'none';
-    console.log(`Debug display ${debugDisplay.style.display === 'none' ? 'hidden' : 'shown'}`);
-  }
-});
-
-
-// Function to update debug display
-function updateDebugDisplay() {
-  if (!debugDisplay) return;
-  
-  const playerPos = controls.object.position.clone();
-  let nearestObjectInfo = 'None';
-  let nearestSitPosInfo = 'None';
-  
-  if (nearCouch) {
-    const objPos = new Vector3();
-    nearCouch.getWorldPosition(objPos);
-    const distance = playerPos.distanceTo(objPos);
-    nearestObjectInfo = `${nearCouch.userData.type}\nPosition: ${objPos.x.toFixed(2)}, ${objPos.y.toFixed(2)}, ${objPos.z.toFixed(2)}\nDistance: ${distance.toFixed(2)}`;
-  }
-  
-  if (nearSittingPosition) {
-    const sitPos = new Vector3();
-    nearSittingPosition.getWorldPosition(sitPos);
-    const distance = playerPos.distanceTo(sitPos);
-    nearestSitPosInfo = `For: ${nearSittingPosition.userData.forCouch}\nPosition: ${sitPos.x.toFixed(2)}, ${sitPos.y.toFixed(2)}, ${sitPos.z.toFixed(2)}\nDistance: ${distance.toFixed(2)}`;
-  }
-  
-  debugDisplay.textContent = 
-`Player Position: ${playerPos.x.toFixed(2)}, ${playerPos.y.toFixed(2)}, ${playerPos.z.toFixed(2)}
-Sitting: ${isSitting ? 'Yes' : 'No'}
-Nearest Seatable Object: ${nearestObjectInfo}
-Nearest Sitting Position: ${nearestSitPosInfo}`;
-}
-
-
-function getObjectDropTransform(objectId: string) {
-  const preferredAnchor = findBestDropAnchor(objectId);
-  if (preferredAnchor) {
-    return {
-      objectId,
-      ownerSessionId: null,
-      position: {
-        x: preferredAnchor.position.x,
-        y: preferredAnchor.position.y,
-        z: preferredAnchor.position.z,
-      },
-      rotation: {
-        yaw: preferredAnchor.yaw,
-        pitch: 0,
-      },
-    };
-  }
-
-  const dropRaycaster = new Raycaster();
-  const cameraDirection = new Vector3();
-  camera.getWorldDirection(cameraDirection);
-  dropRaycaster.set(camera.position, cameraDirection);
-
-  const intersectsNavmesh = dropRaycaster.intersectObjects(collidableMeshList, false);
-  let dropPosition: Vector3;
-
-  if (intersectsNavmesh.length > 0 && intersectsNavmesh[0].distance < pickupDistance * 1.5) {
-    dropPosition = intersectsNavmesh[0].point.clone();
-    dropPosition.y += 0.1;
-  } else {
-    const forwardVector = new Vector3(0, 0, -1);
-    forwardVector.applyQuaternion(camera.quaternion);
-    dropPosition = camera.position.clone().add(forwardVector.multiplyScalar(pickupDistance * 0.75));
-    dropPosition.y = camera.position.y - standingHeight + 0.01;
-  }
-
-  return {
-    objectId,
-    ownerSessionId: null,
-    position: {
-      x: dropPosition.x,
-      y: dropPosition.y,
-      z: dropPosition.z,
-    },
-    rotation: {
-      yaw: camera.rotation.y,
-      pitch: 0,
-    },
-  };
-}
-
-function applyObjectSnapshot(snapshot: { objectId: string; ownerSessionId: string | null; position: { x: number; y: number; z: number }; rotation: { yaw: number; pitch: number } | null }) {
-  const objectRoot = pickableObjectMap.get(snapshot.objectId);
-  if (!objectRoot) {
-    return;
-  }
-
-  const activeAnimation = activeObjectAnimations.get(snapshot.objectId);
-  if (snapshot.ownerSessionId) {
-    if (activeAnimation) {
-      activeObjectAnimations.delete(snapshot.objectId);
-    }
-    if (heldObjectId === snapshot.objectId) {
-      return;
-    }
-    objectRoot.visible = false;
-    return;
-  }
-
-  if (activeAnimation) {
-    activeAnimation.endPosition.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
-    activeAnimation.endQuaternion.setFromEuler(new Euler(0, snapshot.rotation?.yaw ?? 0, 0, 'YXZ'));
-    return;
-  }
-
-  if (heldObjectId === snapshot.objectId && heldObject) {
-    heldObject.parent?.remove(heldObject);
-    scene.add(heldObject);
-    heldObject = null;
-    heldObjectId = null;
-  }
-
-  objectRoot.visible = true;
-  if (objectRoot.parent !== scene) {
-    objectRoot.parent?.remove(objectRoot);
-    scene.add(objectRoot);
-  }
-  objectRoot.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
-  if (snapshot.rotation) {
-    objectRoot.rotation.set(0, snapshot.rotation.yaw, 0);
-  }
-}
-
-function pickupObjectById(objectId: string) {
-  const objectRoot = pickableObjectMap.get(objectId);
-  if (!objectRoot || heldObject) {
-    return false;
-  }
-
-  activeObjectAnimations.delete(objectId);
-  clearObjectRootHighlight(objectRoot);
-  if (hoveredObject?.userData.objectId === objectId) {
-    clearMeshHighlight(hoveredObject);
-    hoveredObject = null;
-  }
-  heldObject = objectRoot;
-  heldObjectId = objectId;
-  objectRoot.visible = true;
-  if (heldObject.parent) {
-    heldObject.parent.remove(heldObject);
-  }
-  camera.add(heldObject);
-  heldObject.position.copy(heldObjectOffset);
-  heldObject.rotation.set(0, 0, 0);
-  return true;
-}
-
-function dropHeldObjectLocally() {
-  if (!heldObject) {
-    heldObjectId = null;
-    return;
-  }
-
-  const worldPosition = new Vector3();
-  const worldQuaternion = new Quaternion();
-  heldObject.getWorldPosition(worldPosition);
-  heldObject.getWorldQuaternion(worldQuaternion);
-  heldObject.parent?.remove(heldObject);
-  scene.add(heldObject);
-  heldObject.position.copy(worldPosition);
-  heldObject.quaternion.copy(worldQuaternion);
-  heldObject = null;
-  heldObjectId = null;
-}
-
-function applyLobbyCamera(delta: number) {
-  lobbyCameraTime += delta;
-  controls.object.position.copy(lobbyCameraPosition);
-  controls.object.rotation.set(0, lobbyCameraTime * lobbyCameraYawSpeed, 0);
-  camera.rotation.x = 0;
-}
+window.__musicspaceOccupySeat = (seatId: string) => sceneInteractionFeature?.occupySeat(seatId) ?? false;
+window.__musicspaceReleaseSeat = () => {
+  sceneInteractionFeature?.releaseSeat();
+};
+window.__musicspaceGetObjectState = () => sceneInteractionFeature?.getObjectState() ?? {
+  hoveredObjectId: null,
+  heldObjectId: null,
+};
+window.__musicspaceOccupyObject = (objectId: string) => sceneInteractionFeature?.occupyObject(objectId) ?? false;
+window.__musicspaceApplyObjectSnapshot = (snapshot) => {
+  sceneInteractionFeature?.applyObjectSnapshot(snapshot);
+};
 
 function setSceneMode(nextMode: SceneMode) {
   if (sceneMode === nextMode) {
@@ -1840,21 +1143,7 @@ function setSceneMode(nextMode: SceneMode) {
   mobileControlsFeature?.reset();
 
   if (nextMode === 'lobby') {
-    if (isSitting) {
-      performStandAction();
-    } else {
-      currentSeatId = null;
-      nearSittingPosition = null;
-      nearCouch = null;
-      interactionPrompt.style.display = 'none';
-      closeButton.style.display = 'none';
-    }
-    if (hoveredObject) {
-      clearMeshHighlight(hoveredObject);
-      hoveredObject = null;
-    }
-    dropHeldObjectLocally();
-    renderer.domElement.style.cursor = 'auto';
+    sceneInteractionFeature?.handleSceneModeChange('lobby');
     mobileControlsFeature?.setVisible(false);
     lobbyOverlay.classList.add('is-visible');
     applyLobbyCamera(0);
@@ -1863,6 +1152,7 @@ function setSceneMode(nextMode: SceneMode) {
 
   mobileControlsFeature?.setVisible(true);
   lobbyOverlay.classList.remove('is-visible');
+  sceneInteractionFeature?.handleSceneModeChange('room');
   renderer.domElement.style.cursor = isTouchDevice ? 'auto' : 'grab';
 }
 
@@ -1870,54 +1160,9 @@ window.__musicspaceSetLobbyMode = (enabled) => {
   setSceneMode(enabled ? 'lobby' : 'room');
 };
 
-// PICKUP interaction
 window.addEventListener('mousedown', (event) => {
-  if (sceneMode !== 'room') {
-    return;
-  }
-
-  let actionTaken = false;
-
-  if (heldObject && heldObjectId) {
-    const clickedObjectId = getClickedPickableObjectId();
-    if (clickedObjectId !== heldObjectId) {
-      const releasingObjectId = heldObjectId;
-      const dropTransform = getObjectDropTransform(releasingObjectId);
-      startObjectReleaseAnimation(dropTransform);
-      if (window.__musicspaceRequestObjectRelease) {
-        window.__musicspaceRequestObjectRelease(releasingObjectId, dropTransform);
-      }
-      actionTaken = true;
-    }
-  } else {
-    if (event.target === renderer.domElement && !(event.target as HTMLElement).closest('#audioControls')) {
-      if (hoveredObject && hoveredObject.userData.pickableGLBRoot) {
-        const objectId = hoveredObject.userData.objectId as string | undefined;
-        if (objectId && window.__musicspaceRequestObjectClaim) {
-          const requestSent = window.__musicspaceRequestObjectClaim(objectId);
-          if (requestSent) {
-            actionTaken = true;
-          } else {
-            actionTaken = pickupObjectById(objectId);
-          }
-        } else if (objectId) {
-          actionTaken = pickupObjectById(objectId);
-        }
-      }
-    }
-  }
-
-  if (actionTaken) {
-    event.preventDefault();
-  }
+  sceneInteractionFeature?.handlePointerDown(event);
 });
-
-window.__musicspaceGetObjectState = () => ({
-  hoveredObjectId: sceneMode === 'room' ? (hoveredObject?.userData.objectId as string | undefined) ?? null : null,
-  heldObjectId: sceneMode === 'room' ? heldObjectId : null,
-});
-window.__musicspaceOccupyObject = (objectId: string) => sceneMode === 'room' ? pickupObjectById(objectId) : false;
-window.__musicspaceApplyObjectSnapshot = applyObjectSnapshot;
 
 // WASD movement + collision
 const moveState = { forward: false, backward: false, left: false, right: false };
@@ -1961,20 +1206,20 @@ document.addEventListener('focusin', (event) => {
      return;
    }
 
-   // Handle sitting/standing with E and W keys
-   if (e.code === 'KeyE' && nearSittingPosition && !isSitting) {
-     requestSeatClaim();
+      // Handle sitting/standing with E and W keys
+   if (e.code === 'KeyE' && sceneInteractionFeature?.hasNearbySeat() && !sceneInteractionFeature.isSitting()) {
+     sceneInteractionFeature.requestSeatClaim();
      return;
    }
    
-if (e.code === 'KeyW' && isSitting) {
-     requestSeatRelease();
+if (e.code === 'KeyW' && sceneInteractionFeature?.isSitting()) {
+     sceneInteractionFeature.requestSeatRelease();
      console.log(`Standing. Player at:`, controls.object.position, `Facing Yaw:`, controls.object.rotation.y, `Pitch:`, camera.rotation.x);
      return;
    }
    
    // Only allow movement if not sitting
-   if (!isSitting) {
+   if (!sceneInteractionFeature?.isSitting()) {
      if (e.code === 'KeyW') moveState.forward = true;
      if (e.code === 'KeyS') moveState.backward = true;
      if (e.code === 'KeyA') moveState.left = true;
@@ -1991,7 +1236,7 @@ if (e.code === 'KeyW' && isSitting) {
      return;
    }
 
-   if (!isSitting) {
+   if (!sceneInteractionFeature?.isSitting()) {
      if (e.code === 'KeyW') moveState.forward = false;
      if (e.code === 'KeyS') moveState.backward = false;
      if (e.code === 'KeyA') moveState.left = false;
@@ -2017,10 +1262,7 @@ const delta = clock.getDelta();
 
 // ——— spin the held object ———
 
-if (heldObject) {
- heldObject.rotation.y += delta * spinSpeed;
-}
-updateObjectReleaseAnimations(performance.now());
+sceneInteractionFeature?.update(delta, performance.now());
 if (sceneMode === 'lobby') {
   applyLobbyCamera(delta);
 }
@@ -2067,47 +1309,8 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
     });
   } */
 
-  // Hover highlight detection - uses mouseForHover updated by pointermove
-  if (sceneMode === 'room') {
-    raycaster.setFromCamera(mouseForHover, camera);
-    const hoverHits = raycaster.intersectObjects<Mesh>(interactiveObjects, true);
-
-    if (hoverHits.length > 0 && hoverHits[0].distance <= pickupDistance) {
-      const intersectedMesh = hoverHits[0].object as Mesh;
-      // Ensure we are highlighting a mesh that is part of a pickable GLB root
-      if (intersectedMesh.userData.pickableGLBRoot) {
-        const pickablePart = intersectedMesh; // The mesh itself is what gets the emissive color
-        const hoveredObjectId = pickablePart.userData.objectId as string | undefined;
-        if (hoveredObjectId === heldObjectId) {
-          if (hoveredObject) {
-            clearMeshHighlight(hoveredObject);
-            hoveredObject = null;
-          }
-        } else if (pickablePart !== hoveredObject) {
-          if (hoveredObject) {
-            clearMeshHighlight(hoveredObject);
-          }
-          hoveredObject = pickablePart;
-          const mat = hoveredObject.material as MeshStandardMaterial;
-          mat.emissive = new Color(0x00ff00); // Highlight current
-          mat.emissiveIntensity = 0.5;
-        }
-      } else if (hoveredObject) { // If hovering over something not pickable, or too far
-        clearMeshHighlight(hoveredObject);
-        hoveredObject = null;
-      }
-    } else if (hoveredObject) { // No hits or hit is too far
-      clearMeshHighlight(hoveredObject);
-      hoveredObject = null;
-    }
-  } else if (hoveredObject) {
-    clearMeshHighlight(hoveredObject);
-    hoveredObject = null;
-  }
-
   // Movement & collision
-  if (sceneMode === 'room' && collidableMeshList.length > 0 && !isSitting) {
-    //const delta = clock.getDelta();
+  if (sceneMode === 'room' && collidableMeshList.length > 0 && !sceneInteractionFeature?.isSitting()) {
     velocity.x -= velocity.x * 10.0 * delta;
     velocity.z -= velocity.z * 10.0 * delta;
 
@@ -2137,56 +1340,8 @@ const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, hi
       controls.object.position.copy(oldPos);
     }
 
-    applyRemoteAvatarSeparation();
-    
-    // Check for proximity AND facing to sitting positions
-    let isNearAnySittingPosition = false;
-    if (sittingPositionObjects.length > 0) {
-      const playerPosition = controls.object.position.clone();
-      const cameraDir = new Vector3();
-      camera.getWorldDirection(cameraDir);
-      
-      for (const sitPos of sittingPositionObjects) {
-        const sitPosition = new Vector3();
-        sitPos.getWorldPosition(sitPosition);
-        
-        const toSit = sitPosition.clone().sub(playerPosition).normalize();
-        const distance = playerPosition.distanceTo(sitPosition);
-        const isFacing = cameraDir.dot(toSit) > 0.5; // threshold for facing
-        
-        if (distance < proximityDistance && isFacing) {
-          isNearAnySittingPosition = true;
-          nearSittingPosition = sitPos;
-          
-          // Find the associated couch for reference
-          const couchType = sitPos.userData.forCouch;
-          scene.traverse((object: Object3D) => {
-            if (object.userData && object.userData.type === couchType) {
-              nearCouch = object;
-            }
-          });
-          
-          // Show interaction button
-          interactionPrompt.textContent = 'Sit';
-          interactionPrompt.style.display = 'block';
-          break;
-        }
-      }
-      
-      if (!isNearAnySittingPosition) {
-        nearSittingPosition = null;
-        nearCouch = null;
-        interactionPrompt.style.display = 'none';
-      }
-    }
-  } else if (sceneMode !== 'room') {
-    nearSittingPosition = null;
-    nearCouch = null;
-    interactionPrompt.style.display = 'none';
+    sceneInteractionFeature?.applyRemoteAvatarSeparation();
   }
-
-  // Update debug display
-  updateDebugDisplay();
 
   ambientSceneFeature?.update(tvReactiveLevels);
   
@@ -2197,4 +1352,11 @@ animate();
 //updateNowPlaying();
 //setInterval(updateNowPlaying, 30000);
 } // End of initializeApp function
+
+
+
+
+
+
+
 
