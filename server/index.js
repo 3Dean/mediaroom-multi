@@ -58,6 +58,10 @@ const hydratedSurfaceRooms = new Set();
 const chatRateLimits = new Map();
 const roomAuthorities = new Map(Object.entries(loadFallbackAuthorityStore()).map(([roomId, authority]) => [roomId, normalizeRoomAuthority(authority)]));
 const jwksCache = new Map();
+const persistenceHealth = {
+  authority: createPersistenceStatus(canUseBackendPersistence(), 'fallback-only'),
+  surface: createPersistenceStatus(canUseSurfaceBackendPersistence(), 'memory-only'),
+};
 
 const server = createServer((request, response) => {
   if (request.url === '/health') {
@@ -73,8 +77,10 @@ const server = createServer((request, response) => {
       spawnPoints: SPAWN_POINTS.length,
       authorityRooms: roomAuthorities.size,
       surfaceRooms: roomSurfaces.size,
-      authorityPersistence: canUseBackendPersistence() ? 'backend+fallback' : 'fallback-only',
-      surfacePersistence: canUseSurfaceBackendPersistence() ? 'backend' : 'memory-only',
+      authorityPersistence: describePersistenceStatus(persistenceHealth.authority, 'backend+fallback'),
+      surfacePersistence: describePersistenceStatus(persistenceHealth.surface, 'backend'),
+      authorityPersistenceStatus: persistenceHealth.authority,
+      surfacePersistenceStatus: persistenceHealth.surface,
       cognitoIssuer: COGNITO_ISSUER || null,
     }));
     return;
@@ -143,10 +149,12 @@ wss.on('close', () => clearInterval(heartbeat));
 if (HOST) {
   server.listen(PORT, HOST, () => {
     logServerStart();
+    void probePersistenceHealth();
   });
 } else {
   server.listen(PORT, () => {
     logServerStart();
+    void probePersistenceHealth();
   });
 }
 
@@ -160,7 +168,7 @@ function logServerStart() {
     maxChatLength: MAX_CHAT_LENGTH,
     chatRate: `${CHAT_MAX_MESSAGES}/${CHAT_WINDOW_MS}ms`,
     allowedOrigins: ALLOWED_ORIGINS.length === 0 ? 'all' : ALLOWED_ORIGINS,
-    authorityPersistence: canUseBackendPersistence() ? 'backend+fallback' : 'fallback-only',
+    authorityPersistence: describePersistenceStatus(persistenceHealth.authority, 'backend+fallback'),
     cognitoIssuer: COGNITO_ISSUER || 'disabled',
     logLevel: LOG_LEVEL,
   });
@@ -1013,8 +1021,10 @@ async function ensureRoomSurfaces(roomId) {
     hydratedSurfaceRooms.add(roomId);
     try {
       roomSurfaces.set(roomId, await loadSurfaceSnapshotsFromBackend(roomId));
+      markPersistenceHealthy(persistenceHealth.surface);
     } catch (error) {
       hydratedSurfaceRooms.delete(roomId);
+      markPersistenceDegraded(persistenceHealth.surface, error);
       logEvent('error', 'surface.hydrate.failed', {
         roomId,
         error: formatErrorForLog(error),
@@ -1047,12 +1057,14 @@ function ensureRoomAuthority(roomId) {
 async function hydrateRoomAuthority(roomId) {
   try {
     const persisted = await loadAuthorityFromBackend(roomId);
+    markPersistenceHealthy(persistenceHealth.authority);
     if (persisted) {
       roomAuthorities.set(roomId, persisted);
       persistFallbackAuthorityStore(roomAuthorities);
       return persisted;
     }
   } catch (error) {
+    markPersistenceDegraded(persistenceHealth.authority, error);
     logEvent('error', 'authority.hydrate.failed', {
       roomId,
       error: formatErrorForLog(error),
@@ -1069,12 +1081,14 @@ async function persistRoomAuthority(roomId, options = {}) {
 
   try {
     const persisted = await saveAuthorityToBackend(roomId, authority, options);
+    markPersistenceHealthy(persistenceHealth.authority);
     if (persisted) {
       roomAuthorities.set(roomId, persisted);
       persistFallbackAuthorityStore(roomAuthorities);
       return persisted;
     }
   } catch (error) {
+    markPersistenceDegraded(persistenceHealth.authority, error);
     logEvent('error', 'authority.persist.failed', {
       roomId,
       error: formatErrorForLog(error),
@@ -1088,14 +1102,42 @@ async function persistRoomAuthority(roomId, options = {}) {
 async function persistRoomSurface(roomId, surface) {
   try {
     const persisted = await saveSurfaceSnapshotToBackend(roomId, surface);
+    markPersistenceHealthy(persistenceHealth.surface);
     return persisted ?? surface;
   } catch (error) {
+    markPersistenceDegraded(persistenceHealth.surface, error);
     logEvent('error', 'surface.persist.failed', {
       roomId,
       surfaceId: surface.surfaceId,
       error: formatErrorForLog(error),
     });
     return surface;
+  }
+}
+
+async function probePersistenceHealth() {
+  if (persistenceHealth.authority.configured) {
+    try {
+      await loadAuthorityFromBackend('__healthcheck__');
+      markPersistenceHealthy(persistenceHealth.authority);
+    } catch (error) {
+      markPersistenceDegraded(persistenceHealth.authority, error);
+      logEvent('warn', 'authority.healthcheck.failed', {
+        error: formatErrorForLog(error),
+      });
+    }
+  }
+
+  if (persistenceHealth.surface.configured) {
+    try {
+      await loadSurfaceSnapshotsFromBackend('__healthcheck__');
+      markPersistenceHealthy(persistenceHealth.surface);
+    } catch (error) {
+      markPersistenceDegraded(persistenceHealth.surface, error);
+      logEvent('warn', 'surface.healthcheck.failed', {
+        error: formatErrorForLog(error),
+      });
+    }
   }
 }
 
@@ -1496,6 +1538,48 @@ function formatErrorForLog(error) {
   };
 }
 
+function createPersistenceStatus(configured, fallbackMode) {
+  return {
+    configured,
+    mode: configured ? 'verifying' : fallbackMode,
+    lastCheckedAt: null,
+    lastError: null,
+  };
+}
+
+function markPersistenceHealthy(status) {
+  if (!status.configured) {
+    return;
+  }
+
+  status.mode = 'available';
+  status.lastCheckedAt = new Date().toISOString();
+  status.lastError = null;
+}
+
+function markPersistenceDegraded(status, error) {
+  if (!status.configured) {
+    return;
+  }
+
+  status.mode = 'degraded';
+  status.lastCheckedAt = new Date().toISOString();
+  status.lastError = formatErrorForLog(error);
+}
+
+function describePersistenceStatus(status, healthyLabel) {
+  if (!status.configured) {
+    return status.mode;
+  }
+  if (status.mode === 'available') {
+    return healthyLabel;
+  }
+  if (status.mode === 'verifying') {
+    return `${healthyLabel}:verifying`;
+  }
+  return `${healthyLabel}:degraded`;
+}
+
 async function getSigningKey(kid) {
   const cached = jwksCache.get(kid);
   if (cached) {
@@ -1529,6 +1613,8 @@ function deriveCognitoIssuer(userPoolId) {
   const [region] = userPoolId.split('_');
   return `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
 }
+
+
 
 
 

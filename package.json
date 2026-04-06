@@ -7,8 +7,12 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "smoke": "node scripts/smoke-health.mjs",
+    "verify": "npm run build && npm run smoke:health && npm run smoke:realtime",
     "realtime": "node server/index.js",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "smoke:health": "node scripts/smoke-health.mjs",
+    "smoke:realtime": "node scripts/smoke-realtime.mjs"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.16.1",
