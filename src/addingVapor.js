@@ -1,12 +1,9 @@
-import * as THREE from 'three';
-// GLTFLoader will be passed from main.ts, so we don't need to import it here if main.ts already does.
-// However, if we want this module to be self-contained in terms of its own GLTF loading logic (even if it uses the loader instance from main),
-// it's good practice to declare its dependencies. For now, we'll assume gltfLoader is passed.
+import { AdditiveBlending, Box3, BufferAttribute, BufferGeometry, Points, RepeatWrapping, ShaderMaterial, TextureLoader, Vector3 } from 'three';
 
 // --- Sprite sheet texture ---
-const textureLoader = new THREE.TextureLoader();
+const textureLoader = new TextureLoader();
 const vaporTexture = textureLoader.load('/images/vaporsprite4x4.png'); // Ensure this path is correct from project root
-vaporTexture.wrapS = vaporTexture.wrapT = THREE.RepeatWrapping;
+vaporTexture.wrapS = vaporTexture.wrapT = RepeatWrapping;
 
 // --- Set the number of frames ---
 const tilesHoriz = 2; // Number of columns in sprite sheet (quadrants)
@@ -14,7 +11,7 @@ const tilesVert = 2;  // Number of rows
 const totalFrames = 4; // Only 4 quadrant frames
 
 // --- Particle geometry ---
-const vaporGeometry = new THREE.BufferGeometry();
+const vaporGeometry = new BufferGeometry();
 const count = 4; // Number of vapor particles
 
 const positions = new Float32Array(count * 3);
@@ -26,14 +23,14 @@ for (let i = 0; i < count; i++) {
   offsets[i] = Math.random() * totalFrames;
 }
 
-vaporGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-vaporGeometry.setAttribute('offset', new THREE.BufferAttribute(offsets, 1));
+vaporGeometry.setAttribute('position', new BufferAttribute(positions, 3));
+vaporGeometry.setAttribute('offset', new BufferAttribute(offsets, 1));
 
 // --- Shader material ---
-const vaporMaterial = new THREE.ShaderMaterial({
+const vaporMaterial = new ShaderMaterial({
   transparent: true,
   depthWrite: false,
-  blending: THREE.AdditiveBlending,
+  blending: AdditiveBlending,
   uniforms: {
     map: { value: vaporTexture },
     time: { value: 0 },
@@ -93,12 +90,12 @@ const vaporMaterial = new THREE.ShaderMaterial({
 
 export function addVaporToCoffee(targetObject) {
   // Compute bounding box to position vapor
-  const box = new THREE.Box3().setFromObject(targetObject);
-  const center = box.getCenter(new THREE.Vector3());
+  const box = new Box3().setFromObject(targetObject);
+  const center = box.getCenter(new Vector3());
   const maxY = box.max.y;
 
   // Create vapor emitter points
-  const vaporParticles = new THREE.Points(vaporGeometry, vaporMaterial);
+  const vaporParticles = new Points(vaporGeometry, vaporMaterial);
   vaporParticles.position.set(center.x, maxY + 0.1, center.z); // Adjust as needed
 
   // Add vapor to the target object's parent
@@ -107,4 +104,3 @@ export function addVaporToCoffee(targetObject) {
   console.log('✅ Vapor effect added to target object.');
   return vaporMaterial;
 }
-

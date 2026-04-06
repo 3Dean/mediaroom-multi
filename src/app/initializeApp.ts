@@ -54,10 +54,6 @@ import { addVaporToCoffee } from '../addingVapor.js'; // Import the vapor functi
 import { animateFlowers, initializeWindEffectOnModel } from '../wind'; // Import wind animation
 import { loadPreferences } from '../preferences/preferencesStore';
 import type { RoomSurfaceSnapshot } from '../types/room';
-//import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
-//import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
-//import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
-//import { Vector3, Euler, Object3D } from 'three';
 import * as THREE from 'three';
 
 // --- TOUCH CONTROL VARIABLES ---

@@ -1,6 +1,6 @@
-import * as THREE from 'three';
+import { Mesh, type Object3D } from 'three';
 
-export const flowerParts: THREE.Mesh[] = [];
+export const flowerParts: Mesh[] = [];
 
 export const windSettings = {
   strength: 0.1, // Further adjusted for more subtle movement
@@ -59,9 +59,9 @@ export function animateFlowers(time: number) {
 }
 
 // Helper function to initialize wind effect on a model's parts
-export function initializeWindEffectOnModel(modelNode: THREE.Object3D, modelName?: string) {
+export function initializeWindEffectOnModel(modelNode: Object3D, modelName?: string) {
     modelNode.traverse(function (node) {
-        if (node instanceof THREE.Mesh) { 
+        if (node instanceof Mesh) { 
             node.userData.originalPosition = node.position.clone();
             node.userData.originalRotation = node.rotation.clone();
             node.userData.windOffset = Math.random() * Math.PI * 2;

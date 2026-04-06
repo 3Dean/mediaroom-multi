@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import { Box3, CanvasTexture, CapsuleGeometry, Group, Mesh, MeshStandardMaterial, Scene, Sprite, SpriteMaterial, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import type { PlayerPresence } from '../types/player';
 
@@ -12,13 +12,13 @@ const AVATAR_STYLE_TRANSFORMS: Record<string, { modelPath: string; scale: { x: n
   signal: { modelPath: '/models/avatar_signal.glb', scale: { x: 0.7, y: 0.7, z: 0.7 }, offsetY: 0.3 },
 };
 const loader = new GLTFLoader();
-const avatarTemplateCache = new Map<string, Promise<THREE.Group | null>>();
+const avatarTemplateCache = new Map<string, Promise<Group | null>>();
 
 export class RemotePlayerManager {
-  private readonly avatars = new Map<string, THREE.Group>();
-  private readonly scene: THREE.Scene;
+  private readonly avatars = new Map<string, Group>();
+  private readonly scene: Scene;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: Scene) {
     this.scene = scene;
   }
 
@@ -58,19 +58,19 @@ export class RemotePlayerManager {
     this.avatars.clear();
   }
 
-  private ensureAvatar(participant: PlayerPresence, selfSessionId: string | null): THREE.Group {
+  private ensureAvatar(participant: PlayerPresence, selfSessionId: string | null): Group {
     const existing = this.avatars.get(participant.sessionId);
     if (existing) {
       this.configureAvatar(existing, participant, selfSessionId);
       return existing;
     }
 
-    const group = new THREE.Group();
+    const group = new Group();
     group.name = `remote-player-${participant.sessionId}`;
 
     const labelTexture = createNameLabelTexture(participant.displayName);
-    const label = new THREE.Sprite(
-      new THREE.SpriteMaterial({
+    const label = new Sprite(
+      new SpriteMaterial({
         map: labelTexture,
         transparent: true,
       }),
@@ -86,7 +86,7 @@ export class RemotePlayerManager {
     return group;
   }
 
-  private configureAvatar(group: THREE.Group, participant: PlayerPresence, selfSessionId: string | null): void {
+  private configureAvatar(group: Group, participant: PlayerPresence, selfSessionId: string | null): void {
     const desiredStyle = participant.avatarStyle ?? null;
     if (group.userData.avatarStyle === desiredStyle) {
       return;
@@ -129,13 +129,13 @@ export class RemotePlayerManager {
   }
 }
 
-function createFallbackAvatar(color: number): THREE.Group {
-  const group = new THREE.Group();
+function createFallbackAvatar(color: number): Group {
+  const group = new Group();
   group.name = 'avatar-visual';
 
-  const body = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.22, 0.9, 4, 8),
-    new THREE.MeshStandardMaterial({
+  const body = new Mesh(
+    new CapsuleGeometry(0.22, 0.9, 4, 8),
+    new MeshStandardMaterial({
       color,
       roughness: 0.6,
     }),
@@ -145,14 +145,14 @@ function createFallbackAvatar(color: number): THREE.Group {
   return group;
 }
 
-function loadAvatarTemplate(path: string): Promise<THREE.Group | null> {
+function loadAvatarTemplate(path: string): Promise<Group | null> {
   const cached = avatarTemplateCache.get(path);
   if (cached) {
     return cached;
   }
 
-  const pending = new Promise<THREE.Group | null>((resolve) => {
-    loader.load(path, (gltf: { scene: THREE.Group }) => {
+  const pending = new Promise<Group | null>((resolve) => {
+    loader.load(path, (gltf: { scene: Group }) => {
       const avatarRoot = gltf.scene.clone(true);
       normalizeAvatarRoot(avatarRoot);
       resolve(avatarRoot);
@@ -163,10 +163,10 @@ function loadAvatarTemplate(path: string): Promise<THREE.Group | null> {
   return pending;
 }
 
-function normalizeAvatarRoot(root: THREE.Group): void {
-  const bounds = new THREE.Box3().setFromObject(root);
-  const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
+function normalizeAvatarRoot(root: Group): void {
+  const bounds = new Box3().setFromObject(root);
+  const size = new Vector3();
+  const center = new Vector3();
   bounds.getSize(size);
   bounds.getCenter(center);
 
@@ -176,21 +176,21 @@ function normalizeAvatarRoot(root: THREE.Group): void {
     root.updateMatrixWorld(true);
   }
 
-  const scaledBounds = new THREE.Box3().setFromObject(root);
-  const scaledCenter = new THREE.Vector3();
+  const scaledBounds = new Box3().setFromObject(root);
+  const scaledCenter = new Vector3();
   scaledBounds.getCenter(scaledCenter);
   const minY = scaledBounds.min.y;
   root.position.set(-scaledCenter.x, -minY, -scaledCenter.z);
 }
 
-function createNameLabelTexture(displayName: string): THREE.CanvasTexture {
+function createNameLabelTexture(displayName: string): CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 64;
 
   const context = canvas.getContext('2d');
   if (!context) {
-    return new THREE.CanvasTexture(canvas);
+    return new CanvasTexture(canvas);
   }
 
   context.clearRect(0, 0, canvas.width, canvas.height);
@@ -204,7 +204,7 @@ function createNameLabelTexture(displayName: string): THREE.CanvasTexture {
   context.textBaseline = 'middle';
   context.fillText(displayName, canvas.width / 2, canvas.height / 2);
 
-  const texture = new THREE.CanvasTexture(canvas);
+  const texture = new CanvasTexture(canvas);
   texture.needsUpdate = true;
   return texture;
 }

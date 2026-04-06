@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import { Vector3 } from 'three';
 import { APP_CONFIG } from './config';
 import {
   confirmSignUpWithEmail,
@@ -918,7 +918,7 @@ function getLocalPlayerTransform(): PlayerTransform | null {
     return null;
   }
 
-  const worldPosition = new THREE.Vector3();
+  const worldPosition = new Vector3();
   camera.getWorldPosition(worldPosition);
 
   return {
