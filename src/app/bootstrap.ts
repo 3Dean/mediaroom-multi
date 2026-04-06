@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { APP_CONFIG } from './config';
-import { initializeApp } from './initializeApp';
 import {
   confirmSignUpWithEmail,
   getAuthenticatedUser,
@@ -9,9 +8,7 @@ import {
   signOutCurrentUser,
   signUpWithEmail,
 } from '../backend/authClient';
-import { uploadRoomSurfaceImage } from '../backend/surfaceImageClient';
-import { uploadRoomTvVideo } from '../backend/tvMediaClient';
-import { RemotePlayerManager } from '../player/remotePlayerManager';
+import type { RemotePlayerManager } from '../player/remotePlayerManager';
 import { RoomClient } from '../room/roomClient';
 import { applyServerMessage } from '../room/roomPresence';
 import { RoomSessionStore } from '../room/roomSession';
@@ -34,6 +31,10 @@ const sessionStore = new RoomSessionStore();
 export function bootstrapApp(): void {
   window.addEventListener('DOMContentLoaded', async () => {
     const sidebarPanels = initializeSidebarLayout();
+    const [{ initializeApp }, { RemotePlayerManager }] = await Promise.all([
+      import('./initializeApp'),
+      import('../player/remotePlayerManager'),
+    ]);
     initializeApp();
 
     let currentUser = await getAuthenticatedUser();
@@ -521,6 +522,7 @@ export function bootstrapApp(): void {
           throw new Error('Shared surfaces are available only in saved rooms.');
         }
 
+        const { uploadRoomSurfaceImage } = await import('../backend/surfaceImageClient');
         const imagePath = await uploadRoomSurfaceImage(activeSession.roomId, surfaceId, file);
         roomClient.send({
           type: 'admin.setSurfaceImage',
@@ -563,6 +565,7 @@ export function bootstrapApp(): void {
           throw new Error('Shared TV is available only in saved rooms.');
         }
 
+        const { uploadRoomTvVideo } = await import('../backend/tvMediaClient');
         const sourceUrl = await uploadRoomTvVideo(activeSession.roomId, file);
         roomClient.send({
           type: 'admin.setTvMedia',
