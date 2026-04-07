@@ -1062,19 +1062,64 @@ body.mouse #mobile-controls-layer {
   position: sticky;
   top: 0;
   z-index: 3;
-  padding: 14px 14px 12px;
+  padding: 10px 10px 12px;
   display: grid;
   gap: 10px;
   background: linear-gradient(180deg, rgba(10, 12, 18, 0.96), rgba(10, 12, 18, 0.82));
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+#musicspace-sidebar-brand {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border-radius: 18px;
+  line-height: 0;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+#musicspace-sidebar-brand img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 #musicspace-sidebar-scroll {
   min-height: 0;
+  flex: 1 1 auto;
   overflow-y: auto;
   padding: 14px;
   display: grid;
   gap: 14px;
+}
+
+#musicspace-sidebar-footer {
+  flex: 0 0 auto;
+  padding: 12px 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(10, 12, 18, 0.22), rgba(10, 12, 18, 0.72));
+}
+
+.musicspace-sidebar-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  color: rgba(223, 231, 242, 0.72);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.musicspace-sidebar-footer-links a,
+.musicspace-sidebar-footer-links span {
+  color: inherit;
+  text-decoration: none;
+}
+
+.musicspace-sidebar-footer-links a:hover {
+  color: #ffffff;
+  text-decoration: underline;
 }
 
 #musicspace-primary-panels,
@@ -1715,9 +1760,14 @@ select.musicspace-input:focus {
   }
 
   #musicspace-sidebar-scroll,
-  #musicspace-sidebar-sticky {
+  #musicspace-sidebar-sticky,
+  #musicspace-sidebar-footer {
     padding-left: 12px;
     padding-right: 12px;
+  }
+
+  #musicspace-sidebar-brand {
+    border-radius: 16px;
   }
 
   .musicspace-card,
