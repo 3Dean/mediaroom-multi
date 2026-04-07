@@ -1,27 +1,4 @@
-// Function to toggle light helpers visibility
-/* function toggleLightHelpers() {
-  if (lightHelpers.length === 0) {
-    console.log("No light helpers to toggle");
-    return;
-  }
-  
-  // Toggle visibility of all helpers
-  let currentState = null;
-  
-  // Get current state from first helper
-  if (lightHelpers[0]) {
-    currentState = lightHelpers[0].visible;
-  }
-  
-  // Toggle to opposite state
-  const newState = (currentState === null) ? true : !currentState;
-  
-  lightHelpers.forEach(helper => {
-    helper.visible = newState;
-  });
-  
-  console.log(`Light helpers ${newState ? 'shown' : 'hidden'}`);
-} */
+
 // Extend the Window interface to include customLights
 declare global {
   interface Window {
@@ -1351,11 +1328,3 @@ animate();
 //updateNowPlaying();
 //setInterval(updateNowPlaying, 30000);
 } // End of initializeApp function
-
-
-
-
-
-
-
-

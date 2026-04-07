@@ -1,0 +1,743 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>Terms of Service</title><style>
+/* cspell:disable-file */
+/* webkit printing magic: print all background colors */
+html {
+	-webkit-print-color-adjust: exact;
+}
+* {
+	box-sizing: border-box;
+	-webkit-print-color-adjust: exact;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+@media only screen {
+	body {
+		margin: 2em auto;
+		max-width: 900px;
+		color: rgb(55, 53, 47);
+	}
+}
+
+body {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+a,
+a.visited {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.pdf-relative-link-path {
+	font-size: 80%;
+	color: #444;
+}
+
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+/* Override strong tags inside headings to maintain consistent weight */
+h1 strong,
+h2 strong,
+h3 strong {
+	font-weight: 600;
+}
+
+.page-title {
+	font-size: 2.5rem;
+	font-weight: 700;
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+h1 {
+	font-size: 1.875rem;
+	margin-top: 1.875rem;
+}
+
+h2 {
+	font-size: 1.5rem;
+	margin-top: 1.5rem;
+}
+
+h3 {
+	font-size: 1.25rem;
+	margin-top: 1.25rem;
+}
+
+.source {
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	padding: 1.5em;
+	word-break: break-all;
+}
+
+.callout {
+	border-radius: 10px;
+	padding: 1rem;
+}
+
+figure {
+	margin: 1.25em 0;
+	page-break-inside: avoid;
+}
+
+figcaption {
+	opacity: 0.5;
+	font-size: 85%;
+	margin-top: 0.5em;
+}
+
+mark {
+	background-color: transparent;
+}
+
+.indented {
+	padding-left: 1.5em;
+}
+
+hr {
+	background: transparent;
+	display: block;
+	width: 100%;
+	height: 1px;
+	visibility: visible;
+	border: none;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+img {
+	max-width: 100%;
+}
+
+@media only print {
+	img {
+		max-height: 100vh;
+		object-fit: contain;
+	}
+
+	table.collection-content {
+		width: 100%;
+		table-layout: fixed;
+	}
+
+	table.collection-content th,
+	table.collection-content td {
+		overflow-wrap: anywhere;
+	}
+
+	table.collection-content td > .user,
+	table.collection-content td > time {
+		white-space: pre-wrap;
+	}
+}
+
+@page {
+	margin: 1in;
+}
+
+.collection-content-wrapper {
+	overflow-x: auto;
+}
+
+@media only print {
+	.collection-content-wrapper {
+		overflow-x: visible;
+	}
+}
+
+.collection-content {
+	font-size: 0.875rem;
+}
+
+.collection-content td {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.column-list {
+	display: flex;
+	gap: 46px;
+}
+
+.column {
+	min-width: 0;
+	overflow: hidden;
+}
+
+.column > *:first-child {
+	margin-top: 0;
+}
+
+.table_of_contents-item {
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.3;
+	padding: 0.125rem;
+}
+
+.table_of_contents-indent-1 {
+	margin-left: 1.5rem;
+}
+
+.table_of_contents-indent-2 {
+	margin-left: 3rem;
+}
+
+.table_of_contents-indent-3 {
+	margin-left: 4.5rem;
+}
+
+.table_of_contents-link {
+	text-decoration: none;
+	opacity: 0.7;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
+}
+
+table,
+th,
+td {
+	border: 1px solid rgba(55, 53, 47, 0.09);
+	border-collapse: collapse;
+}
+
+table {
+	border-left: none;
+	border-right: none;
+}
+
+th,
+td {
+	font-weight: normal;
+	padding: 0.25em 0.5em;
+	line-height: 1.5;
+	min-height: 1.5em;
+	text-align: left;
+}
+
+th {
+	color: rgba(55, 53, 47, 0.6);
+}
+
+ol,
+ul {
+	margin: 0;
+	margin-block-start: 0.6em;
+	margin-block-end: 0.6em;
+}
+
+li > ol:first-child,
+li > ul:first-child {
+	margin-block-start: 0.6em;
+}
+
+ul > li {
+	list-style: disc;
+}
+
+ul.to-do-list {
+	padding-inline-start: 0;
+}
+
+ul.to-do-list > li {
+	list-style: none;
+}
+
+.to-do-children-checked {
+	text-decoration: line-through;
+	opacity: 0.375;
+}
+
+ul.toggle > li {
+	list-style: none;
+}
+
+ul {
+	padding-inline-start: 1.7em;
+}
+
+ul > li {
+	padding-left: 0.1em;
+}
+
+ol {
+	padding-inline-start: 1.6em;
+}
+
+ol.numbered-list.numbered-list-digits-2 {
+	padding-inline-start: 2em;
+}
+
+ol.numbered-list.numbered-list-digits-3plus {
+	padding-inline-start: 2.4em;
+}
+
+ol > li {
+	padding-left: 0.2em;
+}
+
+.mono ol {
+	padding-inline-start: 2em;
+}
+
+.mono ol > li {
+	text-indent: -0.4em;
+}
+
+.toggle {
+	padding-inline-start: 0em;
+	list-style-type: none;
+}
+
+/* Indent toggle children */
+.toggle > li > details {
+	padding-left: 1.7em;
+}
+
+.toggle > li > details > summary {
+	margin-left: -1.1em;
+}
+
+.selected-value {
+	display: inline-block;
+	padding: 0 0.5em;
+	background: rgba(206, 205, 202, 0.5);
+	border-radius: 3px;
+	margin-right: 0.5em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	white-space: nowrap;
+}
+
+.collection-title {
+	display: inline-block;
+	margin-right: 1em;
+}
+
+.page-description {
+	margin-bottom: 2em;
+}
+
+.simple-table {
+	margin-top: 1em;
+	font-size: 0.875rem;
+	empty-cells: show;
+}
+.simple-table td {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table th {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table-header-color {
+	background: rgb(247, 246, 243);
+	color: black;
+}
+.simple-table-header {
+	font-weight: 500;
+}
+
+time {
+	opacity: 0.5;
+}
+
+.icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	max-width: 1.2em;
+	max-height: 1.2em;
+	text-decoration: none;
+	vertical-align: text-bottom;
+	margin-right: 0.5em;
+}
+
+img.icon {
+	border-radius: 3px;
+}
+
+.callout img.notion-static-icon {
+	width: 1em;
+	height: 1em;
+}
+
+.callout p {
+	margin: 0;
+}
+
+.callout h1,
+.callout h2,
+.callout h3 {
+	margin: 0 0 0.6rem;
+}
+
+.user-icon {
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 100%;
+	margin-right: 0.5rem;
+}
+
+.user-icon-inner {
+	font-size: 0.8em;
+}
+
+.text-icon {
+	border: 1px solid #000;
+	text-align: center;
+}
+
+.page-cover-image {
+	display: block;
+	object-fit: cover;
+	width: 100%;
+	max-height: 30vh;
+}
+
+.page-header-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+
+.page-header-icon-with-cover {
+	margin-top: -0.72em;
+	margin-left: 0.07em;
+}
+
+.page-header-icon img {
+	border-radius: 3px;
+}
+
+.link-to-page {
+	margin: 1em 0;
+	padding: 0;
+	border: none;
+	font-weight: 500;
+}
+
+p > .user {
+	opacity: 0.5;
+}
+
+td > .user,
+td > time {
+	white-space: nowrap;
+}
+
+input[type="checkbox"] {
+	transform: scale(1.5);
+	margin-right: 0.6em;
+	vertical-align: middle;
+}
+
+p {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+.image {
+	border: none;
+	margin: 1.5em 0;
+	padding: 0;
+	border-radius: 0;
+	text-align: center;
+}
+
+.code,
+code {
+	background: rgba(135, 131, 120, 0.15);
+	border-radius: 3px;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 85%;
+	tab-size: 2;
+}
+
+code {
+	color: #eb5757;
+}
+
+.code {
+	padding: 1.5em 1em;
+}
+
+.code-wrap {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.code > code {
+	background: none;
+	padding: 0;
+	font-size: 100%;
+	color: inherit;
+}
+
+blockquote {
+	font-size: 1em;
+	margin: 1em 0;
+	padding-left: 1em;
+	border-left: 3px solid rgb(55, 53, 47);
+}
+
+blockquote.quote-large {
+	font-size: 1.25em;
+}
+
+.bookmark {
+	text-decoration: none;
+	max-height: 8em;
+	padding: 0;
+	display: flex;
+	width: 100%;
+	align-items: stretch;
+}
+
+.bookmark-title {
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 1.75em;
+	white-space: nowrap;
+}
+
+.bookmark-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.bookmark-info {
+	flex: 4 1 180px;
+	padding: 12px 14px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.bookmark-image {
+	width: 33%;
+	flex: 1 1 180px;
+	display: block;
+	position: relative;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.bookmark-description {
+	color: rgba(55, 53, 47, 0.6);
+	font-size: 0.75em;
+	overflow: hidden;
+	max-height: 4.5em;
+	word-break: break-word;
+}
+
+.bookmark-href {
+	font-size: 0.75em;
+	margin-top: 0.25em;
+}
+
+.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
+.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
+.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
+.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
+.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
+.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
+.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
+.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
+.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
+.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
+.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
+.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.highlight-default {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.highlight-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.highlight-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.highlight-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.highlight-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.highlight-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.highlight-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.highlight-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.highlight-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.highlight-default_background {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray_background {
+	background: rgba(42, 28, 0, 0.07);
+}
+.highlight-brown_background {
+	background: rgba(139, 46, 0, 0.086);
+}
+.highlight-orange_background {
+	background: rgba(224, 101, 1, 0.129);
+}
+.highlight-yellow_background {
+	background: rgba(211, 168, 0, 0.137);
+}
+.highlight-teal_background {
+	background: rgba(0, 100, 45, 0.09);
+}
+.highlight-blue_background {
+	background: rgba(0, 124, 215, 0.094);
+}
+.highlight-purple_background {
+	background: rgba(102, 0, 178, 0.078);
+}
+.highlight-pink_background {
+	background: rgba(197, 0, 93, 0.086);
+}
+.highlight-red_background {
+	background: rgba(223, 22, 0, 0.094);
+}
+.block-color-default {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.block-color-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.block-color-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.block-color-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.block-color-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.block-color-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.block-color-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.block-color-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.block-color-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.block-color-default_background {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray_background {
+	background: rgba(240, 239, 237, 1);
+}
+.block-color-brown_background {
+	background: rgba(245, 237, 233, 1);
+}
+.block-color-orange_background {
+	background: rgba(251, 235, 222, 1);
+}
+.block-color-yellow_background {
+	background: rgba(249, 243, 220, 1);
+}
+.block-color-teal_background {
+	background: rgba(232, 241, 236, 1);
+}
+.block-color-blue_background {
+	background: rgba(229, 242, 252, 1);
+}
+.block-color-purple_background {
+	background: rgba(243, 235, 249, 1);
+}
+.block-color-pink_background {
+	background: rgba(250, 233, 241, 1);
+}
+.block-color-red_background {
+	background: rgba(252, 233, 231, 1);
+}
+.select-value-color-default { background-color: rgba(42, 28, 0, 0.07); }
+.select-value-color-gray { background-color: rgba(28, 19, 1, 0.11); }
+.select-value-color-brown { background-color: rgba(127, 51, 0, 0.156); }
+.select-value-color-orange { background-color: rgba(196, 88, 0, 0.203); }
+.select-value-color-yellow { background-color: rgba(209, 156, 0, 0.282); }
+.select-value-color-green { background-color: rgba(0, 96, 38, 0.156); }
+.select-value-color-blue { background-color: rgba(0, 118, 217, 0.203); }
+.select-value-color-purple { background-color: rgba(92, 0, 163, 0.141); }
+.select-value-color-pink { background-color: rgba(183, 0, 78, 0.152); }
+.select-value-color-red { background-color: rgba(206, 24, 0, 0.164); }
+
+.checkbox {
+	display: inline-flex;
+	vertical-align: text-bottom;
+	width: 16;
+	height: 16;
+	background-size: 16px;
+	margin-left: 2px;
+	margin-right: 5px;
+}
+
+.checkbox-on {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+
+.checkbox-off {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+	
+</style></head><body><article id="33b58aa1-92c1-80d4-9b5a-e821436b47c5" class="page sans"><header><h1 class="page-title" dir="auto">Terms of Service</h1><p class="page-description" dir="auto"></p></header><div class="page-body"><div style="display:contents" dir="auto"><h1 id="33b58aa1-92c1-80db-bf61-e4d885617c76" class="">Terms of Service</h1></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-800d-9b22-d7bd6634d8ab" class=""><strong>Effective date:</strong> April, 7 2026</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8032-a905-f893322435c4" class="">Welcome to MediaRoom. These Terms of Service (“Terms”) govern your access to and use of https://mediaroom-multi.onrender.com/ and related rooms, features, content, and services (the “Service”).</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80d0-ba4b-e9c39ce64de6" class="">By accessing or using the Service, you agree to these Terms.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8083-b5a7-e2169e0ff999" class="">1. Eligibility</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80a0-b510-dd80e84f0cce" class="">You must be at least 13 years old to use the Service. If you are under the age of majority in your jurisdiction, you may use the Service only with permission from a parent or legal guardian.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-80a8-896d-cc5d6af55220" class="">2. Use of the Service</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80e6-ac95-c03097d9ac85" class="">You agree to use the Service only for lawful purposes and in a way that does not harm the Service, other users, or third parties.</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80ba-bbdd-f94f4fdf9054" class="">You may not:</p></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8017-9d08-f916eaae97ff" class="bulleted-list"><li style="list-style-type:disc">violate any law or regulation</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80ea-a7be-f61c0d392759" class="bulleted-list"><li style="list-style-type:disc">infringe intellectual property or privacy rights</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80f5-a6a3-f80eed3324e4" class="bulleted-list"><li style="list-style-type:disc">upload or share unlawful, abusive, defamatory, harassing, hateful, fraudulent, or sexually explicit content</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80f7-89ef-d597bd793348" class="bulleted-list"><li style="list-style-type:disc">distribute spam, malware, or harmful code</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80ed-b2e6-f90d34839e55" class="bulleted-list"><li style="list-style-type:disc">interfere with security, stability, or operation of the Service</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-800d-872d-e430a064e3c9" class="bulleted-list"><li style="list-style-type:disc">attempt unauthorized access to accounts, rooms, systems, or data</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8020-bcd3-ca9ace5d49d4" class="bulleted-list"><li style="list-style-type:disc">scrape, copy, or exploit the Service except as permitted by law or with our written permission</li></ul></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-80cb-a46b-f61cfcfca2f0" class="">3. Accounts and User Responsibility</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-806c-a120-c7030586e12d" class="">If the Service allows accounts, you are responsible for maintaining the confidentiality of your login credentials and for activity under your account.</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8092-995f-fc5400779d1d" class="">You agree to provide accurate information and keep it reasonably up to date.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8077-ab6d-dd627d32d1a4" class="">4. User Content</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-804f-8ce8-c23ac15467cb" class="">You may be able to submit, upload, stream, post, or share content through the Service (“User Content”).</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80df-8a0e-fe5ff330324d" class="">You retain ownership of your User Content. However, by submitting User Content through the Service, you grant us a limited, non-exclusive, worldwide, royalty-free license to host, store, reproduce, display, and transmit that content only as needed to operate, improve, and provide the Service.</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8093-9c23-ce867c200465" class="">You are solely responsible for your User Content and represent that you have the rights needed to post or share it.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-805a-9296-d5335181d059" class="">5. Shared Rooms and Community Features</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8044-97a3-f8b90d34cdb8" class="">If the Service includes rooms, chat, shared audio, or collaborative spaces:</p></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8034-92f0-f3b29798f5f7" class="bulleted-list"><li style="list-style-type:disc">content and activity you share in a room may be visible to other participants</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8012-aed1-cad2f2968b5b" class="bulleted-list"><li style="list-style-type:disc">you are responsible for what you say, upload, or share</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80b8-b808-c878c1939400" class="bulleted-list"><li style="list-style-type:disc">we may remove content or restrict access if we believe it violates these Terms, creates risk, or harms users or the Service</li></ul></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8098-8db7-cb32522a6374" class="">6. Intellectual Property</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8063-8ee8-d9dc9e7472f1" class="">The Service, including its design, branding, software, text, graphics, and other materials, is owned by us or our licensors and is protected by intellectual property laws.</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8098-ad68-dcb550235e91" class="">Except for the limited right to use the Service under these Terms, no rights are granted to you.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8033-acf6-d81033e059bc" class="">7. Third-Party Services and Links</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-803d-8eb9-c9bc93002cbc" class="">The Service may integrate with or link to third-party services, content, or tools. We are not responsible for third-party services or their terms, policies, or content.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-808a-92cc-c211042433e2" class="">8. Availability and Changes</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80fe-9a24-c06af7e63a03" class="">We may modify, suspend, or discontinue any part of the Service at any time, with or without notice.</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80f0-9791-d4ffb6795806" class="">We do not guarantee that the Service will always be available, uninterrupted, secure, or error-free.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-800d-b4af-ff0ef76624f1" class="">9. Disclaimer</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80e1-8bb4-ff87916019c1" class="">The Service is provided “as is” and “as available” without warranties of any kind, express or implied, including warranties of merchantability, fitness for a particular purpose, non-infringement, and availability.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-80cd-9d0b-f39ce2bca698" class="">10. Limitation of Liability</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8062-b9aa-dc2a34c4ea98" class="">To the fullest extent permitted by law, we will not be liable for any indirect, incidental, special, consequential, exemplary, or punitive damages, or for any loss of data, profits, goodwill, or business opportunities arising out of or related to your use of the Service.</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8004-9766-cea4c694e29b" class="">If we are found liable for any claim arising out of the Service, our total liability will not exceed the greater of: (a) the amount you paid us for the Service in the 12 months before the claim, or (b) USD $100.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8026-af19-d452b1d95caa" class="">11. Indemnification</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8027-b6df-fb57cb151f52" class="">You agree to indemnify and hold harmless MediaRoom and its operators from claims, damages, liabilities, and expenses arising out of your use of the Service, your User Content, or your violation of these Terms.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8068-86dd-d06c0bd0f06f" class="">12. Termination</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8045-a009-ea2a2e016068" class="">We may suspend or terminate your access to the Service at any time if we believe you violated these Terms, created risk, or misused the Service.</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80a8-8738-f8cb7bf21956" class="">You may stop using the Service at any time.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-801c-ae88-c79eaf06169d" class="">13. Changes to These Terms</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8004-8366-e9f0bddd59f7" class="">We may update these Terms from time to time. If we make material changes, we will update the effective date and may provide additional notice.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8033-8d54-e521cefa43c3" class="">14. Governing Law</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80a4-8211-cf0a53ad45a8" class="">These Terms are governed by the laws of the State of [Your State], without regard to conflict of laws principles.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-80bc-bc3e-f2988ce37ae8" class="">15. Contact</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8099-90d1-d27c9804f626" class="">Questions about these Terms may be sent to:</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-807f-a0de-d4838c4ce699" class="">[Company / Project Name]</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-802a-b2a9-c50cd01ed683" class="">[Email Address]</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8046-89dd-d11a55c614e3" class="">[Mailing Address, if applicable]</p></div></div></article><span class="sans" style="font-size:14px;padding-top:2em"></span></body></html>

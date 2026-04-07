@@ -1,0 +1,743 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>Privacy Policy</title><style>
+/* cspell:disable-file */
+/* webkit printing magic: print all background colors */
+html {
+	-webkit-print-color-adjust: exact;
+}
+* {
+	box-sizing: border-box;
+	-webkit-print-color-adjust: exact;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+@media only screen {
+	body {
+		margin: 2em auto;
+		max-width: 900px;
+		color: rgb(55, 53, 47);
+	}
+}
+
+body {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+a,
+a.visited {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.pdf-relative-link-path {
+	font-size: 80%;
+	color: #444;
+}
+
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+/* Override strong tags inside headings to maintain consistent weight */
+h1 strong,
+h2 strong,
+h3 strong {
+	font-weight: 600;
+}
+
+.page-title {
+	font-size: 2.5rem;
+	font-weight: 700;
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+h1 {
+	font-size: 1.875rem;
+	margin-top: 1.875rem;
+}
+
+h2 {
+	font-size: 1.5rem;
+	margin-top: 1.5rem;
+}
+
+h3 {
+	font-size: 1.25rem;
+	margin-top: 1.25rem;
+}
+
+.source {
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	padding: 1.5em;
+	word-break: break-all;
+}
+
+.callout {
+	border-radius: 10px;
+	padding: 1rem;
+}
+
+figure {
+	margin: 1.25em 0;
+	page-break-inside: avoid;
+}
+
+figcaption {
+	opacity: 0.5;
+	font-size: 85%;
+	margin-top: 0.5em;
+}
+
+mark {
+	background-color: transparent;
+}
+
+.indented {
+	padding-left: 1.5em;
+}
+
+hr {
+	background: transparent;
+	display: block;
+	width: 100%;
+	height: 1px;
+	visibility: visible;
+	border: none;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+img {
+	max-width: 100%;
+}
+
+@media only print {
+	img {
+		max-height: 100vh;
+		object-fit: contain;
+	}
+
+	table.collection-content {
+		width: 100%;
+		table-layout: fixed;
+	}
+
+	table.collection-content th,
+	table.collection-content td {
+		overflow-wrap: anywhere;
+	}
+
+	table.collection-content td > .user,
+	table.collection-content td > time {
+		white-space: pre-wrap;
+	}
+}
+
+@page {
+	margin: 1in;
+}
+
+.collection-content-wrapper {
+	overflow-x: auto;
+}
+
+@media only print {
+	.collection-content-wrapper {
+		overflow-x: visible;
+	}
+}
+
+.collection-content {
+	font-size: 0.875rem;
+}
+
+.collection-content td {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.column-list {
+	display: flex;
+	gap: 46px;
+}
+
+.column {
+	min-width: 0;
+	overflow: hidden;
+}
+
+.column > *:first-child {
+	margin-top: 0;
+}
+
+.table_of_contents-item {
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.3;
+	padding: 0.125rem;
+}
+
+.table_of_contents-indent-1 {
+	margin-left: 1.5rem;
+}
+
+.table_of_contents-indent-2 {
+	margin-left: 3rem;
+}
+
+.table_of_contents-indent-3 {
+	margin-left: 4.5rem;
+}
+
+.table_of_contents-link {
+	text-decoration: none;
+	opacity: 0.7;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
+}
+
+table,
+th,
+td {
+	border: 1px solid rgba(55, 53, 47, 0.09);
+	border-collapse: collapse;
+}
+
+table {
+	border-left: none;
+	border-right: none;
+}
+
+th,
+td {
+	font-weight: normal;
+	padding: 0.25em 0.5em;
+	line-height: 1.5;
+	min-height: 1.5em;
+	text-align: left;
+}
+
+th {
+	color: rgba(55, 53, 47, 0.6);
+}
+
+ol,
+ul {
+	margin: 0;
+	margin-block-start: 0.6em;
+	margin-block-end: 0.6em;
+}
+
+li > ol:first-child,
+li > ul:first-child {
+	margin-block-start: 0.6em;
+}
+
+ul > li {
+	list-style: disc;
+}
+
+ul.to-do-list {
+	padding-inline-start: 0;
+}
+
+ul.to-do-list > li {
+	list-style: none;
+}
+
+.to-do-children-checked {
+	text-decoration: line-through;
+	opacity: 0.375;
+}
+
+ul.toggle > li {
+	list-style: none;
+}
+
+ul {
+	padding-inline-start: 1.7em;
+}
+
+ul > li {
+	padding-left: 0.1em;
+}
+
+ol {
+	padding-inline-start: 1.6em;
+}
+
+ol.numbered-list.numbered-list-digits-2 {
+	padding-inline-start: 2em;
+}
+
+ol.numbered-list.numbered-list-digits-3plus {
+	padding-inline-start: 2.4em;
+}
+
+ol > li {
+	padding-left: 0.2em;
+}
+
+.mono ol {
+	padding-inline-start: 2em;
+}
+
+.mono ol > li {
+	text-indent: -0.4em;
+}
+
+.toggle {
+	padding-inline-start: 0em;
+	list-style-type: none;
+}
+
+/* Indent toggle children */
+.toggle > li > details {
+	padding-left: 1.7em;
+}
+
+.toggle > li > details > summary {
+	margin-left: -1.1em;
+}
+
+.selected-value {
+	display: inline-block;
+	padding: 0 0.5em;
+	background: rgba(206, 205, 202, 0.5);
+	border-radius: 3px;
+	margin-right: 0.5em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	white-space: nowrap;
+}
+
+.collection-title {
+	display: inline-block;
+	margin-right: 1em;
+}
+
+.page-description {
+	margin-bottom: 2em;
+}
+
+.simple-table {
+	margin-top: 1em;
+	font-size: 0.875rem;
+	empty-cells: show;
+}
+.simple-table td {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table th {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table-header-color {
+	background: rgb(247, 246, 243);
+	color: black;
+}
+.simple-table-header {
+	font-weight: 500;
+}
+
+time {
+	opacity: 0.5;
+}
+
+.icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	max-width: 1.2em;
+	max-height: 1.2em;
+	text-decoration: none;
+	vertical-align: text-bottom;
+	margin-right: 0.5em;
+}
+
+img.icon {
+	border-radius: 3px;
+}
+
+.callout img.notion-static-icon {
+	width: 1em;
+	height: 1em;
+}
+
+.callout p {
+	margin: 0;
+}
+
+.callout h1,
+.callout h2,
+.callout h3 {
+	margin: 0 0 0.6rem;
+}
+
+.user-icon {
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 100%;
+	margin-right: 0.5rem;
+}
+
+.user-icon-inner {
+	font-size: 0.8em;
+}
+
+.text-icon {
+	border: 1px solid #000;
+	text-align: center;
+}
+
+.page-cover-image {
+	display: block;
+	object-fit: cover;
+	width: 100%;
+	max-height: 30vh;
+}
+
+.page-header-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+
+.page-header-icon-with-cover {
+	margin-top: -0.72em;
+	margin-left: 0.07em;
+}
+
+.page-header-icon img {
+	border-radius: 3px;
+}
+
+.link-to-page {
+	margin: 1em 0;
+	padding: 0;
+	border: none;
+	font-weight: 500;
+}
+
+p > .user {
+	opacity: 0.5;
+}
+
+td > .user,
+td > time {
+	white-space: nowrap;
+}
+
+input[type="checkbox"] {
+	transform: scale(1.5);
+	margin-right: 0.6em;
+	vertical-align: middle;
+}
+
+p {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+.image {
+	border: none;
+	margin: 1.5em 0;
+	padding: 0;
+	border-radius: 0;
+	text-align: center;
+}
+
+.code,
+code {
+	background: rgba(135, 131, 120, 0.15);
+	border-radius: 3px;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 85%;
+	tab-size: 2;
+}
+
+code {
+	color: #eb5757;
+}
+
+.code {
+	padding: 1.5em 1em;
+}
+
+.code-wrap {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.code > code {
+	background: none;
+	padding: 0;
+	font-size: 100%;
+	color: inherit;
+}
+
+blockquote {
+	font-size: 1em;
+	margin: 1em 0;
+	padding-left: 1em;
+	border-left: 3px solid rgb(55, 53, 47);
+}
+
+blockquote.quote-large {
+	font-size: 1.25em;
+}
+
+.bookmark {
+	text-decoration: none;
+	max-height: 8em;
+	padding: 0;
+	display: flex;
+	width: 100%;
+	align-items: stretch;
+}
+
+.bookmark-title {
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 1.75em;
+	white-space: nowrap;
+}
+
+.bookmark-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.bookmark-info {
+	flex: 4 1 180px;
+	padding: 12px 14px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.bookmark-image {
+	width: 33%;
+	flex: 1 1 180px;
+	display: block;
+	position: relative;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.bookmark-description {
+	color: rgba(55, 53, 47, 0.6);
+	font-size: 0.75em;
+	overflow: hidden;
+	max-height: 4.5em;
+	word-break: break-word;
+}
+
+.bookmark-href {
+	font-size: 0.75em;
+	margin-top: 0.25em;
+}
+
+.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
+.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
+.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
+.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
+.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
+.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
+.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
+.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
+.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
+.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
+.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
+.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.highlight-default {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.highlight-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.highlight-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.highlight-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.highlight-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.highlight-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.highlight-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.highlight-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.highlight-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.highlight-default_background {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray_background {
+	background: rgba(42, 28, 0, 0.07);
+}
+.highlight-brown_background {
+	background: rgba(139, 46, 0, 0.086);
+}
+.highlight-orange_background {
+	background: rgba(224, 101, 1, 0.129);
+}
+.highlight-yellow_background {
+	background: rgba(211, 168, 0, 0.137);
+}
+.highlight-teal_background {
+	background: rgba(0, 100, 45, 0.09);
+}
+.highlight-blue_background {
+	background: rgba(0, 124, 215, 0.094);
+}
+.highlight-purple_background {
+	background: rgba(102, 0, 178, 0.078);
+}
+.highlight-pink_background {
+	background: rgba(197, 0, 93, 0.086);
+}
+.highlight-red_background {
+	background: rgba(223, 22, 0, 0.094);
+}
+.block-color-default {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.block-color-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.block-color-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.block-color-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.block-color-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.block-color-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.block-color-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.block-color-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.block-color-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.block-color-default_background {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray_background {
+	background: rgba(240, 239, 237, 1);
+}
+.block-color-brown_background {
+	background: rgba(245, 237, 233, 1);
+}
+.block-color-orange_background {
+	background: rgba(251, 235, 222, 1);
+}
+.block-color-yellow_background {
+	background: rgba(249, 243, 220, 1);
+}
+.block-color-teal_background {
+	background: rgba(232, 241, 236, 1);
+}
+.block-color-blue_background {
+	background: rgba(229, 242, 252, 1);
+}
+.block-color-purple_background {
+	background: rgba(243, 235, 249, 1);
+}
+.block-color-pink_background {
+	background: rgba(250, 233, 241, 1);
+}
+.block-color-red_background {
+	background: rgba(252, 233, 231, 1);
+}
+.select-value-color-default { background-color: rgba(42, 28, 0, 0.07); }
+.select-value-color-gray { background-color: rgba(28, 19, 1, 0.11); }
+.select-value-color-brown { background-color: rgba(127, 51, 0, 0.156); }
+.select-value-color-orange { background-color: rgba(196, 88, 0, 0.203); }
+.select-value-color-yellow { background-color: rgba(209, 156, 0, 0.282); }
+.select-value-color-green { background-color: rgba(0, 96, 38, 0.156); }
+.select-value-color-blue { background-color: rgba(0, 118, 217, 0.203); }
+.select-value-color-purple { background-color: rgba(92, 0, 163, 0.141); }
+.select-value-color-pink { background-color: rgba(183, 0, 78, 0.152); }
+.select-value-color-red { background-color: rgba(206, 24, 0, 0.164); }
+
+.checkbox {
+	display: inline-flex;
+	vertical-align: text-bottom;
+	width: 16;
+	height: 16;
+	background-size: 16px;
+	margin-left: 2px;
+	margin-right: 5px;
+}
+
+.checkbox-on {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+
+.checkbox-off {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+	
+</style></head><body><article id="33b58aa1-92c1-80b1-9b57-ce71a4526e7e" class="page sans"><header><h1 class="page-title" dir="auto">Privacy Policy</h1><p class="page-description" dir="auto">We built MediaRoom to be simple and respectful. We do not sell personal information, and we only use the information needed to run the service, keep it secure, and support the features you choose to use.</p></header><div class="page-body"><div style="display:contents" dir="auto"><h1 id="33b58aa1-92c1-805e-b557-f865547be1cd" class="">Privacy Policy</h1></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80d6-81df-e81bdfd7e02e" class=""><strong>Effective date:</strong> April 7, 2026</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80c9-8fd4-e876e47cc70f" class="">MediaRoom (“we,” “us,” or “our”) respects your privacy. This Privacy Policy explains what information we collect, how we use it, and the choices you have when you use https://mediaroom-multi.onrender.com/ and any related rooms, features, or services (the “Service”).</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8025-8e07-de8406548da0" class="">1. Information We Collect</h2></div><div style="display:contents" dir="auto"><h3 id="33b58aa1-92c1-8060-b7e3-fa4b71d0dd77" class="">Information you provide to us</h3></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8032-b6e6-d2afb3bbf6d1" class="">We may collect information you choose to provide, such as:</p></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8037-a41a-f57428620aeb" class="bulleted-list"><li style="list-style-type:disc">name or display name</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8080-b51e-ed0a9ba93e7f" class="bulleted-list"><li style="list-style-type:disc">email address</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80ed-bf65-db660edfa160" class="bulleted-list"><li style="list-style-type:disc">account details</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8010-8b54-d350b5adb3d3" class="bulleted-list"><li style="list-style-type:disc">messages sent through contact forms, support forms, or invites</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80de-ba99-f6c10296bc83" class="bulleted-list"><li style="list-style-type:disc">room names, profile details, or other content you choose to submit</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80bc-99f3-ea2293796194" class="bulleted-list"><li style="list-style-type:disc">media, chat, or other content you choose to upload or share through the Service</li></ul></div><div style="display:contents" dir="auto"><h3 id="33b58aa1-92c1-8007-bf5e-e16806646bb7" class="">Information collected automatically</h3></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8038-8bba-dea1e82ccb07" class="">When you use the Service, we may automatically collect limited technical information, such as:</p></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80d3-878a-e20bb906ced6" class="bulleted-list"><li style="list-style-type:disc">IP address</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80c4-a8a7-d3239384f826" class="bulleted-list"><li style="list-style-type:disc">browser type</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8046-be53-c7c838798101" class="bulleted-list"><li style="list-style-type:disc">device type</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8060-a88d-c83f0828fbdf" class="bulleted-list"><li style="list-style-type:disc">operating system</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8073-b635-cf891fffba82" class="bulleted-list"><li style="list-style-type:disc">referring pages</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-809e-b8e1-d378ab32f59c" class="bulleted-list"><li style="list-style-type:disc">pages viewed</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8093-8cd9-f30d2958138c" class="bulleted-list"><li style="list-style-type:disc">session activity</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80eb-b6dd-ecb11fa43512" class="bulleted-list"><li style="list-style-type:disc">error, crash, and performance logs</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80b7-87b5-fc4fb66c69ea" class="bulleted-list"><li style="list-style-type:disc">cookies or similar technologies used for login, preferences, security, or analytics</li></ul></div><div style="display:contents" dir="auto"><h3 id="33b58aa1-92c1-8054-8dad-dfa3e3c1b17d" class="">Information visible to other users</h3></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80e7-af51-ff49dea89f0f" class="">Depending on how the Service works, some information you provide may be visible to other users, such as:</p></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80c4-bc98-eb79512cd208" class="bulleted-list"><li style="list-style-type:disc">display name</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80cc-98aa-d45cff07b705" class="bulleted-list"><li style="list-style-type:disc">profile image</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8057-9d70-cf82a3dd3d49" class="bulleted-list"><li style="list-style-type:disc">room participation</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-804a-881e-f05923327429" class="bulleted-list"><li style="list-style-type:disc">chat messages or shared content</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80f8-aad5-ff4b343471dd" class="bulleted-list"><li style="list-style-type:disc">activity that is intended to be public or shared within a room</li></ul></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8087-a81f-cc54c09a0d1e" class="">2. How We Use Information</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-801c-9285-ce0150e7bc6b" class="">We use information to:</p></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8068-9aa3-cbc5c2310bb7" class="bulleted-list"><li style="list-style-type:disc">provide, operate, and maintain the Service</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80f0-9c71-ccf336ea14c3" class="bulleted-list"><li style="list-style-type:disc">create and manage rooms or accounts</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8024-a5ff-c9ddf2adf409" class="bulleted-list"><li style="list-style-type:disc">authenticate users and keep the Service secure</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-806e-a7d4-d04e82f6908d" class="bulleted-list"><li style="list-style-type:disc">respond to support requests and communications</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-801a-8ff2-e94e6ecdd145" class="bulleted-list"><li style="list-style-type:disc">improve performance, usability, and reliability</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80ba-907e-fd7e6e444832" class="bulleted-list"><li style="list-style-type:disc">prevent fraud, abuse, spam, and misuse</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-804b-8427-ecf84fec0b59" class="bulleted-list"><li style="list-style-type:disc">comply with legal obligations</li></ul></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-803a-a2a8-c477a56ad49d" class="">We do <strong>not</strong> sell personal information.</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80e5-a441-e29f1e0babba" class="">We do <strong>not</strong> use personal information for behavioral advertising or profiling without consent.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8059-85ab-fac1fb473a1e" class="">3. Sharing of Information</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80c4-8e91-c16984b17bb4" class="">We may share information only in these limited situations:</p></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80fd-88e1-c6d7e4708a97" class="bulleted-list"><li style="list-style-type:disc">with service providers that help us operate the Service, such as hosting, storage, authentication, analytics, or communications providers</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8092-aa5d-e4422a6070b8" class="bulleted-list"><li style="list-style-type:disc">with other users, when information is intentionally shared through room participation, chat, or profile features</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8059-8ceb-c9e659142baf" class="bulleted-list"><li style="list-style-type:disc">when required by law, legal process, or to protect rights, safety, or security</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80f0-9275-d02dbcacbe2c" class="bulleted-list"><li style="list-style-type:disc">as part of a merger, acquisition, asset sale, or business transfer</li></ul></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8048-b097-f532b9aaec6b" class="">4. Cookies and Similar Technologies</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80b0-93ce-d5e681d471ef" class="">We may use cookies or similar technologies to:</p></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-806c-9c93-eb98e6ada5f3" class="bulleted-list"><li style="list-style-type:disc">keep you signed in</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80dc-bc0d-ee8a48582cec" class="bulleted-list"><li style="list-style-type:disc">remember your settings</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80c0-b9e3-dfcd47d6b2b8" class="bulleted-list"><li style="list-style-type:disc">maintain security</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-808f-baff-fcd6f5449f7e" class="bulleted-list"><li style="list-style-type:disc">understand basic usage and performance</li></ul></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-804b-8c9b-ed75dee1de63" class="">You can usually control cookies through your browser settings. Disabling cookies may affect how the Service works.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-80cb-a7ab-d4691b6f3be7" class="">5. Third-Party Services</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80ea-8bdb-ce37cd8ab5a0" class="">The Service may rely on third-party tools or embedded services. Those providers may collect information according to their own privacy policies. We encourage you to review those policies where relevant.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-802a-8f02-ffea1dafd210" class="">6. Data Retention</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-800e-8a24-fa0db11637b4" class="">We keep personal information only as long as reasonably necessary to operate the Service, provide requested features, resolve disputes, maintain security, comply with legal obligations, and enforce our agreements.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-803b-82ea-d5f57dc0a939" class="">7. Your Choices</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80f5-88d2-cc80c8a36903" class="">You may be able to:</p></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-803d-a40d-dd1b2e02f880" class="bulleted-list"><li style="list-style-type:disc">access or update certain account information</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80cb-b2e5-d1367885bbca" class="bulleted-list"><li style="list-style-type:disc">request deletion of your account or personal information</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-8046-b04c-c26e87d301d4" class="bulleted-list"><li style="list-style-type:disc">opt out of non-essential communications</li></ul></div><div style="display:contents" dir="auto"><ul id="33b58aa1-92c1-80b8-b2d9-d649cc7e1ab1" class="bulleted-list"><li style="list-style-type:disc">control cookies through your browser</li></ul></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-809b-b798-ddfaf78777dd" class="">To make a privacy request, contact us at: [privacy@email.com]</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8070-9ddc-f376130ffc2c" class="">8. Do Not Track</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8043-909b-f9d93cda1ef8" class="">At this time, [we do not respond to / we honor where required] browser “Do Not Track” signals. We do not permit third parties to collect personal information across different websites through the Service for their own advertising purposes [unless that changes and is disclosed here].</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-80be-91db-cb65d310916e" class="">9. Children’s Privacy</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-802e-be9a-e478ae33a5ac" class="">The Service is not directed to children under 13, and we do not knowingly collect personal information from children under 13. If you believe a child has provided personal information, contact us and we will take appropriate steps to delete it.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-8029-a8a9-febc95fad1b4" class="">10. Security</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-802a-97dd-ef816c3c7180" class="">We use reasonable administrative, technical, and organizational measures to protect information. However, no method of transmission or storage is completely secure, and we cannot guarantee absolute security.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-80b3-b2ab-da8eea7a9953" class="">11. Changes to This Policy</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80d9-93b8-f9f3268d40fb" class="">We may update this Privacy Policy from time to time. If we make material changes, we will update the effective date and, where appropriate, provide additional notice.</p></div><div style="display:contents" dir="auto"><h2 id="33b58aa1-92c1-80a2-bc03-c0d4ada81da1" class="">12. Contact</h2></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8082-aa0d-df20e7152eef" class="">If you have questions about this Privacy Policy or want to make a privacy request, contact us at:</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8013-a358-df8b58a4d1bc" class="">Studio 10b LLC / Project: MediaRoom</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-8044-bcd7-d0682e722d62" class="">info@studio10b.com</p></div><div style="display:contents" dir="auto"><p id="33b58aa1-92c1-80d1-8496-ff6348025714" class="">Studio 10b LLC, PO BOX 693, Newtown, CT 06470</p></div></div></article><span class="sans" style="font-size:14px;padding-top:2em"></span></body></html>
