@@ -7,9 +7,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vapor</title>
     <style>
+      :root {
+        --musicspace-footer-height: 56px;
+        --musicspace-footer-safe-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+      }
+
+      html,
       body {
         margin: 0;
         overflow: hidden;
+        min-height: 100%;
+        font-family: Arial, Helvetica, sans-serif;
       }
 
       canvas {
@@ -93,9 +101,100 @@
         top: 0;
         left: 0;
         width: 100vw;
-        height: 100vh;
+        height: calc(100vh - var(--musicspace-footer-height));
         z-index: 0;
         pointer-events: auto;
+      }
+
+      #musicspace-footer {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 10001;
+        height: var(--musicspace-footer-height);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        box-sizing: border-box;
+        padding: 0 32px var(--musicspace-footer-safe-bottom);
+        background: rgba(10, 12, 20, 0.94);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(18px);
+        pointer-events: auto;
+      }
+
+      .musicspace-footer-brand {
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .musicspace-footer-brand img {
+        display: block;
+        height: 20.8px;
+        width: auto;
+      }
+
+      .musicspace-footer-links {
+        display: inline-flex;
+        align-items: center;
+        gap: 28px;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 14px;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .musicspace-footer-links a,
+      .musicspace-footer-links span {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .musicspace-footer-links a:hover {
+        text-decoration: underline;
+      }
+
+      @media (max-width: 900px) {
+        :root {
+          --musicspace-footer-height: 72px;
+        }
+
+        #musicspace-footer {
+          padding-left: 18px;
+          padding-right: 18px;
+          gap: 12px;
+        }
+
+        .musicspace-footer-links {
+          gap: 16px;
+          font-size: 12px;
+        }
+
+        .musicspace-footer-brand img {
+          height: 17.6px;
+        }
+      }
+
+      @media (max-width: 640px) {
+        :root {
+          --musicspace-footer-height: 92px;
+        }
+
+        #musicspace-footer {
+          flex-direction: column;
+          justify-content: center;
+          align-items: flex-start;
+          padding-top: 10px;
+        }
+
+        .musicspace-footer-links {
+          width: 100%;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
       }
     </style>
   </head>
@@ -156,6 +255,18 @@
       <button id="musicspace-sidebar-toggle" type="button" aria-expanded="true" aria-controls="musicspace-sidebar">Hide</button>
     </div>
     <audio id="audioPlayer" src=""></audio>
+    <footer id="musicspace-footer" aria-label="Site footer">
+      <div class="musicspace-footer-brand">
+        <a href="https://www.somafm.com" target="_blank" rel="noreferrer noopener" aria-label="Visit SomaFM">
+          <img src="/somafm-logo.svg" alt="SomaFM" />
+        </a>
+      </div>
+      <div class="musicspace-footer-links">
+        <span>&copy;Studio 10b LLC. 2026. All rights reserved.</span>
+        <a href="#" aria-label="Privacy policy">Privacy</a>
+        <a href="#" aria-label="Terms of service">Terms</a>
+      </div>
+    </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
