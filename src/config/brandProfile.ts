@@ -78,7 +78,7 @@ export const somaFmBrandProfile: BrandProfile = {
       drone: { label: 'Drone', background: { path: '/images/equirectangular-drone.jpg', rotationDegrees: 0 } },
       dubstep: { label: 'Dubstep', background: { path: '/images/equirectangular-dubstep.jpg', rotationDegrees: -60 } },
       indie: { label: 'Indie', background: { path: '/images/equirectangular-indie.jpg', rotationDegrees: -124 } },
-      jazz: { label: 'Jazz', background: { path: '/images/equirectangular-jazz.jpg', rotationDegrees: 15 } },
+      jazz: { label: 'Jazz', background: { path: '/images/equirectangular-jazz.jpg', rotationDegrees: 3 } },
       metal: { label: 'Metal', background: { path: '/images/equirectangular-metal.jpg', rotationDegrees: 20 } },
       space: { label: 'Space', background: { path: '/images/equirectangular-space.jpg', rotationDegrees: -110 } },
     },
