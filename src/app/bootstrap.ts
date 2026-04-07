@@ -24,12 +24,14 @@ import { RoomPanel } from '../ui/roomPanel';
 import { loadPreferences, resetPreferences, savePreferences } from '../preferences/preferencesStore';
 import type { UserPreferences } from '../preferences/preferencesModel';
 import type { RoomSummary, RoomSurfaceId } from '../types/room';
+import { activeBrandProfile } from '../config/brandProfile';
 
 const roomState = new RoomStateStore();
 const sessionStore = new RoomSessionStore();
 
 export function bootstrapApp(): void {
   window.addEventListener('DOMContentLoaded', async () => {
+    const brandProfile = activeBrandProfile;
     const sidebarPanels = initializeSidebarLayout();
     const [{ initializeApp }, { RemotePlayerManager }] = await Promise.all([
       import('./initializeApp'),
@@ -52,10 +54,10 @@ export function bootstrapApp(): void {
 
     const updateLobbyOverlay = () => {
       if (currentUser?.signInDetails?.loginId) {
-        (window as any).__musicspaceSetLobbyOverlaySupport?.('Choose a room or create one from the sidebar.');
+        (window as any).__musicspaceSetLobbyOverlaySupport?.(brandProfile.lobby.heroSignedInSupportHtml);
         return;
       }
-      (window as any).__musicspaceSetLobbyOverlaySupport?.('Sign in to create a saved room with ownership and moderation controls.');
+      (window as any).__musicspaceSetLobbyOverlaySupport?.(brandProfile.lobby.heroSupportHtml);
     };
 
     const participantList = new ParticipantList({

@@ -50,6 +50,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
 let controls: any;
 import { loadPreferences } from '../preferences/preferencesStore';
+import { activeBrandProfile, getBrandBackgroundConfig, getBrandStationOptions } from '../config/brandProfile';
 import type { RoomSurfaceSnapshot } from '../types/room';
 import type { MobileControlsFeature } from './mobileControlsFeature';
 import type { AmbientSceneFeature } from './scene/ambientSceneFeature';
@@ -104,27 +105,10 @@ let sceneInteractionFeaturePromise: Promise<SceneInteractionFeature> | null = nu
 
 // Scene + Camera + Renderer
 const scene = new Scene();
+const brandProfile = activeBrandProfile;
+const brandStations = brandProfile.audio.stations;
+const defaultBackgroundMood = brandProfile.audio.defaultStationMood;
 const backgroundTextureLoader = new TextureLoader();
-type BackgroundConfig = {
-  path: string;
-  rotationDegrees: number;
-};
-const defaultBackgroundConfig: BackgroundConfig = {
-  path: '/images/equirectangular-chill.jpg',
-  rotationDegrees: 0,
-};
-const moodBackgroundConfigs: Record<string, BackgroundConfig> = {
-  beat: { path: '/images/equirectangular-beat.jpg', rotationDegrees: 8 },
-  chill: { path: '/images/equirectangular-chill.jpg', rotationDegrees: 15 },
-  dark: { path: '/images/equirectangular-dark.jpg', rotationDegrees: 0 },
-  defcon: { path: '/images/equirectangular-defcon.jpg', rotationDegrees: 200 },
-  drone: { path: '/images/equirectangular-drone.jpg', rotationDegrees: 0 },
-  dubstep: { path: '/images/equirectangular-dubstep.jpg', rotationDegrees: -60 },
-  indie: { path: '/images/equirectangular-indie.jpg', rotationDegrees: -124 },
-  jazz: { path: '/images/equirectangular-jazz.jpg', rotationDegrees: 15 },
-  metal: { path: '/images/equirectangular-metal.jpg', rotationDegrees: 20 },
-  space: { path: '/images/equirectangular-space.jpg', rotationDegrees: -110 },
-};
 const backgroundTextureCache = new Map<string, Texture>();
 
 async function resolveStorageAssetUrl(path: string) {
@@ -141,7 +125,7 @@ function resolveBackgroundMood(mood: string) {
 
 function applyMoodBackground(mood: string) {
   const effectiveMood = resolveBackgroundMood(mood);
-  const config = moodBackgroundConfigs[effectiveMood] ?? defaultBackgroundConfig;
+  const config = getBrandBackgroundConfig(effectiveMood, brandProfile);
   (scene as any).backgroundRotation = new Euler(0, MathUtils.degToRad(config.rotationDegrees), 0);
 
   const cachedTexture = backgroundTextureCache.get(config.path);
@@ -186,15 +170,15 @@ lobbyOverlay.className = 'is-visible';
 
 const lobbyOverlayEyebrow = document.createElement('div');
 lobbyOverlayEyebrow.className = 'lobby-overlay-eyebrow';
-lobbyOverlayEyebrow.textContent = 'MediaRoom';
+lobbyOverlayEyebrow.textContent = brandProfile.lobby.heroBrandLine;
 
 const lobbyOverlayHeadline = document.createElement('div');
 lobbyOverlayHeadline.className = 'lobby-overlay-headline';
-lobbyOverlayHeadline.innerHTML = 'Step into<br>the session';
+lobbyOverlayHeadline.innerHTML = brandProfile.lobby.heroHeadlineHtml;
 
 const lobbyOverlaySupport = document.createElement('div');
 lobbyOverlaySupport.className = 'lobby-overlay-support';
-  lobbyOverlaySupport.textContent = 'Sign in to create a saved room with ownership and moderation controls.';
+  lobbyOverlaySupport.innerHTML = brandProfile.lobby.heroSupportHtml;
 
 lobbyOverlay.append(lobbyOverlayEyebrow, lobbyOverlayHeadline, lobbyOverlaySupport);
 
@@ -205,7 +189,7 @@ if (appDiv) {
 }
 
 window.__musicspaceSetLobbyOverlaySupport = (message: string) => {
-  lobbyOverlaySupport.textContent = message;
+  lobbyOverlaySupport.innerHTML = message;
 };
 
 // Listen for pointer move to update hover detection coordinates
@@ -377,7 +361,7 @@ if (!audioControlsContainer) {
 
 // Create play/pause button
 const playButton = document.createElement('button');
-playButton.textContent = 'Play Music';
+playButton.textContent = brandProfile.audio.playButtonLabel;
 playButton.className = 'musicspace-button musicspace-button--primary';
 playButton.style.padding = '8px 12px';
 playButton.style.backgroundColor = '#9e552f';
@@ -389,24 +373,13 @@ playButton.style.fontWeight = 'bold';
 playButton.style.fontSize = '11px';
 audioControlsContainer.appendChild(playButton);
 
-// Create SomaFM station buttons
-const somaStations = [
-  { name: 'Groove Salad (Chill)', stream: 'https://ice4.somafm.com/groovesalad-128-mp3', info: 'https://api.somafm.com/channels/groovesalad.json', mood: 'chill' },
-  { name: 'Secret Agent (Jazz)', stream: 'https://ice6.somafm.com/secretagent-128-mp3', info: 'https://api.somafm.com/channels/secretagent.json', mood: 'jazz' },
-  { name: 'Metal Detector (Metal)', stream: 'https://ice1.somafm.com/metal-128-mp3', info: 'https://api.somafm.com/channels/metal.json', mood: 'metal' },
-  { name: 'Drone Zone', stream: 'https://ice1.somafm.com/dronezone-128-mp3', info: 'https://api.somafm.com/channels/dronezone.json', mood: 'drone' },
-  { name: 'DEF CON Radio', stream: 'https://ice4.somafm.com/defcon-128-mp3', info: 'https://api.somafm.com/channels/defcon.json', mood: 'defcon' },
-  { name: 'Beat Blender', stream: 'https://ice2.somafm.com/beatblender-128-mp3', info: 'https://api.somafm.com/channels/beatblender.json', mood: 'beat' },
-  { name: 'Doomed (Dark)', stream: 'https://ice6.somafm.com/doomed-128-mp3', info: 'https://api.somafm.com/channels/doomed.json', mood: 'dark' },
-  { name: 'Dub Step Beyond', stream: 'https://ice2.somafm.com/dubstep-128-mp3', info: 'https://api.somafm.com/channels/dubstep.json', mood: 'dubstep' },
-  { name: 'Indie Pop Rocks', stream: 'https://ice1.somafm.com/indiepop-128-mp3', info: 'https://api.somafm.com/channels/indiepop.json', mood: 'indie' },
-  { name: 'Mission Control', stream: 'https://ice6.somafm.com/missioncontrol-128-mp3', info: 'https://api.somafm.com/channels/missioncontrol.json', mood: 'space' }
-];
+// Create brand station options
+const stationOptions = getBrandStationOptions(brandProfile);
 
 // Dropdown to select station
 const stationSelect = document.createElement('select');
 stationSelect.className = 'musicspace-input';
-window.__musicspaceGetStationOptions = () => somaStations.map((station) => ({ label: station.name, mood: station.mood }));
+window.__musicspaceGetStationOptions = () => stationOptions;
 stationSelect.style.padding = '6px';
 stationSelect.style.borderRadius = '4px';
 stationSelect.style.cursor = 'pointer';
@@ -414,10 +387,10 @@ stationSelect.style.fontSize = '12px';
 stationSelect.style.backgroundColor = '#333';
 stationSelect.style.color = '#fff';
 
-somaStations.forEach((station, index) => {
+brandStations.forEach((station, index) => {
   const option = document.createElement('option');
   option.value = index.toString();
-  option.textContent = station.name;
+  option.textContent = station.label;
   stationSelect.appendChild(option);
 });
 audioControlsContainer.appendChild(stationSelect);
@@ -459,7 +432,7 @@ audioElement.style.display = 'none'; // Hide the audio element
 document.body.appendChild(audioElement);
 
 // URL of the stream
-const streamUrl = 'https://ice4.somafm.com/groovesalad-128-mp3';
+const streamUrl = brandStations[0]?.stream ?? '';
 audioElement.src = streamUrl;
 audioElement.crossOrigin = 'anonymous';
 audioElement.preload = 'none'; // Don't preload until user clicks play
@@ -513,30 +486,30 @@ playButton.addEventListener('click', function() {
             playButton.style.backgroundColor = '#dc3545'; // Red for pause
         }).catch(error => {
             console.error('Error playing audio:', error);
-            playButton.textContent = 'Play Music';
+            playButton.textContent = brandProfile.audio.playButtonLabel;
             playButton.disabled = false;
             playButton.style.backgroundColor = '#824323';
         });
     } else {
         audioElement.pause();
         isPlaying = false;
-        playButton.textContent = 'Play Music';
+        playButton.textContent = brandProfile.audio.playButtonLabel;
         playButton.style.backgroundColor = '#9e552f'; // Blue for play
     }
 });
 
-const preferredStationIndex = somaStations.findIndex((station) => station.mood === initialPreferences.audio.preferredStationMood);
+const preferredStationIndex = brandStations.findIndex((station) => station.mood === initialPreferences.audio.preferredStationMood);
 let selectedStationIndex = preferredStationIndex >= 0 ? preferredStationIndex : 0;
 stationSelect.value = String(selectedStationIndex);
-audioElement.src = somaStations[selectedStationIndex].stream;
+audioElement.src = brandStations[selectedStationIndex].stream;
 audioElement.volume = initialPreferences.audio.defaultVolume;
 volumeLabel.textContent = `Volume: ${Math.round(initialPreferences.audio.defaultVolume * 100)}%`;
-applyMoodBackground(somaStations[selectedStationIndex].mood);
+applyMoodBackground(brandStations[selectedStationIndex].mood);
 
 function applyStationSelection(nextIndex: number) {
-  selectedStationIndex = Math.max(0, Math.min(somaStations.length - 1, nextIndex));
+  selectedStationIndex = Math.max(0, Math.min(brandStations.length - 1, nextIndex));
   stationSelect.value = String(selectedStationIndex);
-  const selected = somaStations[selectedStationIndex];
+  const selected = brandStations[selectedStationIndex];
 
   audioElement.src = selected.stream;
   audioElement.load();
@@ -563,14 +536,14 @@ stationSelect.addEventListener('change', () => {
 window.__musicspaceApplyPreferences = (preferences) => {
   if (preferences.backgroundOverrideMood !== undefined) {
     activeBackgroundOverrideMood = preferences.backgroundOverrideMood ?? null;
-    applyMoodBackground(somaStations[selectedStationIndex].mood);
+    applyMoodBackground(brandStations[selectedStationIndex].mood);
   }
 
   if (preferences.preferredStationMood !== undefined) {
     if (!preferences.preferredStationMood) {
       applyStationSelection(0);
     } else {
-      const nextIndex = somaStations.findIndex((station) => station.mood === preferences.preferredStationMood);
+      const nextIndex = brandStations.findIndex((station) => station.mood === preferences.preferredStationMood);
       if (nextIndex >= 0) {
         applyStationSelection(nextIndex);
       }
@@ -852,7 +825,7 @@ tvFeaturePromise = (async () => {
       height: renderer.domElement.height,
     }),
   });
-  feature.loadScreen(somaStations[selectedStationIndex].mood);
+  feature.loadScreen(brandStations[selectedStationIndex].mood);
   tvFeature = feature;
   return feature;
 })();
@@ -899,7 +872,7 @@ surfaceFeaturePromise = (async () => {
     frameSurfaceIds: FRAME_SURFACE_IDS,
     resolveStorageUrl: resolveStorageAssetUrl,
   });
-  feature.setMood(somaStations[selectedStationIndex].mood);
+  feature.setMood(brandStations[selectedStationIndex].mood);
   surfaceFeature = feature;
   return feature;
 })();
@@ -989,7 +962,7 @@ ambientSceneFeaturePromise = import('./scene/ambientSceneFeature').then(({ creat
 });
 
 // Load other models into scene
-const staticModelUrls = [
+const commonStaticModelUrls = [
   '/models/boss.glb',
   '/models/chair.glb',
   '/models/couch_left.glb', // Will be tracked for sitting
@@ -1011,6 +984,7 @@ const staticModelUrls = [
   '/models/rug.glb',
   '/models/coffee.glb' // Add coffee model
 ];
+const staticModelUrls = [...commonStaticModelUrls, ...brandProfile.scene.brandedModelUrls];
 
 // Define positions for couch models
 const modelPositions: { [key: string]: Vector3 } = {
@@ -1038,6 +1012,29 @@ modelPositions['/models/coffee.glb'] = new Vector3(-0.051, 1.069, -1.1182); // D
 
 modelRotations['/models/vinylrecord.glb'] = new Euler(Math.PI / 2, 0, 0); // example: rotate 90° around Y
 modelRotations['/models/coffee.glb'] = new Euler(0, 30, 0); // example: rotate 90° around Y
+
+function applyBrandSceneTransform(url: string, modelScene: Object3D) {
+  const transform = brandProfile.scene.modelTransforms?.[url];
+  if (!transform) {
+    return;
+  }
+
+  if (transform.position) {
+    modelScene.position.set(transform.position.x, transform.position.y, transform.position.z);
+  }
+
+  if (transform.rotationDegrees) {
+    modelScene.rotation.set(
+      MathUtils.degToRad(transform.rotationDegrees.x ?? 0),
+      MathUtils.degToRad(transform.rotationDegrees.y ?? 0),
+      MathUtils.degToRad(transform.rotationDegrees.z ?? 0),
+    );
+  }
+
+  if (transform.scale) {
+    modelScene.scale.set(transform.scale.x, transform.scale.y, transform.scale.z);
+  }
+}
 
 function updateModelPosition(modelUrl: string, position: Vector3) {
   modelPositions[modelUrl] = position;
@@ -1098,6 +1095,8 @@ staticModelUrls.forEach(url => {
     if (url in modelRotations) {
       gltf.scene.rotation.copy(modelRotations[url]);
     }
+
+    applyBrandSceneTransform(url, modelScene);
 
     if (sceneInteractionFeature) {
       sceneInteractionFeature.registerStaticModel(url, modelScene);
@@ -1270,7 +1269,7 @@ tvFeature?.updateAudioLevels(delta, {
   data: audioAnalyser.getFrequencyData(),
   averageFrequency: audioAnalyser.getAverageFrequency() / 255,
   hasActivePlayback: isPlaying && !audioElement.paused && !!audioElement.currentSrc,
-  mood: somaStations[selectedStationIndex]?.mood ?? 'chill',
+  mood: brandStations[selectedStationIndex]?.mood ?? defaultBackgroundMood,
 });
 tvFeature?.updateFrame(delta);
 const tvReactiveLevels = tvFeature?.getReactiveLevels() ?? { bass: 0, mid: 0, high: 0, energy: 0 };

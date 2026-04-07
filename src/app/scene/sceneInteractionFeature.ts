@@ -137,7 +137,7 @@ export function createSceneInteractionFeature({
   interactionPrompt.style.fontSize = '16px';
   interactionPrompt.style.cursor = 'pointer';
   interactionPrompt.style.display = 'none';
-  interactionPrompt.style.zIndex = '10020';
+  interactionPrompt.style.zIndex = '9500';
   document.body.appendChild(interactionPrompt);
 
   const closeButton = document.createElement('button');
@@ -154,7 +154,7 @@ export function createSceneInteractionFeature({
   closeButton.style.borderRadius = '5px';
   closeButton.style.cursor = 'pointer';
   closeButton.style.display = 'none';
-  closeButton.style.zIndex = '10020';
+  closeButton.style.zIndex = '9500';
   document.body.appendChild(closeButton);
 
   const debugDisplay = document.createElement('div');

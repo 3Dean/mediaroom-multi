@@ -125,7 +125,7 @@ export class RoomPanel {
 
     const formHint = document.createElement('div');
     formHint.className = 'musicspace-inline-note room-section-hint';
-    formHint.textContent = 'Signed-in users create saved rooms. Guests can enter temporary sessions.';
+    formHint.innerHTML = 'Signed-in users create saved rooms.<br>Guests can enter temporary sessions.';
 
     formHeader.append(formTitle, formHint);
 

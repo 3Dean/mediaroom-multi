@@ -1,4 +1,5 @@
 import type { UserPreferences } from '../preferences/preferencesModel';
+import { getBrandBackgroundOptions } from '../config/brandProfile';
 import { createSectionIcon } from './sectionIcons';
 
 type StationOption = {
@@ -13,19 +14,7 @@ type PreferencesPanelOptions = {
   onReset: () => UserPreferences;
 };
 
-const BACKGROUND_OPTIONS = [
-  { value: '', label: 'Follow Station Mood' },
-  { value: 'beat', label: 'Beat' },
-  { value: 'chill', label: 'Chill' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'defcon', label: 'Defcon' },
-  { value: 'drone', label: 'Drone' },
-  { value: 'dubstep', label: 'Dubstep' },
-  { value: 'indie', label: 'Indie' },
-  { value: 'jazz', label: 'Jazz' },
-  { value: 'metal', label: 'Metal' },
-  { value: 'space', label: 'Space' },
-];
+const BACKGROUND_OPTIONS = getBrandBackgroundOptions();
 
 const AVATAR_OPTIONS = [
   { value: '', label: 'Default Avatar' },
