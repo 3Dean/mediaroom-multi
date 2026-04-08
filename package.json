@@ -25,7 +25,7 @@
     "playwright": "^1.59.1",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5",
+    "vite": "^6.4.2",
     "vite-plugin-glsl": "^1.4.1"
   },
   "dependencies": {
@@ -33,7 +33,7 @@
     "@aws-sdk/credential-provider-node": "^3.972.29",
     "@aws-sdk/protocol-http": "^3.370.0",
     "@aws-sdk/signature-v4": "^3.370.0",
-    "aws-amplify": "^6.15.0",
+    "aws-amplify": "^6.16.3",
     "gsap": "^3.13.0",
     "three": "^0.177.0",
     "ws": "^8.20.0"
