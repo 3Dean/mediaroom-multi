@@ -75,7 +75,7 @@ export class PreferencesPanel {
     this.volumeValue.className = 'musicspace-inline-note';
 
     const volumeWrap = document.createElement('label');
-    volumeWrap.className = 'musicspace-field';
+    volumeWrap.className = 'musicspace-field musicspace-volume-field';
     const volumeLabel = document.createElement('span');
     volumeLabel.textContent = 'Default volume';
     volumeWrap.append(volumeLabel, this.volumeInput, this.volumeValue);

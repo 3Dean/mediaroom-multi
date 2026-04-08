@@ -638,11 +638,26 @@ export function createSceneInteractionFeature({
       return;
     }
 
+    const hasAcceptedSnapshot = objectRoot.userData.hasAcceptedSnapshot === true;
+    const initialPosition = objectRoot.userData.initialPosition as Vector3 | undefined;
+    const isOriginPlaceholder =
+      snapshot.ownerSessionId === null &&
+      snapshot.position.x === 0 &&
+      snapshot.position.y === 0 &&
+      snapshot.position.z === 0 &&
+      (!snapshot.rotation || snapshot.rotation.yaw === 0);
+    const hasAuthoredScenePosition = Boolean(initialPosition && initialPosition.lengthSq() > 0.0001);
+
+    if (!hasAcceptedSnapshot && isOriginPlaceholder && hasAuthoredScenePosition) {
+      return;
+    }
+
     const activeAnimation = activeObjectAnimations.get(snapshot.objectId);
     if (snapshot.ownerSessionId) {
       if (activeAnimation) {
         activeObjectAnimations.delete(snapshot.objectId);
       }
+      objectRoot.userData.hasAcceptedSnapshot = true;
       if (heldObjectId === snapshot.objectId) {
         return;
       }
@@ -672,6 +687,7 @@ export function createSceneInteractionFeature({
     if (snapshot.rotation) {
       objectRoot.rotation.set(0, snapshot.rotation.yaw, 0);
     }
+    objectRoot.userData.hasAcceptedSnapshot = true;
   }
 
   function applyRemoteAvatarSeparation() {
@@ -776,6 +792,9 @@ export function createSceneInteractionFeature({
         modelScene.userData.isPickableRoot = true;
         modelScene.userData.url = url;
         modelScene.userData.objectId = objectId;
+        modelScene.userData.initialPosition = modelScene.position.clone();
+        modelScene.userData.initialRotation = modelScene.rotation.clone();
+        modelScene.userData.hasAcceptedSnapshot = false;
         pickableObjectMap.set(objectId, modelScene);
 
         modelScene.traverse((child) => {

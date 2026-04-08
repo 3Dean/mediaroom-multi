@@ -753,11 +753,16 @@ body.mouse #mobile-controls-layer {
 }
 
 .room-section-hint {
+  flex: 1 1 auto;
+  display: block;
+  min-width: 0;
+  width: 100%;
+  max-width: none;
   color: #9eacbe;
   font-size: 11px;
   text-align: left;
   line-height: 1.4;
-  text-wrap: pretty;
+  text-wrap: wrap;
 }
 
 .room-join-form {
@@ -1105,10 +1110,12 @@ body.mouse #mobile-controls-layer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 10px 18px;
   color: rgba(223, 231, 242, 0.72);
   font-size: 11px;
   line-height: 1.45;
+  text-align: center;
 }
 
 .musicspace-sidebar-footer-links a,
@@ -1663,6 +1670,11 @@ select.musicspace-input:focus {
 }
 
 @media (max-width: 768px), (pointer: coarse) {
+  #volumeSlider,
+  .musicspace-volume-field {
+    display: none;
+  }
+
   :root {
     --musicspace-mobile-toggle-right: max(12px, calc(env(safe-area-inset-right, 0px) + 12px));
   }

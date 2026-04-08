@@ -72,7 +72,7 @@ export const somaFmBrandProfile: BrandProfile = {
   visuals: {
     moods: {
       beat: { label: 'Beat', background: { path: '/images/equirectangular-beat.jpg', rotationDegrees: 8 } },
-      chill: { label: 'Chill', background: { path: '/images/equirectangular-chill.jpg', rotationDegrees: 15 } },
+      chill: { label: 'Chill', background: { path: '/images/equirectangular-chill.jpg', rotationDegrees: 19 } },
       dark: { label: 'Dark', background: { path: '/images/equirectangular-dark.jpg', rotationDegrees: 0 } },
       defcon: { label: 'Defcon', background: { path: '/images/equirectangular-defcon.jpg', rotationDegrees: 200 } },
       drone: { label: 'Drone', background: { path: '/images/equirectangular-drone.jpg', rotationDegrees: 0 } },
