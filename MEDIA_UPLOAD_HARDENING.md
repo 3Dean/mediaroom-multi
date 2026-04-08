@@ -47,20 +47,23 @@ This note captures the current shared-media upload behavior and the recommended 
 - Current resolver: [`src/app/initializeApp.ts`](src/app/initializeApp.ts)
 - Backward compatibility matters: existing persisted `imagePath` / `sourceUrl` values are storage object keys, not public URLs
 
-## Current Gaps
+## Current Status
 
-1. Bucket permissions are broader than room permissions.
-   Any authenticated user can currently write/delete under shared media prefixes, even if they are not owner/admin of the room.
+Implemented:
 
-2. File limits are enforced only by the normal client.
-   The realtime server validates role before applying media to room state, but does not enforce MIME/size at upload time.
+1. Server-authorized uploads for shared surfaces and shared TV media.
+2. Server-side validation for auth, room role, MIME type, and size limits.
+3. Websocket media updates require a matching unexpired upload intent.
+4. Replaced media now deletes the previously managed storage object.
+5. Saved-room deletion now deletes managed media objects under the room prefixes.
+6. Expired unused upload intents now trigger best-effort deletion of the uploaded managed object key.
+7. Shared media storage prefixes are now read-only for guests and authenticated clients; writes/deletes are server-mediated.
 
-3. Unauthorized or abandoned uploads can leave orphaned objects.
-   Upload happens before the websocket room-state update is accepted.
+Remaining operational work:
 
-4. Room deletion removes room records and surface snapshot records, but does not currently remove storage objects for shared surfaces or shared TV media.
-
-5. Surface replacement and TV replacement do not currently delete previously referenced storage objects.
+1. Deploy the updated Amplify storage policy and verify it in the target environment.
+2. Re-test owner/admin, non-admin, and guest flows after the storage rule change is live.
+3. Re-verify room delete and media replacement cleanup against the deployed bucket.
 
 ## Inventory Of Storage Touchpoints
 
@@ -85,7 +88,7 @@ This note captures the current shared-media upload behavior and the recommended 
 
 - saved room delete endpoint: [`server/index.js`](server/index.js)
 - room delete client: [`src/backend/dataClient.ts`](src/backend/dataClient.ts)
-- no storage object delete helper currently exists for shared media assets
+- managed storage cleanup now lives in [`server/index.js`](server/index.js)
 
 ## Cleanup Decisions Before Step 1
 
@@ -206,7 +209,7 @@ Harden websocket media updates.
 
 ### Step 5
 
-Add storage cleanup helpers.
+Done.
 
 - delete one object by storage key
 - delete all objects by room prefix
@@ -214,15 +217,15 @@ Add storage cleanup helpers.
   - surface replacement
   - TV replacement
   - room deletion
+  - expired unused upload intents
 
 ### Step 6
 
-After the new flow is verified, tighten storage rules in [`amplify/storage/resource.ts`](amplify/storage/resource.ts).
+Done in code.
 
-Target:
-
-- shared media prefixes should no longer allow broad authenticated `write` / `delete`
-- reads can remain available to the audience that needs playback/viewing
+- shared media prefixes now remove broad authenticated `write` / `delete`
+- reads remain available to the audience that needs playback/viewing
+- deployment verification is still required
 
 ## Testing Checklist
 
@@ -235,6 +238,7 @@ Manual verification needed before bucket permissions are tightened:
 - admin can upload a valid TV video
 - non-admin signed-in participant cannot authorize a TV upload
 - guest cannot authorize any upload
+- direct browser upload without a server-issued presigned URL is rejected after storage policy deployment
 - invalid MIME type is rejected server-side
 - oversized file is rejected server-side
 - uploaded media still resolves through `getUrl({ path })`
@@ -243,6 +247,6 @@ Manual verification needed before bucket permissions are tightened:
 
 ## Notes
 
-- No bucket-object cleanup exists yet for shared media.
 - TV media currently lives only in realtime memory; if durable TV persistence is added later, this flow should be reused rather than widened.
-- Before implementing presigned uploads, confirm S3 bucket CORS allows browser `PUT` from the deployed app origin with the required `Content-Type` header.
+- Cleanup is best-effort and only targets managed keys under `room-surfaces/` and `room-tv/`.
+- The storage rule tightening in [`amplify/storage/resource.ts`](amplify/storage/resource.ts) still needs deployment before it takes effect outside local code.

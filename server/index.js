@@ -4,7 +4,7 @@ import { createPublicKey, createVerify, randomUUID } from 'node:crypto';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { WebSocketServer } from 'ws';
@@ -867,6 +867,7 @@ async function handleAdminSetSurfaceImage(socket, message) {
   };
 
   const surfaces = await ensureRoomSurfaces(roomId);
+  const previousSurface = surfaces.find((entry) => entry.surfaceId === surfaceId) ?? null;
   const nextSurface = await persistRoomSurface(roomId, surface);
   const index = surfaces.findIndex((entry) => entry.surfaceId === surfaceId);
   if (index >= 0) {
@@ -882,6 +883,9 @@ async function handleAdminSetSurfaceImage(socket, message) {
     surfaceId,
     imagePath,
   });
+  if (previousSurface?.imagePath && previousSurface.imagePath !== imagePath) {
+    void cleanupManagedMediaObject(previousSurface.imagePath, { roomId, reason: 'surface_replaced', surfaceId });
+  }
   broadcast(roomId, { type: 'surface.updated', surface: nextSurface });
   pushSystemNotice(roomId, `${actor.displayName} updated ${surfaceId}.`);
 }
@@ -938,6 +942,7 @@ async function handleAdminSetTvMedia(socket, message) {
     }
   }
 
+  const previousTvMedia = roomTvMedia.get(roomId) ?? null;
   const tvMedia = sourceUrl
     ? {
         sourceUrl,
@@ -960,6 +965,9 @@ async function handleAdminSetTvMedia(socket, message) {
     actorDisplayName: actor.displayName,
     sourceUrl,
   });
+  if (previousTvMedia?.sourceUrl && previousTvMedia.sourceUrl !== sourceUrl) {
+    void cleanupManagedMediaObject(previousTvMedia.sourceUrl, { roomId, reason: sourceUrl ? 'tv_replaced' : 'tv_cleared' });
+  }
   broadcast(roomId, { type: 'tv.updated', tvMedia });
   pushSystemNotice(roomId, sourceUrl ? `${actor.displayName} updated the shared TV.` : `${actor.displayName} restored the TV visualizer.`);
 }
@@ -1096,6 +1104,8 @@ async function handleDeleteRoomRequest(request, response) {
     }
 
     await deleteSurfaceSnapshotsFromBackend(roomId);
+    await cleanupManagedMediaPrefix(`room-surfaces/${roomId}/`, { roomId, reason: 'room_deleted_surfaces' });
+    await cleanupManagedMediaPrefix(`room-tv/${roomId}/`, { roomId, reason: 'room_deleted_tv' });
     const deleted = await deleteRoomFromBackend(roomId, authority.roomRecordId);
     if (!deleted) {
       writeJson(response, 500, { error: 'delete_failed', message: 'Unable to delete the saved room.' });
@@ -1734,6 +1744,13 @@ function pruneExpiredUploadIntents() {
   for (const [uploadId, intent] of mediaUploadIntents.entries()) {
     if ((intent.expiresAtMs ?? 0) <= now) {
       mediaUploadIntents.delete(uploadId);
+      if (!intent.usedAt && intent.objectKey) {
+        void cleanupManagedMediaObject(intent.objectKey, {
+          roomId: intent.roomId,
+          reason: 'upload_intent_expired',
+          kind: intent.kind,
+        });
+      }
     }
   }
 }
@@ -1779,6 +1796,87 @@ function consumeAuthorizedUploadIntent(uploadId, options) {
   intent.usedAt = new Date().toISOString();
   mediaUploadIntents.delete(uploadId);
   return { ok: true, intent };
+}
+
+async function cleanupManagedMediaObject(objectKey, metadata = {}) {
+  if (!storageClient || !STORAGE_BUCKET_NAME || !isManagedMediaKey(objectKey)) {
+    return false;
+  }
+  try {
+    await storageClient.send(new DeleteObjectCommand({
+      Bucket: STORAGE_BUCKET_NAME,
+      Key: objectKey,
+    }));
+    logEvent('info', 'media.object.deleted', {
+      objectKey,
+      ...metadata,
+    });
+    return true;
+  } catch (error) {
+    logEvent('warn', 'media.object.delete_failed', {
+      objectKey,
+      ...metadata,
+      error: formatErrorForLog(error),
+    });
+    return false;
+  }
+}
+
+async function cleanupManagedMediaPrefix(prefix, metadata = {}) {
+  if (!storageClient || !STORAGE_BUCKET_NAME || !isManagedMediaPrefix(prefix)) {
+    return 0;
+  }
+  let deletedCount = 0;
+  let continuationToken = undefined;
+  try {
+    do {
+      const response = await storageClient.send(new ListObjectsV2Command({
+        Bucket: STORAGE_BUCKET_NAME,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      }));
+      const objects = Array.isArray(response.Contents)
+        ? response.Contents
+          .map((entry) => typeof entry?.Key === 'string' ? ({ Key: entry.Key }) : null)
+          .filter(Boolean)
+        : [];
+      if (objects.length > 0) {
+        await storageClient.send(new DeleteObjectsCommand({
+          Bucket: STORAGE_BUCKET_NAME,
+          Delete: {
+            Objects: objects,
+            Quiet: true,
+          },
+        }));
+        deletedCount += objects.length;
+      }
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (continuationToken);
+
+    logEvent('info', 'media.prefix.deleted', {
+      prefix,
+      deletedCount,
+      ...metadata,
+    });
+    return deletedCount;
+  } catch (error) {
+    logEvent('warn', 'media.prefix.delete_failed', {
+      prefix,
+      ...metadata,
+      error: formatErrorForLog(error),
+    });
+    return deletedCount;
+  }
+}
+
+function isManagedMediaKey(value) {
+  return typeof value === 'string'
+    && (value.startsWith('room-surfaces/') || value.startsWith('room-tv/'));
+}
+
+function isManagedMediaPrefix(value) {
+  return typeof value === 'string'
+    && (value.startsWith('room-surfaces/') || value.startsWith('room-tv/'));
 }
 
 function loadSpawnPoints() {
