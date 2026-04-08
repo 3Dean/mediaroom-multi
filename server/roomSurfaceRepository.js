@@ -113,6 +113,51 @@ export async function saveSurfaceSnapshotToBackend(roomId, surface) {
   return normalizeSurfaceSnapshot(response?.updateRoomSurfaceSnapshot ?? response?.createRoomSurfaceSnapshot ?? null);
 }
 
+export async function deleteSurfaceSnapshotsFromBackend(roomId) {
+  if (!canUseSurfaceBackendPersistence()) {
+    return 0;
+  }
+
+  const response = await executeGraphql(
+    /* GraphQL */ `
+      query ListRoomSurfaceSnapshotIdsByRoom($roomId: String!) {
+        listRoomSurfaceSnapshots(filter: { roomId: { eq: $roomId } }, limit: 100) {
+          items {
+            id
+          }
+        }
+      }
+    `,
+    { roomId },
+  );
+
+  const ids = Array.isArray(response?.listRoomSurfaceSnapshots?.items)
+    ? response.listRoomSurfaceSnapshots.items
+      .map((entry) => typeof entry?.id === 'string' ? entry.id : null)
+      .filter(Boolean)
+    : [];
+
+  let deletedCount = 0;
+  for (const id of ids) {
+    const result = await executeGraphql(
+      /* GraphQL */ `
+        mutation DeleteRoomSurfaceSnapshot($input: DeleteRoomSurfaceSnapshotInput!) {
+          deleteRoomSurfaceSnapshot(input: $input) {
+            id
+          }
+        }
+      `,
+      { input: { id } },
+    );
+
+    if (result?.deleteRoomSurfaceSnapshot?.id) {
+      deletedCount += 1;
+    }
+  }
+
+  return deletedCount;
+}
+
 async function findSurfaceRecordId(roomId, surfaceId) {
   const response = await executeGraphql(
     /* GraphQL */ `

@@ -113,3 +113,19 @@ export async function listRecentRoomMessages(roomId: string) {
     },
   });
 }
+
+export async function deleteRoom(roomId: string, token: string): Promise<void> {
+  const response = await fetch('/api/rooms/delete', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ roomId }),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(typeof payload?.message === 'string' ? payload.message : `Delete room request failed with status ${response.status}`);
+  }
+}

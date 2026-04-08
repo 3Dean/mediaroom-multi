@@ -124,37 +124,15 @@ export function createSceneInteractionFeature({
 
   const interactionPrompt = document.createElement('button');
   interactionPrompt.id = 'interactionButton';
-  interactionPrompt.style.position = 'absolute';
-  interactionPrompt.style.top = '50%';
-  interactionPrompt.style.left = '50%';
-  interactionPrompt.style.transform = 'translate(-50%, -50%)';
-  interactionPrompt.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-  interactionPrompt.style.color = 'white';
-  interactionPrompt.style.padding = '12px 20px';
-  interactionPrompt.style.border = '1px solid #fff';
-  interactionPrompt.style.borderRadius = '8px';
-  interactionPrompt.style.fontFamily = 'Arial, sans-serif';
-  interactionPrompt.style.fontSize = '16px';
-  interactionPrompt.style.cursor = 'pointer';
+  interactionPrompt.className = 'musicspace-scene-button musicspace-scene-button--center musicspace-button musicspace-button--primary';
   interactionPrompt.style.display = 'none';
-  interactionPrompt.style.zIndex = '9500';
   document.body.appendChild(interactionPrompt);
 
   const closeButton = document.createElement('button');
   closeButton.id = 'closeButton';
   closeButton.textContent = 'Stand';
-  closeButton.style.position = 'absolute';
-  closeButton.style.top = '16px';
-  closeButton.style.left = '16px';
-  closeButton.style.right = 'auto';
-  closeButton.style.padding = '8px 12px';
-  closeButton.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-  closeButton.style.color = 'white';
-  closeButton.style.border = '1px solid #fff';
-  closeButton.style.borderRadius = '5px';
-  closeButton.style.cursor = 'pointer';
+  closeButton.className = 'musicspace-scene-button musicspace-scene-button--corner musicspace-button musicspace-button--secondary';
   closeButton.style.display = 'none';
-  closeButton.style.zIndex = '9500';
   document.body.appendChild(closeButton);
 
   const debugDisplay = document.createElement('div');

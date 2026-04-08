@@ -5,8 +5,8 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { WebSocketServer } from 'ws';
-import { canUseBackendPersistence, loadAuthorityFromBackend, loadFallbackAuthorityStore, normalizeAuthority as normalizeRoomAuthority, persistFallbackAuthorityStore, saveAuthorityToBackend } from './roomAuthorityRepository.js';
-import { canUseSurfaceBackendPersistence, loadSurfaceSnapshotsFromBackend, saveSurfaceSnapshotToBackend } from './roomSurfaceRepository.js';
+import { canUseBackendPersistence, deleteRoomFromBackend, loadAuthorityFromBackend, loadFallbackAuthorityStore, normalizeAuthority as normalizeRoomAuthority, persistFallbackAuthorityStore, saveAuthorityToBackend } from './roomAuthorityRepository.js';
+import { canUseSurfaceBackendPersistence, deleteSurfaceSnapshotsFromBackend, loadSurfaceSnapshotsFromBackend, saveSurfaceSnapshotToBackend } from './roomSurfaceRepository.js';
 
 const HOST = process.env.REALTIME_HOST?.trim() || null;
 const PORT = Number(process.env.REALTIME_PORT ?? process.env.PORT ?? 8787);
@@ -94,6 +94,10 @@ const server = createServer((request, response) => {
     response.end(JSON.stringify({
       rooms: listLiveRooms(),
     }));
+    return;
+  }
+  if (request.url === '/api/rooms/delete' && request.method === 'POST') {
+    void handleDeleteRoomRequest(request, response);
     return;
   }
 
@@ -975,6 +979,71 @@ function ensureRoomParticipants(roomId) {
   return created;
 }
 
+async function handleDeleteRoomRequest(request, response) {
+  try {
+    const payload = await readJsonBody(request);
+    const roomId = normalizeToken(payload?.roomId, MAX_ROOM_ID_LENGTH);
+    if (!roomId) {
+      writeJson(response, 400, { error: 'invalid_room', message: 'A valid roomId is required.' });
+      return;
+    }
+
+    const authorizationHeader = typeof request.headers.authorization === 'string' ? request.headers.authorization : '';
+    const token = authorizationHeader.startsWith('Bearer ') ? authorizationHeader.slice(7).trim() : '';
+    const authResult = await verifyAuthToken(token);
+    if (!authResult.ok || !authResult.userId) {
+      writeJson(response, 401, { error: 'unauthorized', message: authResult.message ?? 'Authentication is required.' });
+      return;
+    }
+
+    const authority = await hydrateRoomAuthority(roomId);
+    if (!authority.roomRecordId) {
+      writeJson(response, 404, { error: 'room_not_persisted', message: 'Only saved rooms can be deleted.' });
+      return;
+    }
+
+    if (authority.ownerUserId !== authResult.userId) {
+      writeJson(response, 403, { error: 'forbidden', message: 'Only the room owner can delete this room.' });
+      return;
+    }
+
+    const participants = roomParticipants.get(roomId);
+    if (participants && participants.size > 0) {
+      writeJson(response, 409, { error: 'room_live', message: 'Live rooms cannot be deleted.' });
+      return;
+    }
+
+    await deleteSurfaceSnapshotsFromBackend(roomId);
+    const deleted = await deleteRoomFromBackend(roomId, authority.roomRecordId);
+    if (!deleted) {
+      writeJson(response, 500, { error: 'delete_failed', message: 'Unable to delete the saved room.' });
+      return;
+    }
+
+    roomAuthorities.delete(roomId);
+    persistFallbackAuthorityStore(roomAuthorities);
+    roomParticipants.delete(roomId);
+    roomSockets.delete(roomId);
+    roomMessages.delete(roomId);
+    roomSeats.delete(roomId);
+    roomObjects.delete(roomId);
+    roomSurfaces.delete(roomId);
+    roomTvMedia.delete(roomId);
+    hydratedSurfaceRooms.delete(roomId);
+
+    logEvent('info', 'room.deleted', {
+      roomId,
+      ownerUserId: authResult.userId,
+    });
+    writeJson(response, 200, { ok: true });
+  } catch (error) {
+    logEvent('error', 'room.delete.failed', {
+      error: formatErrorForLog(error),
+    });
+    writeJson(response, 500, { error: 'delete_failed', message: 'Unable to delete the saved room right now.' });
+  }
+}
+
 function listLiveRooms() {
   return Array.from(roomParticipants.entries())
     .filter(([, participants]) => participants.size > 0)
@@ -1234,6 +1303,35 @@ function isOriginAllowed(origin) {
   }
   return ALLOWED_ORIGINS.includes(origin);
 }
+
+function readJsonBody(request) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+
+    request.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    request.on('end', () => {
+      if (chunks.length === 0) {
+        resolve({});
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch (error) {
+        reject(error);
+      }
+    });
+    request.on('error', reject);
+  });
+}
+
+function writeJson(response, statusCode, payload) {
+  response.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  response.end(JSON.stringify(payload));
+}
+
 function loadSpawnPoints() {
   const spawnFilePath = join(__dirname, '..', 'public', 'models', 'spawn_points.glb');
   if (!existsSync(spawnFilePath)) {

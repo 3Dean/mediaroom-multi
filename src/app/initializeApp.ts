@@ -340,14 +340,6 @@ if (!audioControlsContainer) {
 const playButton = document.createElement('button');
 playButton.textContent = brandProfile.audio.playButtonLabel;
 playButton.className = 'musicspace-button musicspace-button--primary';
-playButton.style.padding = '8px 12px';
-playButton.style.backgroundColor = '#9e552f';
-playButton.style.color = 'white';
-playButton.style.border = 'none';
-playButton.style.borderRadius = '4px';
-playButton.style.cursor = 'pointer';
-playButton.style.fontWeight = 'bold';
-playButton.style.fontSize = '11px';
 audioControlsContainer.appendChild(playButton);
 
 // Create brand station options
@@ -357,12 +349,6 @@ const stationOptions = getBrandStationOptions(brandProfile);
 const stationSelect = document.createElement('select');
 stationSelect.className = 'musicspace-input';
 window.__musicspaceGetStationOptions = () => stationOptions;
-stationSelect.style.padding = '6px';
-stationSelect.style.borderRadius = '4px';
-stationSelect.style.cursor = 'pointer';
-stationSelect.style.fontSize = '12px';
-stationSelect.style.backgroundColor = '#333';
-stationSelect.style.color = '#fff';
 
 brandStations.forEach((station, index) => {
   const option = document.createElement('option');
@@ -433,6 +419,29 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+function setPlayButtonState(state: 'idle' | 'loading' | 'playing' | 'error') {
+    playButton.className = 'musicspace-button';
+
+    if (state === 'loading') {
+        playButton.classList.add('musicspace-button--muted');
+        return;
+    }
+
+    if (state === 'playing') {
+        playButton.classList.add('musicspace-button--secondary');
+        return;
+    }
+
+    if (state === 'error') {
+        playButton.classList.add('musicspace-button--danger');
+        return;
+    }
+
+    playButton.classList.add('musicspace-button--primary');
+}
+
+setPlayButtonState('idle');
+
 // Play/pause button event listener
 playButton.addEventListener('click', function() {
     if (listener.context.state === 'suspended') {
@@ -443,7 +452,7 @@ playButton.addEventListener('click', function() {
         // Show loading state
         playButton.textContent = 'Loading...';
         playButton.disabled = true;
-        playButton.style.backgroundColor = '#6c757d';
+        setPlayButtonState('loading');
         
         // Add loading indicator
         const loadingIndicator = document.createElement('span');
@@ -460,18 +469,18 @@ playButton.addEventListener('click', function() {
             isPlaying = true;
             playButton.textContent = 'Pause';
             playButton.disabled = false;
-            playButton.style.backgroundColor = '#dc3545'; // Red for pause
+            setPlayButtonState('playing');
         }).catch(error => {
             console.error('Error playing audio:', error);
             playButton.textContent = brandProfile.audio.playButtonLabel;
             playButton.disabled = false;
-            playButton.style.backgroundColor = '#824323';
+            setPlayButtonState('error');
         });
     } else {
         audioElement.pause();
         isPlaying = false;
         playButton.textContent = brandProfile.audio.playButtonLabel;
-        playButton.style.backgroundColor = '#9e552f'; // Blue for play
+        setPlayButtonState('idle');
     }
 });
 
@@ -493,7 +502,7 @@ function applyStationSelection(nextIndex: number) {
   if (isPlaying) {
     audioElement.play();
     playButton.textContent = 'Pause';
-    playButton.style.backgroundColor = '#dc3545';
+    setPlayButtonState('playing');
   }
 
   if (surfaceFeature) {
@@ -583,7 +592,7 @@ volumeSlider.addEventListener('mousedown', function(event) {
 audioElement.addEventListener('waiting', () => {
     playButton.textContent = 'Loading...';
     playButton.disabled = true;
-    playButton.style.backgroundColor = '#6c757d';
+    setPlayButtonState('loading');
     
     // Add loading indicator if not already present
     if (!playButton.querySelector('span')) {
@@ -598,14 +607,14 @@ audioElement.addEventListener('waiting', () => {
 audioElement.addEventListener('playing', () => {
     playButton.textContent = 'Pause';
     playButton.disabled = false;
-    playButton.style.backgroundColor = '#dc3545';
+    setPlayButtonState('playing');
 });
 
 audioElement.addEventListener('error', (e) => {
     console.error('Audio error:', e);
     playButton.textContent = 'Error';
     playButton.disabled = false;
-    playButton.style.backgroundColor = '#dc3545';
+    setPlayButtonState('error');
 });
 
 

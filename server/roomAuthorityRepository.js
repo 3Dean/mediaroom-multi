@@ -156,6 +156,38 @@ export async function saveAuthorityToBackend(roomId, authority, options = {}) {
   });
 }
 
+export async function deleteRoomFromBackend(roomId, roomRecordId = null) {
+  if (!canUseBackendPersistence()) {
+    return false;
+  }
+
+  if (roomTableName && dynamodbSigner) {
+    return deleteRoomFromDynamo(roomId, roomRecordId);
+  }
+
+  const resolvedRoomRecordId = roomRecordId ?? await findRoomRecordId(roomId);
+  if (!resolvedRoomRecordId) {
+    return false;
+  }
+
+  const response = await executeGraphql(
+    /* GraphQL */ `
+      mutation DeleteRoom($input: DeleteRoomInput!) {
+        deleteRoom(input: $input) {
+          id
+        }
+      }
+    `,
+    {
+      input: {
+        id: resolvedRoomRecordId,
+      },
+    },
+  );
+
+  return Boolean(response?.deleteRoom?.id);
+}
+
 export function canUseBackendPersistence() {
   return Boolean((roomTableName && dynamodbSigner) || (appsyncUrl && appsyncSigner));
 }
@@ -197,6 +229,11 @@ async function ensureRoomRecord(roomId, ownerUserId, maxUsers) {
   );
 
   return response?.createRoom?.id ?? null;
+}
+
+async function findRoomRecordId(roomId) {
+  const existing = await loadAuthorityFromBackend(roomId);
+  return existing?.roomRecordId ?? null;
 }
 
 async function executeGraphql(query, variables) {
@@ -361,6 +398,25 @@ async function fetchRoomRecordFromDynamo(roomId) {
     id: readStringAttribute(item.id),
     createdBy: readStringAttribute(item.createdBy),
   };
+}
+
+async function deleteRoomFromDynamo(roomId, roomRecordId = null) {
+  const record = roomRecordId
+    ? { id: roomRecordId }
+    : await fetchRoomRecordFromDynamo(roomId);
+
+  if (!record?.id) {
+    return false;
+  }
+
+  await executeDynamoRequest('DynamoDB_20120810.DeleteItem', {
+    TableName: roomTableName,
+    Key: {
+      id: { S: record.id },
+    },
+  });
+
+  return true;
 }
 
 async function executeDynamoRequest(target, payload) {

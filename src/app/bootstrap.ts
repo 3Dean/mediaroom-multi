@@ -298,6 +298,28 @@ export function bootstrapApp(): void {
       initialRoomSlug,
       initialDisplayName: preferences.profile.displayName || undefined,
       initialIsAuthenticated: Boolean(currentUser),
+      initialCurrentUserId: currentUser?.userId ?? null,
+      onDeleteRoom: async (room) => {
+        try {
+          const token = await getRealtimeAuthToken();
+          if (!token) {
+            throw new Error('Sign in to delete saved rooms.');
+          }
+
+          const { deleteRoom } = await import('../backend/dataClient');
+          await deleteRoom(room.slug, token);
+          knownRooms = knownRooms.filter((entry) => entry.slug.toLowerCase() !== room.slug.toLowerCase());
+          roomPanel.setRooms(knownRooms, sessionStore.getCurrentSession()?.roomSlug ?? null);
+          roomPanel.setStatus(`Deleted saved room ${room.slug}.`);
+          roomPanel.setMeta('Room removed');
+          await refreshRooms();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unable to delete the saved room.';
+          roomPanel.setStatus(message);
+          roomPanel.setMeta('Delete failed');
+          throw error;
+        }
+      },
     });
 
     authPanel = new AuthPanel({
@@ -308,6 +330,7 @@ export function bootstrapApp(): void {
         authPanel.setUser(currentUser?.signInDetails?.loginId ?? null);
         updateLobbyOverlay();
         roomPanel.setAuthenticationState(Boolean(currentUser));
+        roomPanel.setCurrentUserId(currentUser?.userId ?? null);
         roomPanel.applyPreferenceDefaults({
           displayName: preferences.profile.displayName,
         });
@@ -335,6 +358,7 @@ export function bootstrapApp(): void {
           authPanel.setUser(currentUser?.signInDetails?.loginId ?? email);
           updateLobbyOverlay();
           roomPanel.setAuthenticationState(Boolean(currentUser));
+          roomPanel.setCurrentUserId(currentUser?.userId ?? null);
           void refreshRooms();
           roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Re-enter a room to create or claim its saved session.`);
           return {
@@ -357,6 +381,7 @@ export function bootstrapApp(): void {
         authPanel.setUser(null);
         updateLobbyOverlay();
         roomPanel.setAuthenticationState(false);
+        roomPanel.setCurrentUserId(null);
         if (roomClient) {
           roomClient.disconnect(1000, 'sign-out');
           roomClient = null;

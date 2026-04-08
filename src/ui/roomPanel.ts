@@ -23,6 +23,8 @@ type RoomPanelOptions = {
   initialRoomSlug?: string;
   initialDisplayName?: string;
   initialIsAuthenticated?: boolean;
+  initialCurrentUserId?: string | null;
+  onDeleteRoom?: (room: RoomSummary) => Promise<void>;
   onStatusChange?: (message: string) => void;
   onMetaChange?: (message: string) => void;
 };
@@ -80,18 +82,22 @@ export class RoomPanel {
   private readonly hasUrlRoom: boolean;
   private readonly onStatusChange?: (message: string) => void;
   private readonly onMetaChange?: (message: string) => void;
+  private readonly onDeleteRoom?: (room: RoomSummary) => Promise<void>;
   private rooms: RoomSummary[] = [];
   private activeRoomSlug: string | null = null;
   private activeRoomIsPersisted = false;
   private isAuthenticated = false;
+  private currentUserId: string | null = null;
 
   constructor(onJoin: (values: RoomPanelValues) => void, options: RoomPanelOptions = {}) {
     this.onJoin = onJoin;
     this.generatedRoomSlug = generateRoomSlug();
     this.hasUrlRoom = !!options.initialRoomSlug?.trim();
     this.isAuthenticated = Boolean(options.initialIsAuthenticated);
+    this.currentUserId = options.initialCurrentUserId ?? null;
     this.onStatusChange = options.onStatusChange;
     this.onMetaChange = options.onMetaChange;
+    this.onDeleteRoom = options.onDeleteRoom;
     this.container = document.createElement('div');
     this.container.id = 'room-panel';
     this.container.className = 'musicspace-card musicspace-card--room';
@@ -302,6 +308,11 @@ export class RoomPanel {
     this.refreshJoinIntent();
   }
 
+  setCurrentUserId(userId: string | null): void {
+    this.currentUserId = userId;
+    this.renderRooms();
+  }
+
   setActiveRoom(activeRoomSlug: string | null, isPersisted: boolean): void {
     this.activeRoomSlug = activeRoomSlug;
     this.activeRoomIsPersisted = isPersisted;
@@ -410,6 +421,45 @@ export class RoomPanel {
       });
 
       actions.append(joinAction, shareButton);
+
+      const canDelete = Boolean(
+        this.onDeleteRoom
+        && room.isPersisted
+        && room.createdBy
+        && this.currentUserId
+        && room.createdBy === this.currentUserId,
+      );
+
+      if (canDelete) {
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'musicspace-button musicspace-button--danger musicspace-button--small room-browser-delete-button';
+        deleteButton.textContent = room.isLive ? 'Live' : 'Delete';
+        deleteButton.disabled = Boolean(room.isLive);
+        deleteButton.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          if (room.isLive || !this.onDeleteRoom) {
+            return;
+          }
+
+          const confirmed = window.confirm(`Delete saved room "${room.name}"? This cannot be undone.`);
+          if (!confirmed) {
+            return;
+          }
+
+          const previousLabel = deleteButton.textContent;
+          deleteButton.disabled = true;
+          deleteButton.textContent = 'Deleting...';
+          try {
+            await this.onDeleteRoom(room);
+          } catch {
+            deleteButton.disabled = false;
+            deleteButton.textContent = previousLabel;
+          }
+        });
+        actions.append(deleteButton);
+      }
+
       button.append(title, badges, slug, meta, actions);
       button.addEventListener('click', () => {
         this.roomInput.value = room.slug;
