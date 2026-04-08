@@ -1,8 +1,11 @@
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { createPublicKey, createVerify } from 'node:crypto';
+import { createPublicKey, createVerify, randomUUID } from 'node:crypto';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { defaultProvider } from '@aws-sdk/credential-provider-node';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { WebSocketServer } from 'ws';
 import { canUseBackendPersistence, deleteRoomFromBackend, loadAuthorityFromBackend, loadFallbackAuthorityStore, normalizeAuthority as normalizeRoomAuthority, persistFallbackAuthorityStore, saveAuthorityToBackend } from './roomAuthorityRepository.js';
@@ -19,9 +22,17 @@ const MAX_ROOM_ID_LENGTH = Number(process.env.REALTIME_MAX_ROOM_ID_LENGTH ?? 64)
 const MAX_OBJECT_ID_LENGTH = Number(process.env.REALTIME_MAX_OBJECT_ID_LENGTH ?? 64);
 const MAX_SEAT_ID_LENGTH = Number(process.env.REALTIME_MAX_SEAT_ID_LENGTH ?? 64);
 const MAX_SURFACE_IMAGE_PATH_LENGTH = Number(process.env.REALTIME_MAX_SURFACE_IMAGE_PATH_LENGTH ?? 512);
+const MAX_UPLOAD_FILE_NAME_LENGTH = Number(process.env.REALTIME_MAX_UPLOAD_FILE_NAME_LENGTH ?? 160);
+const MAX_UPLOAD_CONTENT_TYPE_LENGTH = Number(process.env.REALTIME_MAX_UPLOAD_CONTENT_TYPE_LENGTH ?? 128);
+const MAX_UPLOAD_INTENTS_PER_USER = Number(process.env.REALTIME_MAX_UPLOAD_INTENTS_PER_USER ?? 12);
+const MEDIA_UPLOAD_INTENT_TTL_MS = Number(process.env.REALTIME_MEDIA_UPLOAD_INTENT_TTL_MS ?? 5 * 60 * 1000);
+const MAX_SURFACE_IMAGE_BYTES = Number(process.env.REALTIME_MAX_SURFACE_IMAGE_BYTES ?? 5 * 1024 * 1024);
+const MAX_TV_VIDEO_BYTES = Number(process.env.REALTIME_MAX_TV_VIDEO_BYTES ?? 150 * 1024 * 1024);
 const LOG_LEVEL = normalizeLogLevel(process.env.REALTIME_LOG_LEVEL);
 const DEFAULT_EYE_HEIGHT = 1.6;
 const VALID_SURFACE_IDS = new Set(['image01', 'image02', 'image03', 'image04']);
+const ALLOWED_SURFACE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_TV_VIDEO_TYPES = new Set(['video/mp4']);
 const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.REALTIME_ALLOWED_ORIGINS ?? process.env.RENDER_EXTERNAL_URL ?? '');
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const AMPLIFY_OUTPUTS_PATH = join(__dirname, '..', 'amplify_outputs.json');
@@ -29,6 +40,23 @@ const AMPLIFY_OUTPUTS = loadAmplifyOutputs();
 const COGNITO_USER_POOL_ID = process.env.REALTIME_COGNITO_USER_POOL_ID?.trim() || AMPLIFY_OUTPUTS.auth?.user_pool_id || '';
 const COGNITO_CLIENT_ID = process.env.REALTIME_COGNITO_CLIENT_ID?.trim() || AMPLIFY_OUTPUTS.auth?.user_pool_client_id || '';
 const COGNITO_ISSUER = process.env.REALTIME_COGNITO_ISSUER?.trim() || deriveCognitoIssuer(COGNITO_USER_POOL_ID);
+const STORAGE_BUCKET_NAME = process.env.REALTIME_STORAGE_BUCKET_NAME?.trim()
+  || AMPLIFY_OUTPUTS.storage?.bucket_name
+  || AMPLIFY_OUTPUTS.storage?.buckets?.[0]?.bucket_name
+  || '';
+const STORAGE_REGION = process.env.REALTIME_STORAGE_REGION?.trim()
+  || AMPLIFY_OUTPUTS.storage?.aws_region
+  || AMPLIFY_OUTPUTS.storage?.buckets?.[0]?.aws_region
+  || process.env.AWS_REGION?.trim()
+  || AMPLIFY_OUTPUTS.auth?.aws_region
+  || 'us-east-1';
+const storageCredentialsProvider = STORAGE_BUCKET_NAME ? defaultProvider() : null;
+const storageClient = STORAGE_BUCKET_NAME && storageCredentialsProvider
+  ? new S3Client({
+      region: STORAGE_REGION,
+      credentials: storageCredentialsProvider,
+    })
+  : null;
 const DIST_DIR = join(__dirname, '..', 'dist');
 const INDEX_FILE = join(DIST_DIR, 'index.html');
 const HAS_DIST = existsSync(INDEX_FILE);
@@ -56,6 +84,7 @@ const roomSurfaces = new Map();
 const roomTvMedia = new Map();
 const hydratedSurfaceRooms = new Set();
 const chatRateLimits = new Map();
+const mediaUploadIntents = new Map();
 const roomAuthorities = new Map(Object.entries(loadFallbackAuthorityStore()).map(([roomId, authority]) => [roomId, normalizeRoomAuthority(authority)]));
 const jwksCache = new Map();
 const persistenceHealth = {
@@ -63,8 +92,8 @@ const persistenceHealth = {
   surface: createPersistenceStatus(canUseSurfaceBackendPersistence(), 'memory-only'),
 };
 
-function writeHealthResponse(response) {
-  response.writeHead(200, { 'Content-Type': 'application/json' });
+function writeHealthResponse(request, response) {
+  response.writeHead(200, withCorsHeaders(request, { 'Content-Type': 'application/json' }));
   response.end(JSON.stringify({
     ok: true,
     host: HOST ?? 'default',
@@ -85,12 +114,25 @@ function writeHealthResponse(response) {
 }
 
 const server = createServer((request, response) => {
+  if (request.url?.startsWith('/api/')) {
+    if (!isHttpOriginAllowed(request)) {
+      response.writeHead(403, withCorsHeaders(request, { 'Content-Type': 'application/json; charset=utf-8' }));
+      response.end(JSON.stringify({ error: 'origin_not_allowed', message: 'Origin is not allowed.' }));
+      return;
+    }
+    if (request.method === 'OPTIONS') {
+      response.writeHead(204, withCorsHeaders(request, {}));
+      response.end();
+      return;
+    }
+  }
+
   if (request.url === '/health' || request.url === '/healthz') {
-    writeHealthResponse(response);
+    writeHealthResponse(request, response);
     return;
   }
   if (request.url === '/api/rooms/live') {
-    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.writeHead(200, withCorsHeaders(request, { 'Content-Type': 'application/json' }));
     response.end(JSON.stringify({
       rooms: listLiveRooms(),
     }));
@@ -98,6 +140,14 @@ const server = createServer((request, response) => {
   }
   if (request.url === '/api/rooms/delete' && request.method === 'POST') {
     void handleDeleteRoomRequest(request, response);
+    return;
+  }
+  if (request.url === '/api/uploads/surface-authorize' && request.method === 'POST') {
+    void handleAuthorizeSurfaceUploadRequest(request, response);
+    return;
+  }
+  if (request.url === '/api/uploads/tv-authorize' && request.method === 'POST') {
+    void handleAuthorizeTvUploadRequest(request, response);
     return;
   }
 
@@ -774,7 +824,8 @@ async function handleAdminSetSurfaceImage(socket, message) {
   const sessionId = getSocketSessionId(socket, message.sessionId);
   const surfaceId = normalizeSurfaceId(message.surfaceId);
   const imagePath = normalizeToken(message.imagePath, MAX_SURFACE_IMAGE_PATH_LENGTH);
-  if (!roomId || !sessionId || !surfaceId || !imagePath) {
+  const uploadId = normalizeToken(message.uploadId, 128);
+  if (!roomId || !sessionId || !surfaceId || !imagePath || !uploadId) {
     return;
   }
 
@@ -793,6 +844,18 @@ async function handleAdminSetSurfaceImage(socket, message) {
       reason: 'insufficient_role',
     });
     send(socket, { type: 'error', code: 'forbidden', message: 'Only the room owner or admins can update shared surfaces.' });
+    return;
+  }
+
+  const authorizedUpload = consumeAuthorizedUploadIntent(uploadId, {
+    roomId,
+    userId: actor.userId,
+    kind: 'surface-image',
+    objectKey: imagePath,
+    surfaceId,
+  });
+  if (!authorizedUpload.ok) {
+    send(socket, { type: 'error', code: authorizedUpload.code, message: authorizedUpload.message });
     return;
   }
 
@@ -851,9 +914,28 @@ async function handleAdminSetTvMedia(socket, message) {
   const sourceUrl = typeof message.sourceUrl === 'string' && message.sourceUrl.trim()
     ? normalizeToken(message.sourceUrl, 512)
     : null;
+  const uploadId = typeof message.uploadId === 'string' && message.uploadId.trim()
+    ? normalizeToken(message.uploadId, 128)
+    : null;
   if (message.sourceUrl && !sourceUrl) {
     send(socket, { type: 'error', code: 'invalid_tv_source', message: 'TV source URL is invalid.' });
     return;
+  }
+  if (sourceUrl) {
+    if (!uploadId) {
+      send(socket, { type: 'error', code: 'invalid_tv_upload', message: 'Shared TV updates require an authorized upload.' });
+      return;
+    }
+    const authorizedUpload = consumeAuthorizedUploadIntent(uploadId, {
+      roomId,
+      userId: actor.userId,
+      kind: 'tv-video',
+      objectKey: sourceUrl,
+    });
+    if (!authorizedUpload.ok) {
+      send(socket, { type: 'error', code: authorizedUpload.code, message: authorizedUpload.message });
+      return;
+    }
   }
 
   const tvMedia = sourceUrl
@@ -1042,6 +1124,236 @@ async function handleDeleteRoomRequest(request, response) {
     });
     writeJson(response, 500, { error: 'delete_failed', message: 'Unable to delete the saved room right now.' });
   }
+}
+
+async function handleAuthorizeSurfaceUploadRequest(request, response) {
+  try {
+    const payload = await readJsonBody(request);
+    const roomId = normalizeToken(payload?.roomId, MAX_ROOM_ID_LENGTH);
+    const surfaceId = normalizeSurfaceId(payload?.surfaceId);
+    const fileName = normalizeUploadFileName(payload?.fileName);
+    const contentType = normalizeToken(payload?.contentType, MAX_UPLOAD_CONTENT_TYPE_LENGTH);
+    const contentLength = normalizeUploadContentLength(payload?.contentLength);
+
+    if (!roomId) {
+      writeJson(response, 400, { error: 'invalid_room', message: 'A valid roomId is required.' });
+      return;
+    }
+    if (!surfaceId) {
+      writeJson(response, 400, { error: 'invalid_surface', message: 'A valid surfaceId is required.' });
+      return;
+    }
+    if (!fileName) {
+      writeJson(response, 400, { error: 'invalid_file_name', message: 'A valid fileName is required.' });
+      return;
+    }
+    if (!contentType || !ALLOWED_SURFACE_IMAGE_TYPES.has(contentType)) {
+      writeJson(response, 400, { error: 'invalid_content_type', message: 'Only PNG, JPG, or WebP images are supported.' });
+      return;
+    }
+    if (!Number.isFinite(contentLength) || contentLength <= 0) {
+      writeJson(response, 400, { error: 'invalid_content_length', message: 'A valid contentLength is required.' });
+      return;
+    }
+    if (contentLength > MAX_SURFACE_IMAGE_BYTES) {
+      writeJson(response, 400, { error: 'file_too_large', message: 'Images must be 5MB or smaller.' });
+      return;
+    }
+
+    const authorization = await authorizeProtectedMediaUpload(request, {
+      roomId,
+      kind: 'surface-image',
+      contentType,
+      contentLength,
+      fileName,
+      surfaceId,
+    });
+    if (!authorization.ok) {
+      writeJson(response, authorization.statusCode, { error: authorization.error, message: authorization.message });
+      return;
+    }
+
+    writeJson(response, 200, {
+      ok: true,
+      upload: authorization.upload,
+    });
+  } catch (error) {
+    logEvent('error', 'media.surface.authorize.failed', {
+      error: formatErrorForLog(error),
+    });
+    writeJson(response, 500, { error: 'upload_authorize_failed', message: 'Unable to authorize the shared surface upload right now.' });
+  }
+}
+
+async function handleAuthorizeTvUploadRequest(request, response) {
+  try {
+    const payload = await readJsonBody(request);
+    const roomId = normalizeToken(payload?.roomId, MAX_ROOM_ID_LENGTH);
+    const fileName = normalizeUploadFileName(payload?.fileName);
+    const contentType = normalizeToken(payload?.contentType, MAX_UPLOAD_CONTENT_TYPE_LENGTH);
+    const contentLength = normalizeUploadContentLength(payload?.contentLength);
+
+    if (!roomId) {
+      writeJson(response, 400, { error: 'invalid_room', message: 'A valid roomId is required.' });
+      return;
+    }
+    if (!fileName) {
+      writeJson(response, 400, { error: 'invalid_file_name', message: 'A valid fileName is required.' });
+      return;
+    }
+    if (!contentType || !ALLOWED_TV_VIDEO_TYPES.has(contentType)) {
+      writeJson(response, 400, { error: 'invalid_content_type', message: 'Only MP4 videos are supported right now.' });
+      return;
+    }
+    if (!Number.isFinite(contentLength) || contentLength <= 0) {
+      writeJson(response, 400, { error: 'invalid_content_length', message: 'A valid contentLength is required.' });
+      return;
+    }
+    if (contentLength > MAX_TV_VIDEO_BYTES) {
+      writeJson(response, 400, { error: 'file_too_large', message: 'Videos must be 150MB or smaller right now.' });
+      return;
+    }
+
+    const authorization = await authorizeProtectedMediaUpload(request, {
+      roomId,
+      kind: 'tv-video',
+      contentType,
+      contentLength,
+      fileName,
+    });
+    if (!authorization.ok) {
+      writeJson(response, authorization.statusCode, { error: authorization.error, message: authorization.message });
+      return;
+    }
+
+    writeJson(response, 200, {
+      ok: true,
+      upload: authorization.upload,
+    });
+  } catch (error) {
+    logEvent('error', 'media.tv.authorize.failed', {
+      error: formatErrorForLog(error),
+    });
+    writeJson(response, 500, { error: 'upload_authorize_failed', message: 'Unable to authorize the shared TV upload right now.' });
+  }
+}
+
+async function authorizeProtectedMediaUpload(request, options) {
+  if (!storageClient || !STORAGE_BUCKET_NAME) {
+    return {
+      ok: false,
+      statusCode: 503,
+      error: 'storage_not_configured',
+      message: 'Protected media uploads are not configured on the server.',
+    };
+  }
+
+  const token = getBearerToken(request);
+  const authResult = await verifyAuthToken(token);
+  if (!authResult.ok || !authResult.userId) {
+    return {
+      ok: false,
+      statusCode: 401,
+      error: 'unauthorized',
+      message: authResult.message ?? 'Authentication is required.',
+    };
+  }
+
+  const authority = await hydrateRoomAuthority(options.roomId);
+  if (!authority.roomRecordId) {
+    return {
+      ok: false,
+      statusCode: 409,
+      error: 'room_not_persisted',
+      message: 'Shared media uploads are available only in saved rooms.',
+    };
+  }
+
+  const actorRole = resolveRole(authResult.userId, authority);
+  if (actorRole !== 'owner' && actorRole !== 'admin') {
+    return {
+      ok: false,
+      statusCode: 403,
+      error: 'forbidden',
+      message: 'Only the room owner or admins can upload shared media.',
+    };
+  }
+
+  pruneExpiredUploadIntents();
+  enforceUploadIntentQuota(authResult.userId);
+
+  const objectKey = buildProtectedMediaObjectKey(options);
+  const uploadIntent = await createProtectedMediaUploadIntent({
+    roomId: options.roomId,
+    userId: authResult.userId,
+    actorRole,
+    kind: options.kind,
+    surfaceId: options.surfaceId ?? null,
+    fileName: options.fileName,
+    contentType: options.contentType,
+    contentLength: options.contentLength,
+    objectKey,
+  });
+
+  logEvent('info', 'media.upload.authorized', {
+    roomId: options.roomId,
+    userId: authResult.userId,
+    actorRole,
+    kind: options.kind,
+    surfaceId: options.surfaceId ?? null,
+    objectKey,
+    expiresAt: uploadIntent.expiresAt,
+  });
+
+  return {
+    ok: true,
+    upload: {
+      uploadId: uploadIntent.uploadId,
+      roomId: uploadIntent.roomId,
+      kind: uploadIntent.kind,
+      surfaceId: uploadIntent.surfaceId,
+      objectKey: uploadIntent.objectKey,
+      contentType: uploadIntent.contentType,
+      contentLength: uploadIntent.contentLength,
+      expiresAt: uploadIntent.expiresAt,
+      uploadUrl: uploadIntent.uploadUrl,
+      uploadHeaders: {},
+    },
+  };
+}
+
+async function createProtectedMediaUploadIntent(options) {
+  const uploadId = randomUUID();
+  const expiresAtMs = Date.now() + MEDIA_UPLOAD_INTENT_TTL_MS;
+  const uploadUrl = await createPresignedStoragePutUrl(options.objectKey, options.contentType, Math.max(30, Math.floor(MEDIA_UPLOAD_INTENT_TTL_MS / 1000)));
+  const intent = {
+    uploadId,
+    roomId: options.roomId,
+    userId: options.userId,
+    actorRole: options.actorRole,
+    kind: options.kind,
+    surfaceId: options.surfaceId,
+    fileName: options.fileName,
+    contentType: options.contentType,
+    contentLength: options.contentLength,
+    objectKey: options.objectKey,
+    uploadUrl,
+    expiresAt: new Date(expiresAtMs).toISOString(),
+    expiresAtMs,
+    createdAt: new Date().toISOString(),
+    usedAt: null,
+  };
+  mediaUploadIntents.set(uploadId, intent);
+  return intent;
+}
+
+async function createPresignedStoragePutUrl(objectKey, contentType, expiresInSeconds) {
+  const command = new PutObjectCommand({
+    Bucket: STORAGE_BUCKET_NAME,
+    Key: objectKey,
+    ContentType: contentType,
+  });
+  return await getSignedUrl(storageClient, command, { expiresIn: expiresInSeconds });
 }
 
 function listLiveRooms() {
@@ -1328,8 +1640,145 @@ function readJsonBody(request) {
 }
 
 function writeJson(response, statusCode, payload) {
-  response.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  response.writeHead(statusCode, withCorsHeaders(null, { 'Content-Type': 'application/json; charset=utf-8' }));
   response.end(JSON.stringify(payload));
+}
+
+function withCorsHeaders(request, headers = {}) {
+  const origin = typeof request?.headers?.origin === 'string' ? request.headers.origin : '';
+  const allowOrigin = !request
+    ? '*'
+    : origin && isOriginAllowed(origin)
+      ? origin
+      : ALLOWED_ORIGINS.length === 0
+        ? '*'
+        : '';
+  const corsHeaders = {
+    ...headers,
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'content-type,authorization',
+  };
+  if (allowOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = allowOrigin;
+  }
+  if (allowOrigin !== '*') {
+    corsHeaders.Vary = corsHeaders.Vary ? `${corsHeaders.Vary}, Origin` : 'Origin';
+  }
+  return corsHeaders;
+}
+
+function isHttpOriginAllowed(request) {
+  const origin = typeof request.headers.origin === 'string' ? request.headers.origin : '';
+  if (!origin) {
+    return true;
+  }
+  return isOriginAllowed(origin);
+}
+
+function getBearerToken(request) {
+  const authorizationHeader = typeof request.headers.authorization === 'string' ? request.headers.authorization : '';
+  return authorizationHeader.startsWith('Bearer ') ? authorizationHeader.slice(7).trim() : '';
+}
+
+function normalizeUploadFileName(value) {
+  const normalized = normalizeToken(value, MAX_UPLOAD_FILE_NAME_LENGTH);
+  return normalized ? normalized.replace(/[<>:"/\\|?*\x00-\x1f]+/g, '-').trim() : null;
+}
+
+function normalizeUploadContentLength(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.floor(numeric);
+}
+
+function buildProtectedMediaObjectKey(options) {
+  const extension = getExtensionForContentType(options.contentType);
+  const safeStem = sanitizeStorageStem(options.fileName);
+  const randomSuffix = randomUUID().replace(/-/g, '');
+  const fileName = `${Date.now()}-${randomSuffix}-${safeStem}.${extension}`;
+  if (options.kind === 'surface-image') {
+    return `room-surfaces/${options.roomId}/${options.surfaceId}/${fileName}`;
+  }
+  return `room-tv/${options.roomId}/${fileName}`;
+}
+
+function getExtensionForContentType(contentType) {
+  switch (contentType) {
+    case 'image/jpeg':
+      return 'jpg';
+    case 'image/png':
+      return 'png';
+    case 'image/webp':
+      return 'webp';
+    case 'video/mp4':
+      return 'mp4';
+    default:
+      return 'bin';
+  }
+}
+
+function sanitizeStorageStem(fileName) {
+  const withoutExtension = fileName.replace(/\.[a-z0-9]+$/i, '');
+  const normalized = withoutExtension
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return normalized || 'upload';
+}
+
+function pruneExpiredUploadIntents() {
+  const now = Date.now();
+  for (const [uploadId, intent] of mediaUploadIntents.entries()) {
+    if ((intent.expiresAtMs ?? 0) <= now) {
+      mediaUploadIntents.delete(uploadId);
+    }
+  }
+}
+
+function enforceUploadIntentQuota(userId) {
+  const activeIntentIds = [];
+  for (const [uploadId, intent] of mediaUploadIntents.entries()) {
+    if (intent.userId === userId) {
+      activeIntentIds.push({ uploadId, createdAt: intent.createdAt });
+    }
+  }
+  if (activeIntentIds.length < MAX_UPLOAD_INTENTS_PER_USER) {
+    return;
+  }
+  activeIntentIds
+    .sort((left, right) => String(left.createdAt).localeCompare(String(right.createdAt)))
+    .slice(0, activeIntentIds.length - MAX_UPLOAD_INTENTS_PER_USER + 1)
+    .forEach(({ uploadId }) => {
+      mediaUploadIntents.delete(uploadId);
+    });
+}
+
+function consumeAuthorizedUploadIntent(uploadId, options) {
+  pruneExpiredUploadIntents();
+  const intent = mediaUploadIntents.get(uploadId);
+  if (!intent) {
+    return { ok: false, code: 'upload_not_authorized', message: 'That shared media upload is no longer authorized.' };
+  }
+  if (intent.usedAt) {
+    mediaUploadIntents.delete(uploadId);
+    return { ok: false, code: 'upload_already_used', message: 'That shared media upload has already been used.' };
+  }
+  if (intent.roomId !== options.roomId || intent.userId !== options.userId || intent.kind !== options.kind) {
+    return { ok: false, code: 'upload_scope_mismatch', message: 'That shared media upload does not match this room or user.' };
+  }
+  if (intent.objectKey !== options.objectKey) {
+    return { ok: false, code: 'upload_key_mismatch', message: 'That shared media upload key is invalid.' };
+  }
+  if (options.kind === 'surface-image' && intent.surfaceId !== options.surfaceId) {
+    return { ok: false, code: 'upload_surface_mismatch', message: 'That shared surface upload was not authorized for this frame.' };
+  }
+
+  intent.usedAt = new Date().toISOString();
+  mediaUploadIntents.delete(uploadId);
+  return { ok: true, intent };
 }
 
 function loadSpawnPoints() {

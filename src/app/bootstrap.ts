@@ -548,15 +548,20 @@ export function bootstrapApp(): void {
         if (!roomState.getSnapshot().isPersisted) {
           throw new Error('Shared surfaces are available only in saved rooms.');
         }
+        const token = await getRealtimeAuthToken();
+        if (!token) {
+          throw new Error('Sign in to update shared surfaces.');
+        }
 
         const { uploadRoomSurfaceImage } = await import('../backend/surfaceImageClient');
-        const imagePath = await uploadRoomSurfaceImage(activeSession.roomId, surfaceId, file);
+        const upload = await uploadRoomSurfaceImage(activeSession.roomId, surfaceId, file, token);
         roomClient.send({
           type: 'admin.setSurfaceImage',
           roomId: activeSession.roomId,
           sessionId: activeSession.sessionId,
           surfaceId,
-          imagePath,
+          imagePath: upload.objectKey,
+          uploadId: upload.uploadId,
         });
         roomPanel.setStatus(`Uploaded ${surfaceId}. Waiting for room sync...`);
       },
@@ -591,14 +596,19 @@ export function bootstrapApp(): void {
         if (!roomState.getSnapshot().isPersisted) {
           throw new Error('Shared TV is available only in saved rooms.');
         }
+        const token = await getRealtimeAuthToken();
+        if (!token) {
+          throw new Error('Sign in to upload a shared TV video.');
+        }
 
         const { uploadRoomTvVideo } = await import('../backend/tvMediaClient');
-        const sourceUrl = await uploadRoomTvVideo(activeSession.roomId, file);
+        const upload = await uploadRoomTvVideo(activeSession.roomId, file, token);
         roomClient.send({
           type: 'admin.setTvMedia',
           roomId: activeSession.roomId,
           sessionId: activeSession.sessionId,
-          sourceUrl,
+          sourceUrl: upload.objectKey,
+          uploadId: upload.uploadId,
         });
         roomPanel.setStatus(`Uploaded ${file.name}. Waiting for shared TV sync...`);
       },

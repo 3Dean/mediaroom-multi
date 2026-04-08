@@ -1,4 +1,5 @@
 import { ensureAmplifyConfigured } from './amplifyClient';
+import { getRealtimeApiUrl } from './realtimeApiClient';
 import type { Schema } from '../../amplify/data/resource';
 import type { RoomSummary } from '../types/room';
 
@@ -44,7 +45,7 @@ export async function listRooms(): Promise<RoomSummary[]> {
 }
 
 export async function listLiveRooms(): Promise<RoomSummary[]> {
-  const response = await fetch('/api/rooms/live');
+  const response = await fetch(getRealtimeApiUrl('/api/rooms/live'));
   if (!response.ok) {
     throw new Error(`Live room request failed with status ${response.status}`);
   }
@@ -115,7 +116,7 @@ export async function listRecentRoomMessages(roomId: string) {
 }
 
 export async function deleteRoom(roomId: string, token: string): Promise<void> {
-  const response = await fetch('/api/rooms/delete', {
+  const response = await fetch(getRealtimeApiUrl('/api/rooms/delete'), {
     method: 'POST',
     headers: {
       'content-type': 'application/json',

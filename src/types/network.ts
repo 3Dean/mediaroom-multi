@@ -107,6 +107,7 @@ export type AdminSetSurfaceImageMessage = {
   sessionId: string;
   surfaceId: RoomSurfaceId;
   imagePath: string;
+  uploadId: string;
 };
 
 export type AdminSetTvMediaMessage = {
@@ -114,6 +115,7 @@ export type AdminSetTvMediaMessage = {
   roomId: string;
   sessionId: string;
   sourceUrl: string | null;
+  uploadId?: string;
 };
 
 export type AdminSetTvPlaybackMessage = {

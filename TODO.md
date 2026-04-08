@@ -30,6 +30,19 @@
   - done: verify Render can perform shared surface updates after widening AppSync IAM access
   - done: fix durable ownership by switching server authority hydration/persistence to direct DynamoDB
   - next: re-verify shared-surface upload gating and `Recent` ordering in production after the DynamoDB authority change
+  - next: tighten shared media uploads with a server-authorized flow
+  - cleanup before step 1:
+    - document the current upload paths, limits, and room-role checks so rollout preserves existing behavior
+    - identify every read/write/delete path for `room-surfaces/*` and `room-tv/*`, including room deletion and media replacement
+    - decide whether to keep existing stored asset paths fully backward-compatible or migrate only new uploads
+    - confirm S3/CloudFront/CORS requirements for presigned `PUT` uploads from the browser
+    - define the upload-intent lifetime, single-use behavior, and object-key naming rules before changing bucket permissions
+  - step 1: add server upload-authorization endpoints for surface images and TV video uploads
+  - step 2: add server-side validation for room role, media type, size limits, and object-key scope
+  - step 3: update the client upload helpers to request authorization, upload via presigned `PUT`, and submit the returned storage key
+  - step 4: verify websocket room-state updates only accept authorized, unexpired uploaded keys for that room and media kind
+  - step 5: add cleanup for replaced media, deleted rooms, expired upload intents, and orphaned protected uploads
+  - step 6: remove broad authenticated `write/delete` access from shared media prefixes and re-test owner/admin, non-admin, and guest flows
 
 ## Later
 

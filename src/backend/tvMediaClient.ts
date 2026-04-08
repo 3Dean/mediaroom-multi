@@ -1,22 +1,32 @@
-import { ensureAmplifyConfigured } from './amplifyClient';
+import { getRealtimeApiUrl } from './realtimeApiClient';
 
 const MAX_TV_VIDEO_BYTES = 150 * 1024 * 1024;
 const ALLOWED_VIDEO_TYPES = new Set(['video/mp4']);
 
-export async function uploadRoomTvVideo(roomId: string, file: File): Promise<string> {
+type AuthorizedUploadResponse = {
+  ok: true;
+  upload: {
+    uploadId: string;
+    objectKey: string;
+    uploadUrl: string;
+    uploadHeaders?: Record<string, string>;
+  };
+};
+
+export async function uploadRoomTvVideo(
+  roomId: string,
+  file: File,
+  token: string,
+): Promise<{ uploadId: string; objectKey: string }> {
   validateTvVideo(file);
-  await ensureAmplifyConfigured();
-  const { uploadData } = await import('aws-amplify/storage');
-  const safeName = sanitizeFilename(file.name || 'tv-video.mp4');
-  const path = `room-tv/${roomId}/${Date.now()}-${safeName}`;
-  await uploadData({
-    path,
-    data: file,
-    options: {
-      contentType: file.type || 'video/mp4',
-    },
-  }).result;
-  return path;
+
+  const authorization = await authorizeTvUpload(roomId, file, token);
+  await uploadAuthorizedFile(file, authorization.upload.uploadUrl, authorization.upload.uploadHeaders);
+
+  return {
+    uploadId: authorization.upload.uploadId,
+    objectKey: authorization.upload.objectKey,
+  };
 }
 
 export function validateTvVideo(file: File): void {
@@ -28,11 +38,36 @@ export function validateTvVideo(file: File): void {
   }
 }
 
-function sanitizeFilename(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    || 'tv-video.mp4';
+async function authorizeTvUpload(roomId: string, file: File, token: string): Promise<AuthorizedUploadResponse> {
+  const response = await fetch(getRealtimeApiUrl('/api/uploads/tv-authorize'), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      roomId,
+      fileName: file.name || 'tv-video.mp4',
+      contentType: file.type || 'video/mp4',
+      contentLength: file.size,
+    }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.upload?.uploadId || !payload?.upload?.objectKey || !payload?.upload?.uploadUrl) {
+    throw new Error(typeof payload?.message === 'string' ? payload.message : 'Unable to authorize that TV upload right now.');
+  }
+  return payload as AuthorizedUploadResponse;
+}
+
+async function uploadAuthorizedFile(file: File, uploadUrl: string, uploadHeaders: Record<string, string> | undefined): Promise<void> {
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      ...(uploadHeaders ?? {}),
+    },
+    body: file,
+  });
+  if (!response.ok) {
+    throw new Error(`Video upload failed with status ${response.status}.`);
+  }
 }
