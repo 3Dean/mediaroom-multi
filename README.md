@@ -110,6 +110,8 @@ Saved rooms expose owner/admin-only shared media controls:
 
 The current Shared TV UX intentionally does not expose seek or scrubber controls. Playback state is kept simple until a fuller synchronized media control surface is implemented.
 
+For the planned room-scoped media library work, see [`ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md`](./ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md).
+
 ## Health check
 
 The realtime server exposes:

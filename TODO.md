@@ -19,6 +19,7 @@
 
 ## Next
 
+- Room media library planning and implementation checklist lives in `ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md`.
 - Improve remote avatar presentation beyond placeholders.
 - Shared surface image upload and saved-room lifecycle follow-up
   - done: add Amplify storage for guest-readable room surface images
