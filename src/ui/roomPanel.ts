@@ -64,6 +64,28 @@ function formatRoomTimestamp(room: RoomSummary): string {
   return `Updated ${Math.max(1, Math.floor(deltaMs / dayMs))}d ago`;
 }
 
+function formatOwnerLabel(room: RoomSummary, currentUserId: string | null): string {
+  if (!room.createdBy) {
+    return 'Owner: Unknown';
+  }
+
+  if (currentUserId && room.createdBy === currentUserId) {
+    return 'Owner: You';
+  }
+
+  return `Owner: ${room.createdBy.slice(0, 8)}`;
+}
+
+function formatLiveLabel(room: RoomSummary): string {
+  if (room.isLive) {
+    return room.liveParticipantCount && room.liveParticipantCount > 0
+      ? `Status: Live with ${room.liveParticipantCount}`
+      : 'Status: Live';
+  }
+
+  return room.isPersisted ? 'Status: Saved' : 'Status: Temporary';
+}
+
 export class RoomPanel {
   private readonly container: HTMLDivElement;
   private readonly form: HTMLFormElement;
@@ -170,11 +192,11 @@ export class RoomPanel {
 
     this.statusLabel = document.createElement('div');
     this.statusLabel.className = 'musicspace-helper-text room-status';
-    this.statusLabel.textContent = 'Multiplayer wiring will attach here.';
+    this.statusLabel.hidden = true;
 
     this.metaLabel = document.createElement('div');
     this.metaLabel.className = 'musicspace-card-meta room-meta';
-    this.metaLabel.textContent = 'Connection idle';
+    this.metaLabel.hidden = true;
 
     const listSection = document.createElement('div');
     listSection.className = 'musicspace-subsection room-section room-browser';
@@ -257,11 +279,13 @@ export class RoomPanel {
 
   setStatus(message: string): void {
     this.statusLabel.textContent = message;
+    this.statusLabel.hidden = !message.trim();
     this.onStatusChange?.(message);
   }
 
   setMeta(message: string): void {
     this.metaLabel.textContent = message;
+    this.metaLabel.hidden = !message.trim();
     this.onMetaChange?.(message);
   }
 
@@ -398,11 +422,18 @@ export class RoomPanel {
 
       const slug = document.createElement('div');
       slug.className = 'room-browser-item-slug';
-      slug.textContent = room.slug;
+      slug.textContent = `Slug: ${room.slug}`;
 
       const meta = document.createElement('div');
       meta.className = 'room-browser-item-meta';
-      meta.textContent = formatRoomTimestamp(room);
+
+      const liveMeta = document.createElement('div');
+      liveMeta.textContent = `${formatLiveLabel(room)} • ${formatRoomTimestamp(room)}`;
+
+      const ownerMeta = document.createElement('div');
+      ownerMeta.textContent = formatOwnerLabel(room, this.currentUserId);
+
+      meta.append(liveMeta, ownerMeta);
 
       const actions = document.createElement('div');
       actions.className = 'room-browser-actions';

@@ -1004,9 +1004,11 @@ body.mouse #mobile-controls-layer {
 
 .chat-tv-controls {
   display: grid;
-  grid-template-columns: auto minmax(52px, 72px) auto auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   align-items: center;
+  justify-items: stretch;
+  width: 100%;
 }
 
 .chat-surface-select,
@@ -1014,12 +1016,6 @@ body.mouse #mobile-controls-layer {
 .chat-tv-input {
   width: 100%;
   box-sizing: border-box;
-}
-
-.chat-tv-seek-label {
-  color: #9eacbe;
-  font-size: 11px;
-  white-space: nowrap;
 }
 
 .chat-surface-upload-button {
@@ -1716,7 +1712,7 @@ select.musicspace-input:focus {
 }
 
 .chat-tv-controls {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .auth-secondary-actions {

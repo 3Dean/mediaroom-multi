@@ -90,6 +90,7 @@ The room flow now distinguishes between temporary guest sessions and saved rooms
 - guests can join saved rooms
 - guests entering a brand-new link create a temporary room session, not a saved room
 - durable room features such as shared surface uploads are available only in saved rooms
+- room browser cards now show explicit slug, owner, and saved/live state to make duplicate-looking room entries easier to distinguish
 
 In the room panel this means:
 
@@ -99,6 +100,15 @@ In the room panel this means:
 - current room: `Re-Enter Room`
 
 For operational debugging, the realtime server now emits structured JSON logs for joins, disconnects, moderation actions, chat enforcement, and authority persistence failures. Use `REALTIME_LOG_LEVEL=debug|info|warn|error` to control verbosity. `info` is the default and is appropriate for Render.
+
+## Shared media controls
+
+Saved rooms expose owner/admin-only shared media controls:
+
+- Shared Surfaces: upload replacement images for `image01` through `image04`
+- Shared TV: upload an MP4, clear it, and toggle play/pause
+
+The current Shared TV UX intentionally does not expose seek or scrubber controls. Playback state is kept simple until a fuller synchronized media control surface is implemented.
 
 ## Health check
 

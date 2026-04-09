@@ -15,6 +15,7 @@
 - Clarify room lifecycle so signed-in users create saved rooms while guests enter temporary sessions.
 - Move realtime room authority persistence to direct DynamoDB reads/writes on Render.
 - Verify saved-room ownership survives Render restart while temporary guest rooms remain ownerless.
+- Clarify room-browser metadata and simplify Shared TV controls.
 
 ## Next
 
@@ -43,6 +44,9 @@
   - done: step 4: verify websocket room-state updates only accept authorized, unexpired uploaded keys for that room and media kind
   - done: step 5: add cleanup for replaced media, deleted rooms, expired upload intents, and orphaned protected uploads
   - done in code: step 6: remove broad authenticated `write/delete` access from shared media prefixes and re-test owner/admin, non-admin, and guest flows
+  - done: clarify room-browser cards with explicit slug, owner, and saved/live state
+  - done: simplify Shared TV controls to upload, clear, and play/pause only
+  - done: replace misleading synced TV seconds copy with clearer playback status text
   - next: deploy the updated Amplify storage policy and re-test direct browser access in the target environment
 
 ## Later
@@ -54,8 +58,9 @@
   - v1: owner/admin-only TV control for saved rooms
   - use curated or app-managed `S3`/`CloudFront` mp4 URLs
   - next: build a local hardcoded TV-video proof of concept by swapping the current `tvscreen.glb` visualizer material to a `THREE.VideoTexture`
-  - sync media source, play/pause, and seek through room state
+  - sync media source and play/pause through room state
   - apply video as a Three.js `VideoTexture` on the TV mesh
+  - done: remove seek UX for now instead of keeping a misleading partial control
   - defer uploads and YouTube support
   - later: add `MediaConvert`/HLS if direct mp4 delivery becomes too heavy
 - Improve shared object sync beyond claim/drop authority only.

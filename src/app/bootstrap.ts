@@ -194,7 +194,7 @@ export function bootstrapApp(): void {
       }
 
       const realtimeUrl = getRealtimeUrl();
-      roomPanel.setStatus(`Joined ${roomSlug}. Connecting to ${realtimeUrl}.`);
+      roomPanel.setStatus(`Joining ${roomSlug}. Connecting to realtime...`);
       roomPanel.setMeta('Connecting');
       roomPanel.setActiveRoom(roomSlug, knownRooms.some((room) => room.slug.toLowerCase() === roomSlug.toLowerCase() && room.isPersisted));
       participantList.setConnectionStatus('Connecting');
@@ -206,8 +206,8 @@ export function bootstrapApp(): void {
         maxReconnectDelayMs: APP_CONFIG.reconnectMaxDelayMs,
         onOpen: async () => {
           const authToken = await getRealtimeAuthToken();
-          roomPanel.setStatus(`Connected to ${roomSlug}.`);
-          roomPanel.setMeta('Live');
+          roomPanel.setStatus('');
+          roomPanel.setMeta('');
           participantList.setConnectionStatus('Live');
           nextRoomClient.send({
             type: 'room.join',
@@ -393,7 +393,7 @@ export function bootstrapApp(): void {
         roomState.clearPresence();
         syncRoomUi(chatPanel, participantList, remotePlayerManager);
         participantList.setConnectionStatus('Idle');
-        roomPanel.setMeta('Idle');
+        roomPanel.setMeta('');
         void refreshRooms();
         roomPanel.setStatus('Signed out. Join a saved room or enter a temporary guest room. Sign in to create saved rooms and use admin controls.');
         (window as any).__musicspaceSetLobbyMode?.(true);
@@ -642,7 +642,7 @@ export function bootstrapApp(): void {
     chatPanel.mount(sidebarPanels.primaryPanels, sidebarPanels.advancedPanels);
     preferencesPanel.mount(sidebarPanels.advancedPanels);
     syncRoomUi(chatPanel, participantList, remotePlayerManager);
-    roomPanel.setMeta('Idle');
+    roomPanel.setMeta('');
     participantList.setConnectionStatus('Idle');
 
     if (currentUser?.signInDetails?.loginId) {
@@ -760,20 +760,22 @@ function initializeSidebarLayout(): SidebarLayout {
   setActiveQuickNav('music-section');
 
   const syncSessionHeader = () => {
-    const roomMeta = document.querySelector<HTMLElement>('#room-panel .room-meta')?.textContent?.trim() || 'Idle';
+    const participantConnection = document.querySelector<HTMLElement>('#participant-list .musicspace-card-meta')?.textContent?.trim() || '';
+    const roomMeta = document.querySelector<HTMLElement>('#room-panel .room-meta')?.textContent?.trim() || '';
+    const headerStatus = roomMeta || participantConnection || 'Idle';
     const roomStatus = document.querySelector<HTMLElement>('#room-panel .room-status')?.textContent?.trim() || 'Join a room to start a session.';
     const roomSlug = document.querySelector<HTMLInputElement>('#room-panel input[placeholder="Room link / slug"]')?.value.trim() || 'No room selected';
     const displayName = document.querySelector<HTMLInputElement>('#room-panel input[placeholder="Display name"]')?.value.trim()
       || document.querySelector<HTMLElement>('#auth-panel .musicspace-accordion-meta')?.textContent?.trim()
       || 'Guest';
 
-    statusLine1.textContent = roomMeta;
+    statusLine1.textContent = headerStatus;
     statusLine2.textContent = `${roomSlug} · ${displayName}`;
 
     statusIndicator.classList.remove('is-idle', 'is-live', 'is-warn');
-    if (/live|connected/i.test(roomMeta)) {
+    if (/live|connected/i.test(headerStatus)) {
       statusIndicator.classList.add('is-live');
-    } else if (/retry|offline|disconnected|failed/i.test(roomStatus) || /offline|retry/i.test(roomMeta)) {
+    } else if (/retry|offline|disconnected|failed/i.test(roomStatus) || /offline|retry/i.test(headerStatus)) {
       statusIndicator.classList.add('is-warn');
     } else {
       statusIndicator.classList.add('is-idle');

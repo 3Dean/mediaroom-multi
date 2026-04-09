@@ -12,6 +12,19 @@ type ChatPanelOptions = {
 
 const SURFACE_IDS: RoomSurfaceId[] = ['image01', 'image02', 'image03', 'image04'];
 
+function formatPlaybackTimecode(seconds: number): string {
+  const safeSeconds = Math.max(0, Number.isFinite(seconds) ? Math.floor(seconds) : 0);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const remainingSeconds = safeSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+  }
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
 export class ChatPanel {
   private readonly container: HTMLDivElement;
   private readonly sharedMediaContainer: HTMLDetailsElement;
@@ -29,8 +42,6 @@ export class ChatPanel {
   private readonly tvUploadButton: HTMLButtonElement;
   private readonly tvClearButton: HTMLButtonElement;
   private readonly tvTogglePlaybackButton: HTMLButtonElement;
-  private readonly tvSeekInput: HTMLInputElement;
-  private readonly tvSeekButton: HTMLButtonElement;
   private readonly tvHelper: HTMLDivElement;
   private readonly onSend: (body: string) => void;
   private readonly onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
@@ -42,6 +53,7 @@ export class ChatPanel {
   private tvEnabled = false;
   private tvVisible = false;
   private tvIsPlaying = false;
+  private tvCurrentTime = 0;
 
   constructor(options: ChatPanelOptions) {
     this.onSend = options.onSend;
@@ -197,7 +209,7 @@ export class ChatPanel {
     this.tvUploadButton = document.createElement('button');
     this.tvUploadButton.type = 'button';
     this.tvUploadButton.textContent = 'Upload';
-    this.tvUploadButton.className = 'musicspace-button musicspace-button--secondary musicspace-button--block chat-tv-upload-button';
+    this.tvUploadButton.className = 'musicspace-button musicspace-button--primary musicspace-button--block chat-tv-upload-button';
     this.tvUploadButton.addEventListener('click', () => {
       void this.handleTvUpload();
     });
@@ -211,31 +223,12 @@ export class ChatPanel {
     this.tvTogglePlaybackButton = document.createElement('button');
     this.tvTogglePlaybackButton.type = 'button';
     this.tvTogglePlaybackButton.textContent = 'Play';
-    this.tvTogglePlaybackButton.className = 'musicspace-button musicspace-button--secondary';
+    this.tvTogglePlaybackButton.className = 'musicspace-button musicspace-button--secondary musicspace-button--block';
     this.tvTogglePlaybackButton.addEventListener('click', () => {
       void this.handleTvPlaybackUpdate(!this.tvIsPlaying);
     });
 
-    this.tvSeekInput = document.createElement('input');
-    this.tvSeekInput.type = 'number';
-    this.tvSeekInput.min = '0';
-    this.tvSeekInput.step = '0.1';
-    this.tvSeekInput.placeholder = '0';
-    this.tvSeekInput.className = 'musicspace-input musicspace-input--small chat-tv-input';
-
-    const tvSeekLabel = document.createElement('div');
-    tvSeekLabel.className = 'musicspace-inline-unit chat-tv-seek-label';
-    tvSeekLabel.textContent = 'Seconds';
-
-    this.tvSeekButton = document.createElement('button');
-    this.tvSeekButton.type = 'button';
-    this.tvSeekButton.textContent = 'Seek';
-    this.tvSeekButton.className = 'musicspace-button musicspace-button--secondary';
-    this.tvSeekButton.addEventListener('click', () => {
-      void this.handleTvSeekUpdate();
-    });
-
-    tvPlaybackControls.append(this.tvTogglePlaybackButton, this.tvSeekInput, tvSeekLabel, this.tvSeekButton);
+    tvPlaybackControls.append(this.tvTogglePlaybackButton);
     this.tvSection.append(tvTitle, this.tvHelper, tvControls, tvUploadActions, tvPlaybackControls);
 
     sharedMediaBody.append(this.surfaceSection, this.tvSection);
@@ -291,19 +284,19 @@ export class ChatPanel {
     this.tvVisible = visible;
     this.tvEnabled = enabled;
     this.tvIsPlaying = isPlaying;
+    this.tvCurrentTime = Math.max(0, Number.isFinite(currentTime) ? currentTime : 0);
     this.tvSection.style.display = visible ? 'grid' : 'none';
     this.tvFileInput.disabled = !enabled;
     this.tvUploadButton.disabled = !enabled;
     this.tvClearButton.disabled = !enabled;
     this.tvTogglePlaybackButton.disabled = !enabled || !sourceUrl;
     this.tvTogglePlaybackButton.textContent = isPlaying ? 'Pause' : 'Play';
-    this.tvSeekInput.disabled = !enabled || !sourceUrl;
-    this.tvSeekButton.disabled = !enabled || !sourceUrl;
     this.tvInput.value = sourceUrl ?? '';
-    this.tvSeekInput.value = sourceUrl ? String(Math.max(0, Number.isFinite(currentTime) ? currentTime : 0)) : '';
     if (enabled) {
       this.tvHelper.textContent = sourceUrl
-        ? `Shared TV is ${isPlaying ? 'playing' : 'paused'} at ${Math.max(0, Number.isFinite(currentTime) ? currentTime : 0).toFixed(1)}s.`
+        ? (isPlaying
+          ? 'Shared TV is playing.'
+          : `Shared TV is paused at ${formatPlaybackTimecode(currentTime)}.`)
         : 'Owner/admin can upload an MP4 for the shared TV.';
     } else if (!isPersistedRoom) {
       this.tvHelper.textContent = 'Shared TV is available only in saved rooms. Sign in and create the room to enable it.';
@@ -364,8 +357,6 @@ export class ChatPanel {
     this.tvUploadButton.disabled = true;
     this.tvClearButton.disabled = true;
     this.tvTogglePlaybackButton.disabled = true;
-    this.tvSeekInput.disabled = true;
-    this.tvSeekButton.disabled = true;
     this.tvHelper.textContent = sourceUrl ? 'Updating shared TV...' : 'Clearing shared TV...';
 
     try {
@@ -381,8 +372,6 @@ export class ChatPanel {
       this.tvClearButton.disabled = !this.tvEnabled;
       const hasSource = Boolean(this.tvInput.value.trim());
       this.tvTogglePlaybackButton.disabled = !this.tvEnabled || !hasSource;
-      this.tvSeekInput.disabled = !this.tvEnabled || !hasSource;
-      this.tvSeekButton.disabled = !this.tvEnabled || !hasSource;
     }
   }
 
@@ -404,8 +393,6 @@ export class ChatPanel {
     this.tvUploadButton.disabled = true;
     this.tvClearButton.disabled = true;
     this.tvTogglePlaybackButton.disabled = true;
-    this.tvSeekInput.disabled = true;
-    this.tvSeekButton.disabled = true;
     this.tvHelper.textContent = `Uploading ${file.name} for the shared TV...`;
 
     try {
@@ -420,8 +407,6 @@ export class ChatPanel {
       this.tvClearButton.disabled = !this.tvEnabled;
       const hasSource = Boolean(this.tvInput.value.trim());
       this.tvTogglePlaybackButton.disabled = !this.tvEnabled || !hasSource;
-      this.tvSeekInput.disabled = !this.tvEnabled || !hasSource;
-      this.tvSeekButton.disabled = !this.tvEnabled || !hasSource;
     }
   }
 
@@ -430,31 +415,16 @@ export class ChatPanel {
       return;
     }
 
-    const currentTime = parseFloat(this.tvSeekInput.value || '0');
+    const livePlaybackState = window.__musicspaceGetTvPlaybackState?.();
+    const currentTime = livePlaybackState?.sourceUrl
+      ? Math.max(0, Number.isFinite(livePlaybackState.currentTime) ? livePlaybackState.currentTime : this.tvCurrentTime)
+      : this.tvCurrentTime;
+
     this.tvHelper.textContent = isPlaying ? 'Resuming shared TV...' : 'Pausing shared TV...';
     try {
-      await this.onSetTvPlayback(isPlaying, Number.isFinite(currentTime) ? currentTime : 0);
+      await this.onSetTvPlayback(isPlaying, currentTime);
     } catch (error) {
       this.tvHelper.textContent = getErrorMessage(error, 'Unable to update shared TV playback right now.');
-    }
-  }
-
-  private async handleTvSeekUpdate(): Promise<void> {
-    if (!this.tvEnabled || !this.tvInput.value.trim()) {
-      return;
-    }
-
-    const currentTime = parseFloat(this.tvSeekInput.value || '0');
-    if (!Number.isFinite(currentTime) || currentTime < 0) {
-      this.tvHelper.textContent = 'Enter a valid seek time in seconds.';
-      return;
-    }
-
-    this.tvHelper.textContent = `Seeking shared TV to ${currentTime.toFixed(1)}s...`;
-    try {
-      await this.onSetTvPlayback(this.tvIsPlaying, currentTime);
-    } catch (error) {
-      this.tvHelper.textContent = getErrorMessage(error, 'Unable to seek shared TV right now.');
     }
   }
 
