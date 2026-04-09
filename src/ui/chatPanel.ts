@@ -4,16 +4,15 @@ import { createSectionIcon } from './sectionIcons';
 
 type ChatPanelOptions = {
   onSend: (body: string) => void;
-  onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
+  onUploadSurface: (file: File) => Promise<void>;
   onSetTvMedia: (sourceUrl: string | null) => Promise<void>;
   onUploadTvMedia: (file: File) => Promise<void>;
   onSetTvPlayback: (isPlaying: boolean, currentTime: number) => Promise<void>;
   onListRoomMedia: (kind?: RoomMediaAssetKind) => Promise<{ assets: RoomMediaAsset[]; usage: RoomMediaUsage }>;
   onUseRoomMediaAsset: (asset: RoomMediaAsset, target?: RoomSurfaceId) => Promise<void>;
+  onClearRoomMediaAsset: (asset: RoomMediaAsset) => Promise<void>;
   onDeleteRoomMediaAsset: (asset: RoomMediaAsset) => Promise<void>;
 };
-
-const SURFACE_IDS: RoomSurfaceId[] = ['image01', 'image02', 'image03', 'image04'];
 
 function formatPlaybackTimecode(seconds: number): string {
   const safeSeconds = Math.max(0, Number.isFinite(seconds) ? Math.floor(seconds) : 0);
@@ -72,7 +71,6 @@ export class ChatPanel {
   private readonly form: HTMLFormElement;
   private readonly input: HTMLInputElement;
   private readonly surfaceSection: HTMLDivElement;
-  private readonly surfaceSelect: HTMLSelectElement;
   private readonly surfaceFileInput: HTMLInputElement;
   private readonly surfaceUploadButton: HTMLButtonElement;
   private readonly surfaceHelper: HTMLDivElement;
@@ -89,12 +87,13 @@ export class ChatPanel {
   private readonly tvTogglePlaybackButton: HTMLButtonElement;
   private readonly tvHelper: HTMLDivElement;
   private readonly onSend: (body: string) => void;
-  private readonly onUploadSurface: (surfaceId: RoomSurfaceId, file: File) => Promise<void>;
+  private readonly onUploadSurface: (file: File) => Promise<void>;
   private readonly onSetTvMedia: (sourceUrl: string | null) => Promise<void>;
   private readonly onUploadTvMedia: (file: File) => Promise<void>;
   private readonly onSetTvPlayback: (isPlaying: boolean, currentTime: number) => Promise<void>;
   private readonly onListRoomMedia: (kind?: RoomMediaAssetKind) => Promise<{ assets: RoomMediaAsset[]; usage: RoomMediaUsage }>;
   private readonly onUseRoomMediaAsset: (asset: RoomMediaAsset, target?: RoomSurfaceId) => Promise<void>;
+  private readonly onClearRoomMediaAsset: (asset: RoomMediaAsset) => Promise<void>;
   private readonly onDeleteRoomMediaAsset: (asset: RoomMediaAsset) => Promise<void>;
   private surfaceUploadEnabled = false;
   private surfaceUploadVisible = false;
@@ -114,6 +113,7 @@ export class ChatPanel {
     this.onSetTvPlayback = options.onSetTvPlayback;
     this.onListRoomMedia = options.onListRoomMedia;
     this.onUseRoomMediaAsset = options.onUseRoomMediaAsset;
+    this.onClearRoomMediaAsset = options.onClearRoomMediaAsset;
     this.onDeleteRoomMediaAsset = options.onDeleteRoomMediaAsset;
 
     this.container = document.createElement('div');
@@ -197,19 +197,10 @@ export class ChatPanel {
 
     this.surfaceHelper = document.createElement('div');
     this.surfaceHelper.className = 'musicspace-helper-text chat-surface-helper';
-    this.surfaceHelper.textContent = 'Owner/admin can replace image01-image04 for everyone in the room.';
+    this.surfaceHelper.textContent = "Owner/admin can upload PNG, JPG, or WebP to the room's media library.";
 
     const surfaceControls = document.createElement('div');
     surfaceControls.className = 'chat-surface-controls';
-
-    this.surfaceSelect = document.createElement('select');
-    this.surfaceSelect.className = 'musicspace-input chat-surface-select';
-    SURFACE_IDS.forEach((surfaceId) => {
-      const option = document.createElement('option');
-      option.value = surfaceId;
-      option.textContent = surfaceId;
-      this.surfaceSelect.appendChild(option);
-    });
 
     this.surfaceFileInput = document.createElement('input');
     this.surfaceFileInput.type = 'file';
@@ -218,13 +209,13 @@ export class ChatPanel {
 
     this.surfaceUploadButton = document.createElement('button');
     this.surfaceUploadButton.type = 'button';
-    this.surfaceUploadButton.textContent = 'Upload';
+    this.surfaceUploadButton.textContent = 'Upload to Library';
     this.surfaceUploadButton.className = 'musicspace-button musicspace-button--primary musicspace-button--block chat-surface-upload-button';
     this.surfaceUploadButton.addEventListener('click', () => {
       void this.handleSurfaceUpload();
     });
 
-    surfaceControls.append(this.surfaceSelect, this.surfaceFileInput, this.surfaceUploadButton);
+    surfaceControls.append(this.surfaceFileInput, this.surfaceUploadButton);
     this.surfaceSection.append(surfaceTitle, this.surfaceHelper, surfaceControls);
 
     this.tvSection = document.createElement('div');
@@ -358,19 +349,18 @@ export class ChatPanel {
     this.surfaceUploadVisible = visible;
     this.surfaceUploadEnabled = enabled;
     this.surfaceSection.style.display = visible ? 'grid' : 'none';
-    this.surfaceSelect.disabled = !enabled;
     this.surfaceFileInput.disabled = !enabled;
     this.surfaceUploadButton.disabled = !enabled;
     if (enabled) {
-      this.surfaceHelper.textContent = 'Upload PNG, JPG, or WebP to replace image01-image04 for everyone in the room.';
+      this.surfaceHelper.textContent = "Upload PNG, JPG, or WebP to this room's media library, then place images from the library cards below.";
     } else if (!isPersistedRoom) {
       this.surfaceHelper.textContent = 'Shared surfaces are available only in saved rooms. Sign in and create the room to enable them.';
     } else {
-      this.surfaceHelper.textContent = 'Owner/admin can replace image01-image04 for everyone in the room.';
+      this.surfaceHelper.textContent = "Owner/admin can upload images to the room's media library.";
     }
     if (!enabled) {
       this.surfaceFileInput.value = '';
-      this.surfaceUploadButton.textContent = 'Upload';
+      this.surfaceUploadButton.textContent = 'Upload to Library';
     }
   }
 
@@ -500,6 +490,25 @@ export class ChatPanel {
           });
           actions.appendChild(button);
         });
+
+        if (asset.inUseSurfaceIds.length > 0) {
+          const clearButton = document.createElement('button');
+          clearButton.type = 'button';
+          clearButton.className = 'musicspace-button musicspace-button--secondary musicspace-button--small';
+          clearButton.textContent = 'Clear';
+          clearButton.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            try {
+              this.roomMediaStatus.textContent = `Clearing ${asset.fileName} from active surfaces...`;
+              await this.onClearRoomMediaAsset(asset);
+              this.roomMediaStatus.textContent = `${asset.fileName} cleared from active surfaces.`;
+              await this.refreshRoomMediaLibrary();
+            } catch (error) {
+              this.roomMediaStatus.textContent = getErrorMessage(error, 'Unable to clear that image right now.');
+            }
+          });
+          actions.appendChild(clearButton);
+        }
       } else {
         const useButton = document.createElement('button');
         useButton.type = 'button';
@@ -561,24 +570,24 @@ export class ChatPanel {
       return;
     }
 
-    const surfaceId = this.surfaceSelect.value as RoomSurfaceId;
     this.surfaceUploadButton.disabled = true;
-    this.surfaceSelect.disabled = true;
     this.surfaceFileInput.disabled = true;
     this.surfaceUploadButton.textContent = 'Uploading...';
-    this.surfaceHelper.textContent = `Uploading ${file.name} to ${surfaceId}...`;
+    this.surfaceHelper.textContent = `Uploading ${file.name} to the room library...`;
 
     try {
-      await this.onUploadSurface(surfaceId, file);
-      this.surfaceHelper.textContent = `${surfaceId} updated for the room.`;
+      await this.onUploadSurface(file);
+      this.surfaceHelper.textContent = `${file.name} added to the room library.`;
       this.surfaceFileInput.value = '';
+      if (this.roomMediaEnabled) {
+        await this.refreshRoomMediaLibrary();
+      }
     } catch (error) {
       this.surfaceHelper.textContent = getErrorMessage(error, 'Unable to upload that image right now.');
     } finally {
       this.surfaceUploadButton.disabled = !this.surfaceUploadEnabled;
-      this.surfaceSelect.disabled = !this.surfaceUploadEnabled;
       this.surfaceFileInput.disabled = !this.surfaceUploadEnabled;
-      this.surfaceUploadButton.textContent = 'Upload';
+      this.surfaceUploadButton.textContent = 'Upload to Library';
     }
   }
 
@@ -641,6 +650,9 @@ export class ChatPanel {
       await this.onUploadTvMedia(file);
       this.tvHelper.textContent = `${file.name} uploaded for the shared TV.`;
       this.tvFileInput.value = '';
+      if (this.roomMediaEnabled) {
+        await this.refreshRoomMediaLibrary();
+      }
     } catch (error) {
       this.tvHelper.textContent = getErrorMessage(error, 'Unable to upload that TV video right now.');
     } finally {

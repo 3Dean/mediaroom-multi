@@ -1,4 +1,3 @@
-import type { RoomSurfaceId } from '../types/room';
 import { getRealtimeApiUrl } from './realtimeApiClient';
 import { computeFileChecksum, uploadAuthorizedFile } from './mediaUploadClientUtils';
 import { finalizeRoomMediaUpload } from './roomMediaClient';
@@ -23,13 +22,12 @@ type AuthorizedUploadResponse = {
 
 export async function uploadRoomSurfaceImage(
   roomId: string,
-  surfaceId: RoomSurfaceId,
   file: File,
   token: string,
 ): Promise<{ assetId: string; objectKey: string }> {
   validateSurfaceImage(file);
 
-  const authorization = await authorizeSurfaceUpload(roomId, surfaceId, file, token);
+  const authorization = await authorizeSurfaceUpload(roomId, file, token);
 
   if (authorization.mode === 'reuse' && authorization.asset?.id && authorization.asset.storageKey) {
     return {
@@ -62,7 +60,6 @@ export function validateSurfaceImage(file: File): void {
 
 async function authorizeSurfaceUpload(
   roomId: string,
-  surfaceId: RoomSurfaceId,
   file: File,
   token: string,
 ): Promise<AuthorizedUploadResponse> {
@@ -75,8 +72,7 @@ async function authorizeSurfaceUpload(
     },
     body: JSON.stringify({
       roomId,
-      surfaceId,
-      fileName: file.name || `${surfaceId}.png`,
+      fileName: file.name || 'room-surface-image.png',
       contentType: file.type,
       contentLength: file.size,
       checksum,

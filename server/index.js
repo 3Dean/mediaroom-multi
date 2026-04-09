@@ -849,9 +849,11 @@ async function handleAdminSetSurfaceImage(socket, message) {
   const roomId = getSocketRoomId(socket, message.roomId);
   const sessionId = getSocketSessionId(socket, message.sessionId);
   const surfaceId = normalizeSurfaceId(message.surfaceId);
-  const imagePath = normalizeToken(message.imagePath, MAX_SURFACE_IMAGE_PATH_LENGTH);
+  const imagePath = typeof message.imagePath === 'string' && message.imagePath.trim()
+    ? normalizeToken(message.imagePath, MAX_SURFACE_IMAGE_PATH_LENGTH)
+    : null;
   const assetId = normalizeToken(message.assetId, MAX_MEDIA_ASSET_ID_LENGTH);
-  if (!roomId || !sessionId || !surfaceId || !imagePath) {
+  if (!roomId || !sessionId || !surfaceId) {
     return;
   }
 
@@ -870,6 +872,17 @@ async function handleAdminSetSurfaceImage(socket, message) {
       reason: 'insufficient_role',
     });
     send(socket, { type: 'error', code: 'forbidden', message: 'Only the room owner or admins can update shared surfaces.' });
+    return;
+  }
+
+  if (!imagePath) {
+    await clearRoomSurfaceReference(roomId, surfaceId, {
+      actorUserId: actor.userId,
+      actorDisplayName: actor.displayName,
+      assetId,
+      reason: 'surface_cleared_by_admin',
+    });
+    pushSystemNotice(roomId, `${actor.displayName} cleared ${surfaceId}.`);
     return;
   }
 
@@ -1161,7 +1174,6 @@ async function handleAuthorizeSurfaceUploadRequest(request, response) {
   try {
     const payload = await readJsonBody(request);
     const roomId = normalizeToken(payload?.roomId, MAX_ROOM_ID_LENGTH);
-    const surfaceId = normalizeSurfaceId(payload?.surfaceId);
     const fileName = normalizeUploadFileName(payload?.fileName);
     const contentType = normalizeToken(payload?.contentType, MAX_UPLOAD_CONTENT_TYPE_LENGTH);
     const contentLength = normalizeUploadContentLength(payload?.contentLength);
@@ -1169,10 +1181,6 @@ async function handleAuthorizeSurfaceUploadRequest(request, response) {
 
     if (!roomId) {
       writeJson(response, 400, { error: 'invalid_room', message: 'A valid roomId is required.' });
-      return;
-    }
-    if (!surfaceId) {
-      writeJson(response, 400, { error: 'invalid_surface', message: 'A valid surfaceId is required.' });
       return;
     }
     if (!fileName) {
@@ -1202,7 +1210,6 @@ async function handleAuthorizeSurfaceUploadRequest(request, response) {
       contentType,
       contentLength,
       fileName,
-      surfaceId,
       checksum,
     });
     if (!authorization.ok) {

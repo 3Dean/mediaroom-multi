@@ -23,7 +23,7 @@ import { PreferencesPanel } from '../ui/preferencesPanel';
 import { RoomPanel } from '../ui/roomPanel';
 import { loadPreferences, resetPreferences, savePreferences } from '../preferences/preferencesStore';
 import type { UserPreferences } from '../preferences/preferencesModel';
-import type { RoomSummary, RoomSurfaceId } from '../types/room';
+import type { RoomSummary } from '../types/room';
 import { activeBrandProfile } from '../config/brandProfile';
 
 const roomState = new RoomStateStore();
@@ -537,7 +537,7 @@ export function bootstrapApp(): void {
         syncRoomUi(chatPanel, participantList, remotePlayerManager);
         roomPanel.setStatus('Stored message locally. Start the realtime server to broadcast chat.');
       },
-      onUploadSurface: async (surfaceId: RoomSurfaceId, file: File) => {
+      onUploadSurface: async (file: File) => {
         const activeSession = sessionStore.getCurrentSession();
         if (!activeSession || !roomClient?.isConnected()) {
           throw new Error('Enter a live room before updating shared surfaces.');
@@ -554,16 +554,8 @@ export function bootstrapApp(): void {
         }
 
         const { uploadRoomSurfaceImage } = await import('../backend/surfaceImageClient');
-        const upload = await uploadRoomSurfaceImage(activeSession.roomId, surfaceId, file, token);
-        roomClient.send({
-          type: 'admin.setSurfaceImage',
-          roomId: activeSession.roomId,
-          sessionId: activeSession.sessionId,
-          surfaceId,
-          imagePath: upload.objectKey,
-          assetId: upload.assetId,
-        });
-        roomPanel.setStatus(`Uploaded ${surfaceId}. Waiting for room sync...`);
+        await uploadRoomSurfaceImage(activeSession.roomId, file, token);
+        roomPanel.setStatus(`Added ${file.name} to the room media library.`);
       },
       onSetTvMedia: async (sourceUrl: string | null) => {
         const activeSession = sessionStore.getCurrentSession();
@@ -675,6 +667,27 @@ export function bootstrapApp(): void {
           assetId: asset.id,
         });
         roomPanel.setStatus(`Applying ${asset.fileName} to the shared TV...`);
+      },
+      onClearRoomMediaAsset: async (asset) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          throw new Error('Enter a live room before clearing room media.');
+        }
+        if (asset.kind !== 'surface-image' || asset.inUseSurfaceIds.length === 0) {
+          return;
+        }
+
+        for (const surfaceId of asset.inUseSurfaceIds) {
+          roomClient.send({
+            type: 'admin.setSurfaceImage',
+            roomId: activeSession.roomId,
+            sessionId: activeSession.sessionId,
+            surfaceId,
+            imagePath: null,
+            assetId: asset.id,
+          });
+        }
+        roomPanel.setStatus(`Clearing ${asset.fileName} from active surfaces...`);
       },
       onDeleteRoomMediaAsset: async (asset) => {
         const activeSession = sessionStore.getCurrentSession();

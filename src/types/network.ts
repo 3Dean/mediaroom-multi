@@ -106,7 +106,7 @@ export type AdminSetSurfaceImageMessage = {
   roomId: string;
   sessionId: string;
   surfaceId: RoomSurfaceId;
-  imagePath: string;
+  imagePath: string | null;
   uploadId?: string;
   assetId?: string;
 };
