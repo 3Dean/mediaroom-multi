@@ -104,6 +104,8 @@ export class ChatPanel {
   private roomMediaEnabled = false;
   private roomMediaRoomId: string | null = null;
   private roomMediaAssets: RoomMediaAsset[] = [];
+  private roomMediaLastKind: RoomMediaAssetKind = 'surface-image';
+  private roomMediaLoadingPromise: Promise<void> | null = null;
 
   constructor(options: ChatPanelOptions) {
     this.onSend = options.onSend;
@@ -309,6 +311,7 @@ export class ChatPanel {
     videoOption.textContent = 'Videos';
     this.roomMediaKindSelect.append(imageOption, videoOption);
     this.roomMediaKindSelect.addEventListener('change', () => {
+      this.roomMediaLastKind = this.getSelectedRoomMediaKind();
       void this.refreshRoomMediaLibrary();
     });
     roomMediaControls.append(this.roomMediaKindSelect);
@@ -397,6 +400,7 @@ export class ChatPanel {
     const visible = canManageMedia && isPersistedRoom;
     const enabled = canManageMedia && isPersistedRoom;
     const roomChanged = this.roomMediaRoomId !== roomId;
+    const enabledChanged = this.roomMediaEnabled !== enabled;
 
     this.roomMediaEnabled = enabled;
     this.roomMediaRoomId = roomId;
@@ -405,6 +409,7 @@ export class ChatPanel {
 
     if (!visible) {
       this.roomMediaAssets = [];
+      this.roomMediaLoadingPromise = null;
       this.roomMediaUsageLabel.textContent = 'Storage usage unavailable';
       this.roomMediaStatus.textContent = 'Owner/admin can reuse or delete room media.';
       this.roomMediaList.replaceChildren();
@@ -413,10 +418,11 @@ export class ChatPanel {
 
     if (roomChanged) {
       this.roomMediaAssets = [];
+      this.roomMediaLoadingPromise = null;
       this.roomMediaList.replaceChildren();
     }
 
-    if (enabled && roomId) {
+    if ((roomChanged || enabledChanged) && enabled && roomId) {
       void this.refreshRoomMediaLibrary();
     }
   }
@@ -426,21 +432,38 @@ export class ChatPanel {
       return;
     }
 
+    if (this.roomMediaLoadingPromise) {
+      return this.roomMediaLoadingPromise;
+    }
+
+    const kind = this.getSelectedRoomMediaKind();
+    this.roomMediaLastKind = kind;
     this.roomMediaStatus.textContent = 'Loading room media...';
     this.roomMediaList.replaceChildren();
-    try {
-      const kind = this.roomMediaKindSelect.value === 'tv-video' ? 'tv-video' : 'surface-image';
-      const result = await this.onListRoomMedia(kind);
-      this.roomMediaAssets = result.assets;
-      this.roomMediaUsageLabel.textContent = `${formatMediaBytes(result.usage.bytesUsed)} / ${formatMediaBytes(result.usage.byteLimit)} used`;
-      this.roomMediaStatus.textContent = result.assets.length > 0
-        ? `${result.assets.length} ${kind === 'tv-video' ? 'video' : 'image'} asset${result.assets.length === 1 ? '' : 's'}`
-        : `No ${kind === 'tv-video' ? 'videos' : 'images'} uploaded for this room yet.`;
-      this.renderRoomMediaLibrary();
-    } catch (error) {
-      this.roomMediaStatus.textContent = error instanceof Error ? error.message : 'Unable to load room media right now.';
-      this.roomMediaList.replaceChildren();
-    }
+    this.roomMediaLoadingPromise = (async () => {
+      try {
+        const result = await this.onListRoomMedia(kind);
+        if (!this.roomMediaEnabled || !this.roomMediaRoomId || this.roomMediaLastKind !== kind) {
+          return;
+        }
+        this.roomMediaAssets = result.assets;
+        this.roomMediaUsageLabel.textContent = `${formatMediaBytes(result.usage.bytesUsed)} / ${formatMediaBytes(result.usage.byteLimit)} used`;
+        this.roomMediaStatus.textContent = result.assets.length > 0
+          ? `${result.assets.length} ${kind === 'tv-video' ? 'video' : 'image'} asset${result.assets.length === 1 ? '' : 's'}`
+          : `No ${kind === 'tv-video' ? 'videos' : 'images'} uploaded for this room yet.`;
+        this.renderRoomMediaLibrary();
+      } catch (error) {
+        this.roomMediaStatus.textContent = error instanceof Error ? error.message : 'Unable to load room media right now.';
+        this.roomMediaList.replaceChildren();
+      } finally {
+        this.roomMediaLoadingPromise = null;
+      }
+    })();
+    return this.roomMediaLoadingPromise;
+  }
+
+  private getSelectedRoomMediaKind(): RoomMediaAssetKind {
+    return this.roomMediaKindSelect.value === 'tv-video' ? 'tv-video' : 'surface-image';
   }
 
   private renderRoomMediaLibrary(): void {
