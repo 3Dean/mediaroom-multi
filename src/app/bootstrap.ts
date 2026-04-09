@@ -561,7 +561,7 @@ export function bootstrapApp(): void {
           sessionId: activeSession.sessionId,
           surfaceId,
           imagePath: upload.objectKey,
-          uploadId: upload.uploadId,
+          assetId: upload.assetId,
         });
         roomPanel.setStatus(`Uploaded ${surfaceId}. Waiting for room sync...`);
       },
@@ -608,7 +608,7 @@ export function bootstrapApp(): void {
           roomId: activeSession.roomId,
           sessionId: activeSession.sessionId,
           sourceUrl: upload.objectKey,
-          uploadId: upload.uploadId,
+          assetId: upload.assetId,
         });
         roomPanel.setStatus(`Uploaded ${file.name}. Waiting for shared TV sync...`);
       },
@@ -633,6 +633,61 @@ export function bootstrapApp(): void {
           currentTime,
         });
         roomPanel.setStatus(isPlaying ? 'Resuming shared TV...' : 'Pausing shared TV...');
+      },
+      onListRoomMedia: async (kind) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession?.roomId) {
+          throw new Error('Enter a saved room before loading room media.');
+        }
+        const token = await getRealtimeAuthToken();
+        if (!token) {
+          throw new Error('Sign in to manage room media.');
+        }
+        const { listRoomMediaAssets } = await import('../backend/roomMediaClient');
+        return await listRoomMediaAssets(activeSession.roomId, token, kind);
+      },
+      onUseRoomMediaAsset: async (asset, targetSurfaceId) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          throw new Error('Enter a live room before using room media.');
+        }
+        if (asset.kind === 'surface-image') {
+          if (!targetSurfaceId) {
+            throw new Error('Choose a target surface for that image.');
+          }
+          roomClient.send({
+            type: 'admin.setSurfaceImage',
+            roomId: activeSession.roomId,
+            sessionId: activeSession.sessionId,
+            surfaceId: targetSurfaceId,
+            imagePath: asset.storageKey,
+            assetId: asset.id,
+          });
+          roomPanel.setStatus(`Applying ${asset.fileName} to ${targetSurfaceId}...`);
+          return;
+        }
+
+        roomClient.send({
+          type: 'admin.setTvMedia',
+          roomId: activeSession.roomId,
+          sessionId: activeSession.sessionId,
+          sourceUrl: asset.storageKey,
+          assetId: asset.id,
+        });
+        roomPanel.setStatus(`Applying ${asset.fileName} to the shared TV...`);
+      },
+      onDeleteRoomMediaAsset: async (asset) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession?.roomId) {
+          throw new Error('Enter a saved room before deleting room media.');
+        }
+        const token = await getRealtimeAuthToken();
+        if (!token) {
+          throw new Error('Sign in to manage room media.');
+        }
+        const { deleteRoomMediaAsset } = await import('../backend/roomMediaClient');
+        await deleteRoomMediaAsset(activeSession.roomId, asset.id, token);
+        roomPanel.setStatus(`Deleted ${asset.fileName}.`);
       },
     });
 
@@ -835,6 +890,7 @@ function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remo
     snapshot.tvMedia?.isPlaying ?? false,
     snapshot.tvMedia?.currentTime ?? 0,
   );
+  chatPanel.setRoomMediaLibraryState(snapshot.selfRole, snapshot.isPersisted, snapshot.roomId || null);
   participantList.setParticipants(participants, snapshot.selfSessionId, snapshot.authority, snapshot.selfRole);
   Object.values(snapshot.objects).forEach((object) => window.__musicspaceApplyObjectSnapshot?.(object));
   window.__musicspaceSyncRoomSurfaces?.(Object.values(snapshot.surfaces));

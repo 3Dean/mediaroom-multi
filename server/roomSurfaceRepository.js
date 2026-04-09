@@ -158,6 +158,30 @@ export async function deleteSurfaceSnapshotsFromBackend(roomId) {
   return deletedCount;
 }
 
+export async function deleteSurfaceSnapshotFromBackend(roomId, surfaceId) {
+  if (!canUseSurfaceBackendPersistence() || !VALID_SURFACE_IDS.has(surfaceId)) {
+    return false;
+  }
+
+  const existingId = await findSurfaceRecordId(roomId, surfaceId);
+  if (!existingId) {
+    return false;
+  }
+
+  const result = await executeGraphql(
+    /* GraphQL */ `
+      mutation DeleteRoomSurfaceSnapshot($input: DeleteRoomSurfaceSnapshotInput!) {
+        deleteRoomSurfaceSnapshot(input: $input) {
+          id
+        }
+      }
+    `,
+    { input: { id: existingId } },
+  );
+
+  return Boolean(result?.deleteRoomSurfaceSnapshot?.id);
+}
+
 async function findSurfaceRecordId(roomId, surfaceId) {
   const response = await executeGraphql(
     /* GraphQL */ `

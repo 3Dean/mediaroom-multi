@@ -42,6 +42,10 @@ export function applyServerMessage(store: RoomStateStore, message: ServerMessage
       store.upsertSurface(message.surface);
       return;
     }
+    case 'surface.cleared': {
+      store.removeSurface(message.surfaceId);
+      return;
+    }
     case 'tv.updated': {
       store.setTvMedia(message.tvMedia);
       return;

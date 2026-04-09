@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../types/chat';
-import type { RoomRole, RoomSurfaceId } from '../types/room';
+import type { RoomMediaAsset, RoomMediaAssetKind, RoomMediaUsage, RoomRole, RoomSurfaceId } from '../types/room';
 import { createSectionIcon } from './sectionIcons';
 
 type ChatPanelOptions = {
@@ -8,6 +8,9 @@ type ChatPanelOptions = {
   onSetTvMedia: (sourceUrl: string | null) => Promise<void>;
   onUploadTvMedia: (file: File) => Promise<void>;
   onSetTvPlayback: (isPlaying: boolean, currentTime: number) => Promise<void>;
+  onListRoomMedia: (kind?: RoomMediaAssetKind) => Promise<{ assets: RoomMediaAsset[]; usage: RoomMediaUsage }>;
+  onUseRoomMediaAsset: (asset: RoomMediaAsset, target?: RoomSurfaceId) => Promise<void>;
+  onDeleteRoomMediaAsset: (asset: RoomMediaAsset) => Promise<void>;
 };
 
 const SURFACE_IDS: RoomSurfaceId[] = ['image01', 'image02', 'image03', 'image04'];
@@ -25,6 +28,43 @@ function formatPlaybackTimecode(seconds: number): string {
   return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
 }
 
+function formatMediaBytes(bytes: number): string {
+  const safeBytes = Math.max(0, Number(bytes) || 0);
+  if (safeBytes >= 1024 * 1024 * 1024) {
+    return `${(safeBytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  }
+  if (safeBytes >= 1024 * 1024) {
+    return `${(safeBytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (safeBytes >= 1024) {
+    return `${Math.round(safeBytes / 1024)} KB`;
+  }
+  return `${safeBytes} B`;
+}
+
+function formatRelativeTimestamp(value: string): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return 'Unknown date';
+  }
+
+  const deltaMs = Date.now() - timestamp;
+  const minuteMs = 60_000;
+  const hourMs = 60 * minuteMs;
+  const dayMs = 24 * hourMs;
+
+  if (deltaMs < minuteMs) {
+    return 'just now';
+  }
+  if (deltaMs < hourMs) {
+    return `${Math.max(1, Math.floor(deltaMs / minuteMs))}m ago`;
+  }
+  if (deltaMs < dayMs) {
+    return `${Math.max(1, Math.floor(deltaMs / hourMs))}h ago`;
+  }
+  return `${Math.max(1, Math.floor(deltaMs / dayMs))}d ago`;
+}
+
 export class ChatPanel {
   private readonly container: HTMLDivElement;
   private readonly sharedMediaContainer: HTMLDetailsElement;
@@ -37,6 +77,11 @@ export class ChatPanel {
   private readonly surfaceUploadButton: HTMLButtonElement;
   private readonly surfaceHelper: HTMLDivElement;
   private readonly tvSection: HTMLDivElement;
+  private readonly roomMediaSection: HTMLDivElement;
+  private readonly roomMediaUsageLabel: HTMLDivElement;
+  private readonly roomMediaStatus: HTMLDivElement;
+  private readonly roomMediaKindSelect: HTMLSelectElement;
+  private readonly roomMediaList: HTMLDivElement;
   private readonly tvInput: HTMLInputElement;
   private readonly tvFileInput: HTMLInputElement;
   private readonly tvUploadButton: HTMLButtonElement;
@@ -48,12 +93,18 @@ export class ChatPanel {
   private readonly onSetTvMedia: (sourceUrl: string | null) => Promise<void>;
   private readonly onUploadTvMedia: (file: File) => Promise<void>;
   private readonly onSetTvPlayback: (isPlaying: boolean, currentTime: number) => Promise<void>;
+  private readonly onListRoomMedia: (kind?: RoomMediaAssetKind) => Promise<{ assets: RoomMediaAsset[]; usage: RoomMediaUsage }>;
+  private readonly onUseRoomMediaAsset: (asset: RoomMediaAsset, target?: RoomSurfaceId) => Promise<void>;
+  private readonly onDeleteRoomMediaAsset: (asset: RoomMediaAsset) => Promise<void>;
   private surfaceUploadEnabled = false;
   private surfaceUploadVisible = false;
   private tvEnabled = false;
   private tvVisible = false;
   private tvIsPlaying = false;
   private tvCurrentTime = 0;
+  private roomMediaEnabled = false;
+  private roomMediaRoomId: string | null = null;
+  private roomMediaAssets: RoomMediaAsset[] = [];
 
   constructor(options: ChatPanelOptions) {
     this.onSend = options.onSend;
@@ -61,6 +112,9 @@ export class ChatPanel {
     this.onSetTvMedia = options.onSetTvMedia;
     this.onUploadTvMedia = options.onUploadTvMedia;
     this.onSetTvPlayback = options.onSetTvPlayback;
+    this.onListRoomMedia = options.onListRoomMedia;
+    this.onUseRoomMediaAsset = options.onUseRoomMediaAsset;
+    this.onDeleteRoomMediaAsset = options.onDeleteRoomMediaAsset;
 
     this.container = document.createElement('div');
     this.container.id = 'chat-panel';
@@ -231,12 +285,55 @@ export class ChatPanel {
     tvPlaybackControls.append(this.tvTogglePlaybackButton);
     this.tvSection.append(tvTitle, this.tvHelper, tvControls, tvUploadActions, tvPlaybackControls);
 
-    sharedMediaBody.append(this.surfaceSection, this.tvSection);
+    this.roomMediaSection = document.createElement('div');
+    this.roomMediaSection.className = 'musicspace-subsection chat-surface-section';
+
+    const roomMediaHeader = document.createElement('div');
+    roomMediaHeader.className = 'chat-room-media-header';
+
+    const roomMediaTitle = document.createElement('div');
+    roomMediaTitle.className = 'musicspace-subsection-title chat-surface-title';
+    roomMediaTitle.textContent = 'Room Media Library';
+
+    this.roomMediaUsageLabel = document.createElement('div');
+    this.roomMediaUsageLabel.className = 'musicspace-card-meta chat-room-media-usage';
+    this.roomMediaUsageLabel.textContent = 'Storage usage unavailable';
+
+    roomMediaHeader.append(roomMediaTitle, this.roomMediaUsageLabel);
+
+    this.roomMediaStatus = document.createElement('div');
+    this.roomMediaStatus.className = 'musicspace-helper-text chat-surface-helper';
+    this.roomMediaStatus.textContent = 'Owner/admin can reuse or delete room media.';
+
+    const roomMediaControls = document.createElement('div');
+    roomMediaControls.className = 'room-browser-controls';
+
+    this.roomMediaKindSelect = document.createElement('select');
+    this.roomMediaKindSelect.className = 'musicspace-input musicspace-input--small room-browser-sort';
+    const imageOption = document.createElement('option');
+    imageOption.value = 'surface-image';
+    imageOption.textContent = 'Images';
+    const videoOption = document.createElement('option');
+    videoOption.value = 'tv-video';
+    videoOption.textContent = 'Videos';
+    this.roomMediaKindSelect.append(imageOption, videoOption);
+    this.roomMediaKindSelect.addEventListener('change', () => {
+      void this.refreshRoomMediaLibrary();
+    });
+    roomMediaControls.append(this.roomMediaKindSelect);
+
+    this.roomMediaList = document.createElement('div');
+    this.roomMediaList.className = 'room-browser-list';
+
+    this.roomMediaSection.append(roomMediaHeader, this.roomMediaStatus, roomMediaControls, this.roomMediaList);
+
+    sharedMediaBody.append(this.surfaceSection, this.tvSection, this.roomMediaSection);
     this.sharedMediaContainer.append(sharedMediaSummary, sharedMediaBody);
     this.sharedMediaContainer.open = false;
 
     this.setSurfaceUploadState(null, false);
     this.setTvMediaState(null, false, null);
+    this.setRoomMediaLibraryState(null, false, null);
   }
 
   mount(parent: HTMLElement = document.body, advancedParent: HTMLElement = parent): void {
@@ -303,6 +400,151 @@ export class ChatPanel {
     } else {
       this.tvHelper.textContent = 'Owner/admin can control the shared TV video source.';
     }
+  }
+
+  setRoomMediaLibraryState(role: RoomRole | null, isPersistedRoom: boolean, roomId: string | null): void {
+    const canManageMedia = role === 'owner' || role === 'admin';
+    const visible = canManageMedia && isPersistedRoom;
+    const enabled = canManageMedia && isPersistedRoom;
+    const roomChanged = this.roomMediaRoomId !== roomId;
+
+    this.roomMediaEnabled = enabled;
+    this.roomMediaRoomId = roomId;
+    this.roomMediaSection.style.display = visible ? 'grid' : 'none';
+    this.roomMediaKindSelect.disabled = !enabled;
+
+    if (!visible) {
+      this.roomMediaAssets = [];
+      this.roomMediaUsageLabel.textContent = 'Storage usage unavailable';
+      this.roomMediaStatus.textContent = 'Owner/admin can reuse or delete room media.';
+      this.roomMediaList.replaceChildren();
+      return;
+    }
+
+    if (roomChanged) {
+      this.roomMediaAssets = [];
+      this.roomMediaList.replaceChildren();
+    }
+
+    if (enabled && roomId) {
+      void this.refreshRoomMediaLibrary();
+    }
+  }
+
+  private async refreshRoomMediaLibrary(): Promise<void> {
+    if (!this.roomMediaEnabled || !this.roomMediaRoomId) {
+      return;
+    }
+
+    this.roomMediaStatus.textContent = 'Loading room media...';
+    this.roomMediaList.replaceChildren();
+    try {
+      const kind = this.roomMediaKindSelect.value === 'tv-video' ? 'tv-video' : 'surface-image';
+      const result = await this.onListRoomMedia(kind);
+      this.roomMediaAssets = result.assets;
+      this.roomMediaUsageLabel.textContent = `${formatMediaBytes(result.usage.bytesUsed)} / ${formatMediaBytes(result.usage.byteLimit)} used`;
+      this.roomMediaStatus.textContent = result.assets.length > 0
+        ? `${result.assets.length} ${kind === 'tv-video' ? 'video' : 'image'} asset${result.assets.length === 1 ? '' : 's'}`
+        : `No ${kind === 'tv-video' ? 'videos' : 'images'} uploaded for this room yet.`;
+      this.renderRoomMediaLibrary();
+    } catch (error) {
+      this.roomMediaStatus.textContent = error instanceof Error ? error.message : 'Unable to load room media right now.';
+      this.roomMediaList.replaceChildren();
+    }
+  }
+
+  private renderRoomMediaLibrary(): void {
+    if (this.roomMediaAssets.length === 0) {
+      this.roomMediaList.replaceChildren();
+      return;
+    }
+
+    const rows = this.roomMediaAssets.map((asset) => {
+      const card = document.createElement('div');
+      card.className = 'room-browser-item';
+
+      const title = document.createElement('div');
+      title.className = 'room-browser-item-title';
+      title.textContent = asset.fileName;
+
+      const slug = document.createElement('div');
+      slug.className = 'room-browser-item-slug';
+      slug.textContent = `${formatMediaBytes(asset.sizeBytes)} • ${formatRelativeTimestamp(asset.createdAt)}`;
+
+      const meta = document.createElement('div');
+      meta.className = 'room-browser-item-meta';
+      const usageText = asset.kind === 'tv-video'
+        ? (asset.inUseTv ? 'In use on TV' : 'Video asset')
+        : (asset.inUseSurfaceIds.length > 0 ? `In use on ${asset.inUseSurfaceIds.join(', ')}` : 'Image asset');
+      meta.textContent = `${usageText} • uploader ${asset.createdBy.slice(0, 8)}`;
+
+      const actions = document.createElement('div');
+      actions.className = 'room-browser-actions';
+
+      if (asset.kind === 'surface-image') {
+        (['image01', 'image02', 'image03', 'image04'] as RoomSurfaceId[]).forEach((surfaceId) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'musicspace-button musicspace-button--secondary musicspace-button--small';
+          button.textContent = surfaceId;
+          button.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            try {
+              this.roomMediaStatus.textContent = `Applying ${asset.fileName} to ${surfaceId}...`;
+              await this.onUseRoomMediaAsset(asset, surfaceId);
+              this.roomMediaStatus.textContent = `${asset.fileName} applied to ${surfaceId}.`;
+              await this.refreshRoomMediaLibrary();
+            } catch (error) {
+              this.roomMediaStatus.textContent = getErrorMessage(error, 'Unable to apply that image right now.');
+            }
+          });
+          actions.appendChild(button);
+        });
+      } else {
+        const useButton = document.createElement('button');
+        useButton.type = 'button';
+        useButton.className = 'musicspace-button musicspace-button--secondary musicspace-button--small';
+        useButton.textContent = 'Use on TV';
+        useButton.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          try {
+            this.roomMediaStatus.textContent = `Applying ${asset.fileName} to the shared TV...`;
+            await this.onUseRoomMediaAsset(asset);
+            this.roomMediaStatus.textContent = `${asset.fileName} applied to the shared TV.`;
+            await this.refreshRoomMediaLibrary();
+          } catch (error) {
+            this.roomMediaStatus.textContent = getErrorMessage(error, 'Unable to apply that video right now.');
+          }
+        });
+        actions.appendChild(useButton);
+      }
+
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'musicspace-button musicspace-button--danger musicspace-button--small';
+      deleteButton.textContent = 'Delete';
+      deleteButton.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        const confirmed = window.confirm(`Delete "${asset.fileName}"?${asset.inUseTv || asset.inUseSurfaceIds.length > 0 ? ' It is currently in use and will be cleared from the room.' : ''}`);
+        if (!confirmed) {
+          return;
+        }
+        try {
+          this.roomMediaStatus.textContent = `Deleting ${asset.fileName}...`;
+          await this.onDeleteRoomMediaAsset(asset);
+          this.roomMediaStatus.textContent = `${asset.fileName} deleted.`;
+          await this.refreshRoomMediaLibrary();
+        } catch (error) {
+          this.roomMediaStatus.textContent = getErrorMessage(error, 'Unable to delete that asset right now.');
+        }
+      });
+      actions.appendChild(deleteButton);
+
+      card.append(title, slug, meta, actions);
+      return card;
+    });
+
+    this.roomMediaList.replaceChildren(...rows);
   }
 
   private async handleSurfaceUpload(): Promise<void> {

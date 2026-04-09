@@ -976,6 +976,14 @@ body.mouse #mobile-controls-layer {
   line-height: 1.45;
 }
 
+.chat-room-media-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .chat-surface-controls {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

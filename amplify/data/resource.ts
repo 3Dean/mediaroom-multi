@@ -63,6 +63,27 @@ const schema = a.schema({
       updatedAt: a.datetime().required(),
     })
     .authorization((allow) => [allow.authenticated()]),
+
+  RoomMediaAsset: a
+    .model({
+      roomId: a.string().required(),
+      kind: a.string().required(),
+      storageKey: a.string().required(),
+      fileName: a.string().required(),
+      mimeType: a.string().required(),
+      sizeBytes: a.integer().required(),
+      checksum: a.string().required(),
+      createdBy: a.string().required(),
+      createdAt: a.datetime().required(),
+      updatedAt: a.datetime().required(),
+      status: a.string().required(),
+      width: a.integer(),
+      height: a.integer(),
+      durationSeconds: a.float(),
+      inUseSurfaceIds: a.json(),
+      inUseTv: a.boolean(),
+    })
+    .authorization((allow) => [allow.authenticated()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

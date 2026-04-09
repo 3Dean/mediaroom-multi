@@ -4,12 +4,23 @@ import { createPublicKey, createVerify, randomUUID } from 'node:crypto';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
-import { DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { WebSocketServer } from 'ws';
 import { canUseBackendPersistence, deleteRoomFromBackend, loadAuthorityFromBackend, loadFallbackAuthorityStore, normalizeAuthority as normalizeRoomAuthority, persistFallbackAuthorityStore, saveAuthorityToBackend } from './roomAuthorityRepository.js';
-import { canUseSurfaceBackendPersistence, deleteSurfaceSnapshotsFromBackend, loadSurfaceSnapshotsFromBackend, saveSurfaceSnapshotToBackend } from './roomSurfaceRepository.js';
+import {
+  createRoomMediaAssetInBackend,
+  deleteRoomMediaAssetFromBackend,
+  deleteRoomMediaAssetsFromBackend,
+  getRoomMediaAssetByChecksumFromBackend,
+  getRoomMediaAssetByIdFromBackend,
+  getRoomMediaAssetByStorageKeyFromBackend,
+  listRoomMediaAssetsFromBackend,
+  summarizeRoomMediaUsage,
+  updateRoomMediaAssetInBackend,
+} from './roomMediaAssetRepository.js';
+import { canUseSurfaceBackendPersistence, deleteSurfaceSnapshotFromBackend, deleteSurfaceSnapshotsFromBackend, loadSurfaceSnapshotsFromBackend, saveSurfaceSnapshotToBackend } from './roomSurfaceRepository.js';
 
 const HOST = process.env.REALTIME_HOST?.trim() || null;
 const PORT = Number(process.env.REALTIME_PORT ?? process.env.PORT ?? 8787);
@@ -26,8 +37,11 @@ const MAX_UPLOAD_FILE_NAME_LENGTH = Number(process.env.REALTIME_MAX_UPLOAD_FILE_
 const MAX_UPLOAD_CONTENT_TYPE_LENGTH = Number(process.env.REALTIME_MAX_UPLOAD_CONTENT_TYPE_LENGTH ?? 128);
 const MAX_UPLOAD_INTENTS_PER_USER = Number(process.env.REALTIME_MAX_UPLOAD_INTENTS_PER_USER ?? 12);
 const MEDIA_UPLOAD_INTENT_TTL_MS = Number(process.env.REALTIME_MEDIA_UPLOAD_INTENT_TTL_MS ?? 5 * 60 * 1000);
-const MAX_SURFACE_IMAGE_BYTES = Number(process.env.REALTIME_MAX_SURFACE_IMAGE_BYTES ?? 5 * 1024 * 1024);
-const MAX_TV_VIDEO_BYTES = Number(process.env.REALTIME_MAX_TV_VIDEO_BYTES ?? 150 * 1024 * 1024);
+const MAX_SURFACE_IMAGE_BYTES = Number(process.env.REALTIME_MAX_SURFACE_IMAGE_BYTES ?? 10 * 1024 * 1024);
+const MAX_TV_VIDEO_BYTES = Number(process.env.REALTIME_MAX_TV_VIDEO_BYTES ?? 100 * 1024 * 1024);
+const MAX_ROOM_MEDIA_BYTES = Number(process.env.REALTIME_MAX_ROOM_MEDIA_BYTES ?? 500 * 1024 * 1024);
+const MAX_MEDIA_CHECKSUM_LENGTH = Number(process.env.REALTIME_MAX_MEDIA_CHECKSUM_LENGTH ?? 128);
+const MAX_MEDIA_ASSET_ID_LENGTH = Number(process.env.REALTIME_MAX_MEDIA_ASSET_ID_LENGTH ?? 128);
 const LOG_LEVEL = normalizeLogLevel(process.env.REALTIME_LOG_LEVEL);
 const DEFAULT_EYE_HEIGHT = 1.6;
 const VALID_SURFACE_IDS = new Set(['image01', 'image02', 'image03', 'image04']);
@@ -148,6 +162,18 @@ const server = createServer((request, response) => {
   }
   if (request.url === '/api/uploads/tv-authorize' && request.method === 'POST') {
     void handleAuthorizeTvUploadRequest(request, response);
+    return;
+  }
+  if (request.url === '/api/uploads/media-finalize' && request.method === 'POST') {
+    void handleFinalizeMediaUploadRequest(request, response);
+    return;
+  }
+  if (request.url?.startsWith('/api/rooms/media') && request.method === 'GET') {
+    void handleListRoomMediaRequest(request, response);
+    return;
+  }
+  if (request.url === '/api/rooms/media/delete' && request.method === 'POST') {
+    void handleDeleteRoomMediaRequest(request, response);
     return;
   }
 
@@ -824,8 +850,8 @@ async function handleAdminSetSurfaceImage(socket, message) {
   const sessionId = getSocketSessionId(socket, message.sessionId);
   const surfaceId = normalizeSurfaceId(message.surfaceId);
   const imagePath = normalizeToken(message.imagePath, MAX_SURFACE_IMAGE_PATH_LENGTH);
-  const uploadId = normalizeToken(message.uploadId, 128);
-  if (!roomId || !sessionId || !surfaceId || !imagePath || !uploadId) {
+  const assetId = normalizeToken(message.assetId, MAX_MEDIA_ASSET_ID_LENGTH);
+  if (!roomId || !sessionId || !surfaceId || !imagePath) {
     return;
   }
 
@@ -847,15 +873,14 @@ async function handleAdminSetSurfaceImage(socket, message) {
     return;
   }
 
-  const authorizedUpload = consumeAuthorizedUploadIntent(uploadId, {
+  const mediaAsset = await resolveRoomMediaAssetForUse({
     roomId,
-    userId: actor.userId,
     kind: 'surface-image',
-    objectKey: imagePath,
-    surfaceId,
+    assetId,
+    storageKey: imagePath,
   });
-  if (!authorizedUpload.ok) {
-    send(socket, { type: 'error', code: authorizedUpload.code, message: authorizedUpload.message });
+  if (!mediaAsset) {
+    send(socket, { type: 'error', code: 'invalid_surface_asset', message: 'That room image is unavailable.' });
     return;
   }
 
@@ -882,10 +907,9 @@ async function handleAdminSetSurfaceImage(socket, message) {
     actorDisplayName: actor.displayName,
     surfaceId,
     imagePath,
+    assetId: mediaAsset.id,
   });
-  if (previousSurface?.imagePath && previousSurface.imagePath !== imagePath) {
-    void cleanupManagedMediaObject(previousSurface.imagePath, { roomId, reason: 'surface_replaced', surfaceId });
-  }
+  await markRoomMediaSurfaceUsage(roomId, surfaceId, previousSurface?.imagePath ?? null, mediaAsset);
   broadcast(roomId, { type: 'surface.updated', surface: nextSurface });
   pushSystemNotice(roomId, `${actor.displayName} updated ${surfaceId}.`);
 }
@@ -918,26 +942,23 @@ async function handleAdminSetTvMedia(socket, message) {
   const sourceUrl = typeof message.sourceUrl === 'string' && message.sourceUrl.trim()
     ? normalizeToken(message.sourceUrl, 512)
     : null;
-  const uploadId = typeof message.uploadId === 'string' && message.uploadId.trim()
-    ? normalizeToken(message.uploadId, 128)
+  const assetId = typeof message.assetId === 'string' && message.assetId.trim()
+    ? normalizeToken(message.assetId, MAX_MEDIA_ASSET_ID_LENGTH)
     : null;
   if (message.sourceUrl && !sourceUrl) {
     send(socket, { type: 'error', code: 'invalid_tv_source', message: 'TV source URL is invalid.' });
     return;
   }
+  let mediaAsset = null;
   if (sourceUrl) {
-    if (!uploadId) {
-      send(socket, { type: 'error', code: 'invalid_tv_upload', message: 'Shared TV updates require an authorized upload.' });
-      return;
-    }
-    const authorizedUpload = consumeAuthorizedUploadIntent(uploadId, {
+    mediaAsset = await resolveRoomMediaAssetForUse({
       roomId,
-      userId: actor.userId,
       kind: 'tv-video',
-      objectKey: sourceUrl,
+      assetId,
+      storageKey: sourceUrl,
     });
-    if (!authorizedUpload.ok) {
-      send(socket, { type: 'error', code: authorizedUpload.code, message: authorizedUpload.message });
+    if (!mediaAsset) {
+      send(socket, { type: 'error', code: 'invalid_tv_asset', message: 'That shared TV video is unavailable.' });
       return;
     }
   }
@@ -964,10 +985,9 @@ async function handleAdminSetTvMedia(socket, message) {
     actorUserId: actor.userId,
     actorDisplayName: actor.displayName,
     sourceUrl,
+    assetId: mediaAsset?.id ?? null,
   });
-  if (previousTvMedia?.sourceUrl && previousTvMedia.sourceUrl !== sourceUrl) {
-    void cleanupManagedMediaObject(previousTvMedia.sourceUrl, { roomId, reason: sourceUrl ? 'tv_replaced' : 'tv_cleared' });
-  }
+  await markRoomMediaTvUsage(roomId, previousTvMedia?.sourceUrl ?? null, mediaAsset);
   broadcast(roomId, { type: 'tv.updated', tvMedia });
   pushSystemNotice(roomId, sourceUrl ? `${actor.displayName} updated the shared TV.` : `${actor.displayName} restored the TV visualizer.`);
 }
@@ -1104,6 +1124,7 @@ async function handleDeleteRoomRequest(request, response) {
     }
 
     await deleteSurfaceSnapshotsFromBackend(roomId);
+    await deleteRoomMediaAssetsFromBackend(roomId);
     await cleanupManagedMediaPrefix(`room-surfaces/${roomId}/`, { roomId, reason: 'room_deleted_surfaces' });
     await cleanupManagedMediaPrefix(`room-tv/${roomId}/`, { roomId, reason: 'room_deleted_tv' });
     const deleted = await deleteRoomFromBackend(roomId, authority.roomRecordId);
@@ -1144,6 +1165,7 @@ async function handleAuthorizeSurfaceUploadRequest(request, response) {
     const fileName = normalizeUploadFileName(payload?.fileName);
     const contentType = normalizeToken(payload?.contentType, MAX_UPLOAD_CONTENT_TYPE_LENGTH);
     const contentLength = normalizeUploadContentLength(payload?.contentLength);
+    const checksum = normalizeMediaChecksum(payload?.checksum);
 
     if (!roomId) {
       writeJson(response, 400, { error: 'invalid_room', message: 'A valid roomId is required.' });
@@ -1165,8 +1187,12 @@ async function handleAuthorizeSurfaceUploadRequest(request, response) {
       writeJson(response, 400, { error: 'invalid_content_length', message: 'A valid contentLength is required.' });
       return;
     }
+    if (!checksum) {
+      writeJson(response, 400, { error: 'invalid_checksum', message: 'A valid media checksum is required.' });
+      return;
+    }
     if (contentLength > MAX_SURFACE_IMAGE_BYTES) {
-      writeJson(response, 400, { error: 'file_too_large', message: 'Images must be 5MB or smaller.' });
+      writeJson(response, 400, { error: 'file_too_large', message: 'Images must be 10MB or smaller.' });
       return;
     }
 
@@ -1177,16 +1203,14 @@ async function handleAuthorizeSurfaceUploadRequest(request, response) {
       contentLength,
       fileName,
       surfaceId,
+      checksum,
     });
     if (!authorization.ok) {
       writeJson(response, authorization.statusCode, { error: authorization.error, message: authorization.message });
       return;
     }
 
-    writeJson(response, 200, {
-      ok: true,
-      upload: authorization.upload,
-    });
+    writeJson(response, 200, authorization.payload);
   } catch (error) {
     logEvent('error', 'media.surface.authorize.failed', {
       error: formatErrorForLog(error),
@@ -1202,6 +1226,7 @@ async function handleAuthorizeTvUploadRequest(request, response) {
     const fileName = normalizeUploadFileName(payload?.fileName);
     const contentType = normalizeToken(payload?.contentType, MAX_UPLOAD_CONTENT_TYPE_LENGTH);
     const contentLength = normalizeUploadContentLength(payload?.contentLength);
+    const checksum = normalizeMediaChecksum(payload?.checksum);
 
     if (!roomId) {
       writeJson(response, 400, { error: 'invalid_room', message: 'A valid roomId is required.' });
@@ -1219,8 +1244,12 @@ async function handleAuthorizeTvUploadRequest(request, response) {
       writeJson(response, 400, { error: 'invalid_content_length', message: 'A valid contentLength is required.' });
       return;
     }
+    if (!checksum) {
+      writeJson(response, 400, { error: 'invalid_checksum', message: 'A valid media checksum is required.' });
+      return;
+    }
     if (contentLength > MAX_TV_VIDEO_BYTES) {
-      writeJson(response, 400, { error: 'file_too_large', message: 'Videos must be 150MB or smaller right now.' });
+      writeJson(response, 400, { error: 'file_too_large', message: 'Videos must be 100MB or smaller right now.' });
       return;
     }
 
@@ -1230,16 +1259,14 @@ async function handleAuthorizeTvUploadRequest(request, response) {
       contentType,
       contentLength,
       fileName,
+      checksum,
     });
     if (!authorization.ok) {
       writeJson(response, authorization.statusCode, { error: authorization.error, message: authorization.message });
       return;
     }
 
-    writeJson(response, 200, {
-      ok: true,
-      upload: authorization.upload,
-    });
+    writeJson(response, 200, authorization.payload);
   } catch (error) {
     logEvent('error', 'media.tv.authorize.failed', {
       error: formatErrorForLog(error),
@@ -1258,57 +1285,55 @@ async function authorizeProtectedMediaUpload(request, options) {
     };
   }
 
-  const token = getBearerToken(request);
-  const authResult = await verifyAuthToken(token);
-  if (!authResult.ok || !authResult.userId) {
-    return {
-      ok: false,
-      statusCode: 401,
-      error: 'unauthorized',
-      message: authResult.message ?? 'Authentication is required.',
-    };
+  const managerResult = await authenticateMediaManagerRequest(request, options.roomId, 'upload shared media');
+  if (!managerResult.ok) {
+    return managerResult;
   }
 
-  const authority = await hydrateRoomAuthority(options.roomId);
-  if (!authority.roomRecordId) {
+  const usage = await listRoomMediaUsage(options.roomId);
+  if (usage.bytesUsed + options.contentLength > MAX_ROOM_MEDIA_BYTES) {
     return {
       ok: false,
       statusCode: 409,
-      error: 'room_not_persisted',
-      message: 'Shared media uploads are available only in saved rooms.',
+      error: 'room_media_quota_exceeded',
+      message: `This upload would exceed the room's ${formatBytesForMessage(MAX_ROOM_MEDIA_BYTES)} storage limit.`,
     };
   }
 
-  const actorRole = resolveRole(authResult.userId, authority);
-  if (actorRole !== 'owner' && actorRole !== 'admin') {
+  const existingAsset = await getRoomMediaAssetByChecksumFromBackend(options.roomId, options.kind, options.checksum);
+  if (existingAsset) {
     return {
-      ok: false,
-      statusCode: 403,
-      error: 'forbidden',
-      message: 'Only the room owner or admins can upload shared media.',
+      ok: true,
+      payload: {
+        ok: true,
+        mode: 'reuse',
+        asset: serializeRoomMediaAsset(existingAsset),
+        usage: serializeRoomMediaUsage(usage),
+      },
     };
   }
 
   pruneExpiredUploadIntents();
-  enforceUploadIntentQuota(authResult.userId);
+  enforceUploadIntentQuota(managerResult.userId);
 
   const objectKey = buildProtectedMediaObjectKey(options);
   const uploadIntent = await createProtectedMediaUploadIntent({
     roomId: options.roomId,
-    userId: authResult.userId,
-    actorRole,
+    userId: managerResult.userId,
+    actorRole: managerResult.actorRole,
     kind: options.kind,
     surfaceId: options.surfaceId ?? null,
     fileName: options.fileName,
     contentType: options.contentType,
     contentLength: options.contentLength,
     objectKey,
+    checksum: options.checksum,
   });
 
   logEvent('info', 'media.upload.authorized', {
     roomId: options.roomId,
-    userId: authResult.userId,
-    actorRole,
+    userId: managerResult.userId,
+    actorRole: managerResult.actorRole,
     kind: options.kind,
     surfaceId: options.surfaceId ?? null,
     objectKey,
@@ -1317,17 +1342,22 @@ async function authorizeProtectedMediaUpload(request, options) {
 
   return {
     ok: true,
-    upload: {
-      uploadId: uploadIntent.uploadId,
-      roomId: uploadIntent.roomId,
-      kind: uploadIntent.kind,
-      surfaceId: uploadIntent.surfaceId,
-      objectKey: uploadIntent.objectKey,
-      contentType: uploadIntent.contentType,
-      contentLength: uploadIntent.contentLength,
-      expiresAt: uploadIntent.expiresAt,
-      uploadUrl: uploadIntent.uploadUrl,
-      uploadHeaders: {},
+    payload: {
+      ok: true,
+      mode: 'upload',
+      upload: {
+        uploadId: uploadIntent.uploadId,
+        roomId: uploadIntent.roomId,
+        kind: uploadIntent.kind,
+        surfaceId: uploadIntent.surfaceId,
+        objectKey: uploadIntent.objectKey,
+        contentType: uploadIntent.contentType,
+        contentLength: uploadIntent.contentLength,
+        expiresAt: uploadIntent.expiresAt,
+        uploadUrl: uploadIntent.uploadUrl,
+        uploadHeaders: {},
+      },
+      usage: serializeRoomMediaUsage(usage),
     },
   };
 }
@@ -1346,6 +1376,7 @@ async function createProtectedMediaUploadIntent(options) {
     fileName: options.fileName,
     contentType: options.contentType,
     contentLength: options.contentLength,
+    checksum: options.checksum,
     objectKey: options.objectKey,
     uploadUrl,
     expiresAt: new Date(expiresAtMs).toISOString(),
@@ -1355,6 +1386,244 @@ async function createProtectedMediaUploadIntent(options) {
   };
   mediaUploadIntents.set(uploadId, intent);
   return intent;
+}
+
+async function handleFinalizeMediaUploadRequest(request, response) {
+  try {
+    const payload = await readJsonBody(request);
+    const roomId = normalizeToken(payload?.roomId, MAX_ROOM_ID_LENGTH);
+    const uploadId = normalizeToken(payload?.uploadId, MAX_MEDIA_ASSET_ID_LENGTH);
+
+    if (!roomId) {
+      writeJson(response, 400, { error: 'invalid_room', message: 'A valid roomId is required.' });
+      return;
+    }
+    if (!uploadId) {
+      writeJson(response, 400, { error: 'invalid_upload', message: 'A valid uploadId is required.' });
+      return;
+    }
+
+    const managerResult = await authenticateMediaManagerRequest(request, roomId, 'finalize shared media upload');
+    if (!managerResult.ok) {
+      writeJson(response, managerResult.statusCode, { error: managerResult.error, message: managerResult.message });
+      return;
+    }
+
+    const finalizeResult = await finalizeProtectedMediaUpload(roomId, uploadId, managerResult.userId);
+    if (!finalizeResult.ok) {
+      writeJson(response, finalizeResult.statusCode, { error: finalizeResult.error, message: finalizeResult.message });
+      return;
+    }
+
+    writeJson(response, 200, {
+      ok: true,
+      asset: serializeRoomMediaAsset(finalizeResult.asset),
+      usage: serializeRoomMediaUsage(finalizeResult.usage),
+    });
+  } catch (error) {
+    logEvent('error', 'media.upload.finalize.failed', {
+      error: formatErrorForLog(error),
+    });
+    writeJson(response, 500, { error: 'upload_finalize_failed', message: 'Unable to finalize the shared media upload right now.' });
+  }
+}
+
+async function handleListRoomMediaRequest(request, response) {
+  try {
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    const roomId = normalizeToken(url.searchParams.get('roomId'), MAX_ROOM_ID_LENGTH);
+    const kind = normalizeRoomMediaKind(url.searchParams.get('kind'));
+    if (!roomId) {
+      writeJson(response, 400, { error: 'invalid_room', message: 'A valid roomId is required.' });
+      return;
+    }
+
+    const managerResult = await authenticateMediaManagerRequest(request, roomId, 'list room media');
+    if (!managerResult.ok) {
+      writeJson(response, managerResult.statusCode, { error: managerResult.error, message: managerResult.message });
+      return;
+    }
+
+    const assets = await listRoomMediaAssetsFromBackend(roomId, kind);
+    const usage = summarizeRoomMediaUsage(assets);
+    writeJson(response, 200, {
+      ok: true,
+      assets: assets.map((asset) => serializeRoomMediaAsset(asset)),
+      usage: serializeRoomMediaUsage(usage),
+    });
+  } catch (error) {
+    logEvent('error', 'media.list.failed', {
+      error: formatErrorForLog(error),
+    });
+    writeJson(response, 500, { error: 'media_list_failed', message: 'Unable to load room media right now.' });
+  }
+}
+
+async function handleDeleteRoomMediaRequest(request, response) {
+  try {
+    const payload = await readJsonBody(request);
+    const roomId = normalizeToken(payload?.roomId, MAX_ROOM_ID_LENGTH);
+    const assetId = normalizeToken(payload?.assetId, MAX_MEDIA_ASSET_ID_LENGTH);
+    if (!roomId) {
+      writeJson(response, 400, { error: 'invalid_room', message: 'A valid roomId is required.' });
+      return;
+    }
+    if (!assetId) {
+      writeJson(response, 400, { error: 'invalid_asset', message: 'A valid assetId is required.' });
+      return;
+    }
+
+    const managerResult = await authenticateMediaManagerRequest(request, roomId, 'delete room media');
+    if (!managerResult.ok) {
+      writeJson(response, managerResult.statusCode, { error: managerResult.error, message: managerResult.message });
+      return;
+    }
+
+    const deleteResult = await deleteRoomMediaAssetForRoom(roomId, assetId, managerResult.userId);
+    if (!deleteResult.ok) {
+      writeJson(response, deleteResult.statusCode, { error: deleteResult.error, message: deleteResult.message });
+      return;
+    }
+
+    writeJson(response, 200, {
+      ok: true,
+      usage: serializeRoomMediaUsage(deleteResult.usage),
+    });
+  } catch (error) {
+    logEvent('error', 'media.delete.failed', {
+      error: formatErrorForLog(error),
+    });
+    writeJson(response, 500, { error: 'media_delete_failed', message: 'Unable to delete room media right now.' });
+  }
+}
+
+async function authenticateMediaManagerRequest(request, roomId, actionLabel) {
+  const token = getBearerToken(request);
+  const authResult = await verifyAuthToken(token);
+  if (!authResult.ok || !authResult.userId) {
+    return {
+      ok: false,
+      statusCode: 401,
+      error: 'unauthorized',
+      message: authResult.message ?? `Authentication is required to ${actionLabel}.`,
+    };
+  }
+
+  const authority = await hydrateRoomAuthority(roomId);
+  if (!authority.roomRecordId) {
+    return {
+      ok: false,
+      statusCode: 409,
+      error: 'room_not_persisted',
+      message: 'Shared media is available only in saved rooms.',
+    };
+  }
+
+  const actorRole = resolveRole(authResult.userId, authority);
+  if (actorRole !== 'owner' && actorRole !== 'admin') {
+    return {
+      ok: false,
+      statusCode: 403,
+      error: 'forbidden',
+      message: `Only the room owner or admins can ${actionLabel}.`,
+    };
+  }
+
+  return {
+    ok: true,
+    userId: authResult.userId,
+    actorRole,
+    authority,
+  };
+}
+
+async function finalizeProtectedMediaUpload(roomId, uploadId, userId) {
+  const consumed = consumeUploadIntentForFinalize(uploadId, roomId, userId);
+  if (!consumed.ok) {
+    return consumed;
+  }
+
+  const intent = consumed.intent;
+  if (!storageClient || !STORAGE_BUCKET_NAME) {
+    return {
+      ok: false,
+      statusCode: 503,
+      error: 'storage_not_configured',
+      message: 'Protected media uploads are not configured on the server.',
+    };
+  }
+
+  const existingAsset = await getRoomMediaAssetByChecksumFromBackend(roomId, intent.kind, intent.checksum);
+  if (existingAsset) {
+    if (existingAsset.storageKey !== intent.objectKey) {
+      void cleanupManagedMediaObject(intent.objectKey, { roomId, reason: 'duplicate_upload_finalized', kind: intent.kind });
+    }
+    return {
+      ok: true,
+      asset: existingAsset,
+      usage: summarizeRoomMediaUsage(await listRoomMediaAssetsFromBackend(roomId)),
+    };
+  }
+
+  try {
+    const head = await storageClient.send(new HeadObjectCommand({
+      Bucket: STORAGE_BUCKET_NAME,
+      Key: intent.objectKey,
+    }));
+    const objectSize = Number(head.ContentLength ?? intent.contentLength);
+    if (!Number.isFinite(objectSize) || objectSize <= 0) {
+      return {
+        ok: false,
+        statusCode: 409,
+        error: 'upload_missing',
+        message: 'The uploaded media object could not be verified.',
+      };
+    }
+
+    const asset = await createRoomMediaAssetInBackend({
+      roomId,
+      kind: intent.kind,
+      storageKey: intent.objectKey,
+      fileName: intent.fileName,
+      mimeType: intent.contentType,
+      sizeBytes: objectSize,
+      checksum: intent.checksum,
+      createdBy: userId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: 'ready',
+      inUseSurfaceIds: [],
+      inUseTv: false,
+    });
+
+    if (!asset) {
+      return {
+        ok: false,
+        statusCode: 500,
+        error: 'asset_create_failed',
+        message: 'Unable to record the uploaded media asset.',
+      };
+    }
+
+    return {
+      ok: true,
+      asset,
+      usage: summarizeRoomMediaUsage(await listRoomMediaAssetsFromBackend(roomId)),
+    };
+  } catch (error) {
+    logEvent('warn', 'media.upload.verify_failed', {
+      roomId,
+      uploadId,
+      objectKey: intent.objectKey,
+      error: formatErrorForLog(error),
+    });
+    return {
+      ok: false,
+      statusCode: 409,
+      error: 'upload_missing',
+      message: 'The uploaded media object could not be verified.',
+    };
+  }
 }
 
 async function createPresignedStoragePutUrl(objectKey, contentType, expiresInSeconds) {
@@ -1703,15 +1972,24 @@ function normalizeUploadContentLength(value) {
   return Math.floor(numeric);
 }
 
+function normalizeMediaChecksum(value) {
+  const normalized = normalizeToken(value, MAX_MEDIA_CHECKSUM_LENGTH);
+  return normalized ? normalized.toLowerCase() : null;
+}
+
+function normalizeRoomMediaKind(value) {
+  return value === 'surface-image' || value === 'tv-video' ? value : null;
+}
+
 function buildProtectedMediaObjectKey(options) {
   const extension = getExtensionForContentType(options.contentType);
   const safeStem = sanitizeStorageStem(options.fileName);
   const randomSuffix = randomUUID().replace(/-/g, '');
   const fileName = `${Date.now()}-${randomSuffix}-${safeStem}.${extension}`;
   if (options.kind === 'surface-image') {
-    return `room-surfaces/${options.roomId}/${options.surfaceId}/${fileName}`;
+    return `room-surfaces/${options.roomId}/library/${fileName}`;
   }
-  return `room-tv/${options.roomId}/${fileName}`;
+  return `room-tv/${options.roomId}/library/${fileName}`;
 }
 
 function getExtensionForContentType(contentType) {
@@ -1796,6 +2074,208 @@ function consumeAuthorizedUploadIntent(uploadId, options) {
   intent.usedAt = new Date().toISOString();
   mediaUploadIntents.delete(uploadId);
   return { ok: true, intent };
+}
+
+function consumeUploadIntentForFinalize(uploadId, roomId, userId) {
+  pruneExpiredUploadIntents();
+  const intent = mediaUploadIntents.get(uploadId);
+  if (!intent) {
+    return { ok: false, statusCode: 409, error: 'upload_not_authorized', message: 'That shared media upload is no longer authorized.' };
+  }
+  if (intent.usedAt) {
+    mediaUploadIntents.delete(uploadId);
+    return { ok: false, statusCode: 409, error: 'upload_already_used', message: 'That shared media upload has already been used.' };
+  }
+  if (intent.roomId !== roomId || intent.userId !== userId) {
+    return { ok: false, statusCode: 403, error: 'upload_scope_mismatch', message: 'That shared media upload does not match this room or user.' };
+  }
+  intent.usedAt = new Date().toISOString();
+  mediaUploadIntents.delete(uploadId);
+  return { ok: true, intent };
+}
+
+async function listRoomMediaUsage(roomId) {
+  const assets = await listRoomMediaAssetsFromBackend(roomId);
+  return summarizeRoomMediaUsage(assets);
+}
+
+function serializeRoomMediaAsset(asset) {
+  if (!asset) {
+    return null;
+  }
+  return {
+    id: asset.id,
+    roomId: asset.roomId,
+    kind: asset.kind,
+    storageKey: asset.storageKey,
+    fileName: asset.fileName,
+    mimeType: asset.mimeType,
+    sizeBytes: asset.sizeBytes,
+    checksum: asset.checksum,
+    createdBy: asset.createdBy,
+    createdAt: asset.createdAt,
+    updatedAt: asset.updatedAt,
+    status: asset.status,
+    width: asset.width,
+    height: asset.height,
+    durationSeconds: asset.durationSeconds,
+    inUseSurfaceIds: Array.isArray(asset.inUseSurfaceIds) ? [...asset.inUseSurfaceIds] : [],
+    inUseTv: Boolean(asset.inUseTv),
+  };
+}
+
+function serializeRoomMediaUsage(usage) {
+  return {
+    bytesUsed: usage?.bytesUsed ?? 0,
+    assetCount: usage?.assetCount ?? 0,
+    byteLimit: MAX_ROOM_MEDIA_BYTES,
+  };
+}
+
+function formatBytesForMessage(bytes) {
+  const safeBytes = Math.max(0, Number(bytes) || 0);
+  const mb = safeBytes / (1024 * 1024);
+  return `${Math.round(mb)} MB`;
+}
+
+async function resolveRoomMediaAssetForUse({ roomId, kind, assetId, storageKey }) {
+  const normalizedKind = normalizeRoomMediaKind(kind);
+  if (!roomId || !normalizedKind) {
+    return null;
+  }
+
+  const asset = assetId
+    ? await getRoomMediaAssetByIdFromBackend(assetId)
+    : await getRoomMediaAssetByStorageKeyFromBackend(roomId, storageKey);
+
+  if (!asset || asset.roomId !== roomId || asset.kind !== normalizedKind || asset.status !== 'ready') {
+    return null;
+  }
+  if (storageKey && asset.storageKey !== storageKey) {
+    return null;
+  }
+  return asset;
+}
+
+async function markRoomMediaSurfaceUsage(roomId, surfaceId, previousStorageKey, nextAsset) {
+  if (previousStorageKey) {
+    const previousAsset = await getRoomMediaAssetByStorageKeyFromBackend(roomId, previousStorageKey);
+    if (previousAsset && previousAsset.id !== nextAsset.id) {
+      await updateRoomMediaAssetInBackend({
+        ...previousAsset,
+        updatedAt: new Date().toISOString(),
+        inUseSurfaceIds: previousAsset.inUseSurfaceIds.filter((entry) => entry !== surfaceId),
+      });
+    }
+  }
+
+  const nextSurfaceIds = Array.from(new Set([...(nextAsset.inUseSurfaceIds ?? []), surfaceId]));
+  await updateRoomMediaAssetInBackend({
+    ...nextAsset,
+    updatedAt: new Date().toISOString(),
+    inUseSurfaceIds: nextSurfaceIds,
+  });
+}
+
+async function markRoomMediaTvUsage(roomId, previousStorageKey, nextAsset) {
+  if (previousStorageKey) {
+    const previousAsset = await getRoomMediaAssetByStorageKeyFromBackend(roomId, previousStorageKey);
+    if (previousAsset && previousAsset.id !== nextAsset?.id) {
+      await updateRoomMediaAssetInBackend({
+        ...previousAsset,
+        updatedAt: new Date().toISOString(),
+        inUseTv: false,
+      });
+    }
+  }
+
+  if (nextAsset) {
+    await updateRoomMediaAssetInBackend({
+      ...nextAsset,
+      updatedAt: new Date().toISOString(),
+      inUseTv: true,
+    });
+  }
+}
+
+async function clearRoomSurfaceReference(roomId, surfaceId, metadata = {}) {
+  const surfaces = await ensureRoomSurfaces(roomId);
+  const existingIndex = surfaces.findIndex((entry) => entry.surfaceId === surfaceId);
+  const existing = existingIndex >= 0 ? surfaces[existingIndex] : null;
+  if (existingIndex >= 0) {
+    surfaces.splice(existingIndex, 1);
+  }
+  await deleteSurfaceSnapshotFromBackend(roomId, surfaceId);
+  if (existing?.imagePath) {
+    const previousAsset = await getRoomMediaAssetByStorageKeyFromBackend(roomId, existing.imagePath);
+    if (previousAsset) {
+      await updateRoomMediaAssetInBackend({
+        ...previousAsset,
+        updatedAt: new Date().toISOString(),
+        inUseSurfaceIds: previousAsset.inUseSurfaceIds.filter((entry) => entry !== surfaceId),
+      });
+    }
+  }
+  broadcast(roomId, { type: 'surface.cleared', surfaceId });
+  logEvent('info', 'surface.cleared', {
+    roomId,
+    surfaceId,
+    ...metadata,
+  });
+}
+
+async function clearRoomTvReference(roomId, metadata = {}) {
+  const existing = roomTvMedia.get(roomId) ?? null;
+  roomTvMedia.delete(roomId);
+  if (existing?.sourceUrl) {
+    const previousAsset = await getRoomMediaAssetByStorageKeyFromBackend(roomId, existing.sourceUrl);
+    if (previousAsset) {
+      await updateRoomMediaAssetInBackend({
+        ...previousAsset,
+        updatedAt: new Date().toISOString(),
+        inUseTv: false,
+      });
+    }
+  }
+  broadcast(roomId, { type: 'tv.updated', tvMedia: null });
+  logEvent('info', 'tv.cleared', {
+    roomId,
+    ...metadata,
+  });
+}
+
+async function deleteRoomMediaAssetForRoom(roomId, assetId, userId) {
+  const asset = await getRoomMediaAssetByIdFromBackend(assetId);
+  if (!asset || asset.roomId !== roomId || asset.status !== 'ready') {
+    return {
+      ok: false,
+      statusCode: 404,
+      error: 'asset_not_found',
+      message: 'That room media asset could not be found.',
+    };
+  }
+
+  for (const surfaceId of asset.inUseSurfaceIds ?? []) {
+    await clearRoomSurfaceReference(roomId, surfaceId, { assetId, userId, reason: 'asset_deleted' });
+  }
+  if (asset.inUseTv) {
+    await clearRoomTvReference(roomId, { assetId, userId, reason: 'asset_deleted' });
+  }
+
+  await cleanupManagedMediaObject(asset.storageKey, {
+    roomId,
+    assetId,
+    userId,
+    reason: 'asset_deleted',
+    kind: asset.kind,
+  });
+  await deleteRoomMediaAssetFromBackend(assetId);
+
+  const usage = summarizeRoomMediaUsage(await listRoomMediaAssetsFromBackend(roomId));
+  return {
+    ok: true,
+    usage,
+  };
 }
 
 async function cleanupManagedMediaObject(objectKey, metadata = {}) {
