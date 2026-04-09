@@ -69,6 +69,8 @@ const storageClient = STORAGE_BUCKET_NAME && storageCredentialsProvider
   ? new S3Client({
       region: STORAGE_REGION,
       credentials: storageCredentialsProvider,
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     })
   : null;
 const DIST_DIR = join(__dirname, '..', 'dist');
