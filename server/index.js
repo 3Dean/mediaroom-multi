@@ -910,6 +910,14 @@ async function handleAdminSetSurfaceImage(socket, message) {
 
   const surfaces = await ensureRoomSurfaces(roomId);
   const previousSurface = surfaces.find((entry) => entry.surfaceId === surfaceId) ?? null;
+  for (const priorSurfaceId of assetSurfaceIdsExcluding(mediaAsset, surfaceId)) {
+    await clearRoomSurfaceReference(roomId, priorSurfaceId, {
+      actorUserId: actor.userId,
+      actorDisplayName: actor.displayName,
+      assetId: mediaAsset.id,
+      reason: 'surface_reassigned',
+    });
+  }
   const nextSurface = await persistRoomSurface(roomId, surface);
   const index = surfaces.findIndex((entry) => entry.surfaceId === surfaceId);
   if (index >= 0) {
@@ -2184,11 +2192,10 @@ async function markRoomMediaSurfaceUsage(roomId, surfaceId, previousStorageKey, 
     }
   }
 
-  const nextSurfaceIds = Array.from(new Set([...(nextAsset.inUseSurfaceIds ?? []), surfaceId]));
   await updateRoomMediaAssetInBackend({
     ...nextAsset,
     updatedAt: new Date().toISOString(),
-    inUseSurfaceIds: nextSurfaceIds,
+    inUseSurfaceIds: [surfaceId],
   });
 }
 
@@ -2292,6 +2299,11 @@ async function deleteRoomMediaAssetForRoom(roomId, assetId, userId) {
     ok: true,
     usage,
   };
+}
+
+function assetSurfaceIdsExcluding(asset, surfaceId) {
+  const occupiedSurfaceIds = Array.isArray(asset?.inUseSurfaceIds) ? asset.inUseSurfaceIds : [];
+  return occupiedSurfaceIds.filter((entry) => entry !== surfaceId);
 }
 
 async function findRecentRoomMediaAssetByChecksum(roomId, kind, checksum) {

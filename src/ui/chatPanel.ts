@@ -466,6 +466,36 @@ export class ChatPanel {
     return this.roomMediaKindSelect.value === 'tv-video' ? 'tv-video' : 'surface-image';
   }
 
+  private applyOptimisticImagePlacement(assetId: string, surfaceId: RoomSurfaceId): void {
+    this.roomMediaAssets = this.roomMediaAssets.map((asset) => {
+      if (asset.kind !== 'surface-image') {
+        return asset;
+      }
+      if (asset.id === assetId) {
+        return {
+          ...asset,
+          inUseSurfaceIds: [surfaceId],
+        };
+      }
+      if (asset.inUseSurfaceIds.includes(surfaceId)) {
+        return {
+          ...asset,
+          inUseSurfaceIds: [],
+        };
+      }
+      return asset;
+    });
+  }
+
+  private clearOptimisticImagePlacement(assetId: string): void {
+    this.roomMediaAssets = this.roomMediaAssets.map((asset) => asset.id === assetId
+      ? {
+          ...asset,
+          inUseSurfaceIds: [],
+        }
+      : asset);
+  }
+
   private renderRoomMediaLibrary(): void {
     if (this.roomMediaAssets.length === 0) {
       this.roomMediaList.replaceChildren();
@@ -488,7 +518,7 @@ export class ChatPanel {
       meta.className = 'room-browser-item-meta';
       const usageText = asset.kind === 'tv-video'
         ? (asset.inUseTv ? 'In use on TV' : 'Video asset')
-        : (asset.inUseSurfaceIds.length > 0 ? `In use on ${asset.inUseSurfaceIds.join(', ')}` : 'Image asset');
+        : (asset.inUseSurfaceIds.length > 0 ? `Placed on ${asset.inUseSurfaceIds[0]}` : 'Image asset');
       meta.textContent = `${usageText} • uploader ${asset.createdBy.slice(0, 8)}`;
 
       const actions = document.createElement('div');
@@ -505,8 +535,10 @@ export class ChatPanel {
             try {
               this.roomMediaStatus.textContent = `Applying ${asset.fileName} to ${surfaceId}...`;
               await this.onUseRoomMediaAsset(asset, surfaceId);
+              this.applyOptimisticImagePlacement(asset.id, surfaceId);
               this.roomMediaStatus.textContent = `${asset.fileName} applied to ${surfaceId}.`;
-              await this.refreshRoomMediaLibrary();
+              this.renderRoomMediaLibrary();
+              void this.refreshRoomMediaLibrarySoon();
             } catch (error) {
               this.roomMediaStatus.textContent = getErrorMessage(error, 'Unable to apply that image right now.');
             }
@@ -515,6 +547,7 @@ export class ChatPanel {
         });
 
         if (asset.inUseSurfaceIds.length > 0) {
+          const assignedSurfaceId = asset.inUseSurfaceIds[0];
           const clearButton = document.createElement('button');
           clearButton.type = 'button';
           clearButton.className = 'musicspace-button musicspace-button--secondary musicspace-button--small';
@@ -522,10 +555,12 @@ export class ChatPanel {
           clearButton.addEventListener('click', async (event) => {
             event.stopPropagation();
             try {
-              this.roomMediaStatus.textContent = `Clearing ${asset.fileName} from active surfaces...`;
+              this.roomMediaStatus.textContent = `Clearing ${asset.fileName} from ${assignedSurfaceId}...`;
               await this.onClearRoomMediaAsset(asset);
-              this.roomMediaStatus.textContent = `${asset.fileName} cleared from active surfaces.`;
-              await this.refreshRoomMediaLibrary();
+              this.clearOptimisticImagePlacement(asset.id);
+              this.roomMediaStatus.textContent = `${asset.fileName} cleared from ${assignedSurfaceId}.`;
+              this.renderRoomMediaLibrary();
+              void this.refreshRoomMediaLibrarySoon();
             } catch (error) {
               this.roomMediaStatus.textContent = getErrorMessage(error, 'Unable to clear that image right now.');
             }
@@ -612,6 +647,11 @@ export class ChatPanel {
       this.surfaceFileInput.disabled = !this.surfaceUploadEnabled;
       this.surfaceUploadButton.textContent = 'Upload to Library';
     }
+  }
+
+  private async refreshRoomMediaLibrarySoon(delayMs = 350): Promise<void> {
+    await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+    await this.refreshRoomMediaLibrary();
   }
 
   private async handleTvMediaUpdate(sourceUrl: string | null): Promise<void> {
