@@ -1362,7 +1362,9 @@ async function authorizeProtectedMediaUpload(request, options) {
         contentLength: uploadIntent.contentLength,
         expiresAt: uploadIntent.expiresAt,
         uploadUrl: uploadIntent.uploadUrl,
-        uploadHeaders: {},
+        uploadHeaders: {
+          'content-type': uploadIntent.contentType,
+        },
       },
       usage: serializeRoomMediaUsage(usage),
     },

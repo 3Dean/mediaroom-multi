@@ -28,6 +28,8 @@
   - done: add Room Media Library UI for images and videos
   - done: simplify Shared Surfaces so uploads add to the library first and placement happens from library cards
   - done: add non-destructive `Clear` for in-use library images
+  - current prod finding: owner image/video uploads on Render reach the upload step but S3 returns `403` during the browser `PUT`
+  - next: verify the signed upload request sends the expected `Content-Type` and confirm the Render AWS credentials have `s3:PutObject`, `s3:DeleteObject`, and `s3:ListBucket` on the shared media bucket
   - next: production re-test owner/admin upload, reuse, clear, delete, and same-room dedup flows on Render
   - next: decide whether to show friendlier uploader labels than shortened user IDs
   - next: evaluate thumbnails/previews for library assets if the list starts to grow
@@ -59,6 +61,7 @@
   - done: clarify room-browser cards with explicit slug, owner, and saved/live state
   - done: simplify Shared TV controls to upload, clear, and play/pause only
   - done: replace misleading synced TV seconds copy with clearer playback status text
+  - current prod finding: synthesized sandbox storage CORS is already permissive for `PUT`, so the current Render failure looks more like signed-request or IAM access mismatch than browser CORS
   - next: deploy the updated Amplify storage policy and re-test direct browser access in the target environment
 
 ## Later

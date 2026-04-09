@@ -38,6 +38,26 @@ Render also provides `PORT`, and the server uses that automatically.
 
 If `REALTIME_ALLOWED_ORIGINS` is unset, the server falls back to `RENDER_EXTERNAL_URL` when available.
 
+For Cognito-backed saved rooms plus shared media uploads, also provide AWS credentials that can access both the room data backend and the shared media bucket:
+
+- `AWS_REGION=us-east-1`
+- `AWS_ACCESS_KEY_ID=...`
+- `AWS_SECRET_ACCESS_KEY=...`
+- `AWS_SESSION_TOKEN=...` if you use temporary credentials
+- `REALTIME_ROOM_TABLE_NAME=Room-...`
+
+For shared media uploads specifically, the server credentials need:
+
+- `s3:GetObject`
+- `s3:PutObject`
+- `s3:DeleteObject`
+- `s3:ListBucket`
+
+If storage bucket auto-discovery is not working in production, also set:
+
+- `REALTIME_STORAGE_BUCKET_NAME=...`
+- `REALTIME_STORAGE_REGION=us-east-1`
+
 ## Local preflight
 
 1. Run `npm run build`.

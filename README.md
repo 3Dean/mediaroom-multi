@@ -165,6 +165,18 @@ For durable room authority on Render, add these in addition to the Cognito env v
 - `AWS_SESSION_TOKEN=...` if you use temporary credentials
 - `REALTIME_ROOM_TABLE_NAME=Room-...`
 
+For shared media uploads on Render, the same AWS credentials also need S3 access to the Amplify storage bucket that serves `room-surfaces/*` and `room-tv/*`. In practice that means:
+
+- `s3:PutObject`
+- `s3:DeleteObject`
+- `s3:GetObject`
+- `s3:ListBucket`
+
+If bucket auto-discovery is not sufficient in the target environment, also set:
+
+- `REALTIME_STORAGE_BUCKET_NAME=...`
+- `REALTIME_STORAGE_REGION=us-east-1`
+
 Detailed steps are in `DEPLOYMENT.md`.
 
 ## Current limitations
