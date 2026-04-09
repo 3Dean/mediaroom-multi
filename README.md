@@ -105,12 +105,26 @@ For operational debugging, the realtime server now emits structured JSON logs fo
 
 Saved rooms expose owner/admin-only shared media controls:
 
-- Shared Surfaces: upload replacement images for `image01` through `image04`
-- Shared TV: upload an MP4, clear it, and toggle play/pause
+- Shared Surfaces: upload images into a room-scoped media library, then apply or clear them on `image01` through `image04`
+- Shared TV: upload an MP4 into the room library, apply it to the TV, clear it, and toggle play/pause
+
+Room Media Library V1 is now implemented for saved rooms:
+
+- uploads are persisted as room-scoped media assets instead of one-off replacements
+- owner/admin can reuse existing images or videos without re-uploading
+- identical uploads within the same room are deduplicated
+- image assets can be cleared from active surfaces without deleting them from the library
+- media usage is tracked against room-level storage limits
+
+Current upload defaults:
+
+- images: `10 MB` max
+- videos: `100 MB` max
+- room media total: `500 MB` max
 
 The current Shared TV UX intentionally does not expose seek or scrubber controls. Playback state is kept simple until a fuller synchronized media control surface is implemented.
 
-For the planned room-scoped media library work, see [`ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md`](./ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md).
+For the implementation checklist and follow-up notes, see [`ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md`](./ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md).
 
 ## Health check
 

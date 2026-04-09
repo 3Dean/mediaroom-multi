@@ -16,17 +16,28 @@
 - Move realtime room authority persistence to direct DynamoDB reads/writes on Render.
 - Verify saved-room ownership survives Render restart while temporary guest rooms remain ownerless.
 - Clarify room-browser metadata and simplify Shared TV controls.
+- Implement Room Media Library V1 for saved rooms.
 
 ## Next
 
-- Room media library planning and implementation checklist lives in `ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md`.
 - Improve remote avatar presentation beyond placeholders.
+- Room media library follow-up
+  - done: add `RoomMediaAsset` backend model and AppSync persistence
+  - done: add room-scoped media list, finalize, dedup, and delete flows
+  - done: add room quota and per-file upload validation
+  - done: add Room Media Library UI for images and videos
+  - done: simplify Shared Surfaces so uploads add to the library first and placement happens from library cards
+  - done: add non-destructive `Clear` for in-use library images
+  - next: production re-test owner/admin upload, reuse, clear, delete, and same-room dedup flows on Render
+  - next: decide whether to show friendlier uploader labels than shortened user IDs
+  - next: evaluate thumbnails/previews for library assets if the list starts to grow
+  - reference: implementation notes live in `ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md`
 - Shared surface image upload and saved-room lifecycle follow-up
   - done: add Amplify storage for guest-readable room surface images
   - done: add persisted room surface snapshot model and server repository
   - done: add realtime room snapshot/broadcast support for surface updates
   - done: refactor frame texture replacement into reusable surface image application
-  - done: add owner/admin-only upload controls targeting `image01`-`image04`
+  - done: add owner/admin-only upload controls for saved-room shared surfaces
   - done: gate shared surfaces to saved rooms so temporary guest sessions do not imply durable ownership
   - done: merge live rooms into the room browser so active rooms show as joinable
   - done: verify Render can perform shared surface updates after widening AppSync IAM access
@@ -57,7 +68,7 @@
 - Shared TV media playback
   - done: create private S3 + CloudFront distribution path for app-managed media delivery
   - v1: owner/admin-only TV control for saved rooms
-  - use curated or app-managed `S3`/`CloudFront` mp4 URLs
+  - done: use app-managed uploaded room media assets for saved rooms
   - next: build a local hardcoded TV-video proof of concept by swapping the current `tvscreen.glb` visualizer material to a `THREE.VideoTexture`
   - sync media source and play/pause through room state
   - apply video as a Three.js `VideoTexture` on the TV mesh
