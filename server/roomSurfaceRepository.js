@@ -48,7 +48,7 @@ export async function loadSurfaceSnapshotsFromBackend(roomId) {
     { roomId },
   );
 
-  return normalizeSurfaceArray(response?.listRoomSurfaceSnapshots?.items ?? []);
+  return collapseSurfaceSnapshots(normalizeSurfaceArray(response?.listRoomSurfaceSnapshots?.items ?? []));
 }
 
 export async function saveSurfaceSnapshotToBackend(roomId, surface) {
@@ -61,7 +61,8 @@ export async function saveSurfaceSnapshotToBackend(roomId, surface) {
     return null;
   }
 
-  const existingId = await findSurfaceRecordId(roomId, normalized.surfaceId);
+  const existingIds = await findSurfaceRecordIds(roomId, normalized.surfaceId);
+  const existingId = existingIds[0] ?? null;
   const variables = existingId
     ? {
         input: {
@@ -110,6 +111,10 @@ export async function saveSurfaceSnapshotToBackend(roomId, surface) {
     variables,
   );
 
+  if (existingIds.length > 1) {
+    await deleteSurfaceSnapshotIds(existingIds.slice(1));
+  }
+
   return normalizeSurfaceSnapshot(response?.updateRoomSurfaceSnapshot ?? response?.createRoomSurfaceSnapshot ?? null);
 }
 
@@ -137,25 +142,7 @@ export async function deleteSurfaceSnapshotsFromBackend(roomId) {
       .filter(Boolean)
     : [];
 
-  let deletedCount = 0;
-  for (const id of ids) {
-    const result = await executeGraphql(
-      /* GraphQL */ `
-        mutation DeleteRoomSurfaceSnapshot($input: DeleteRoomSurfaceSnapshotInput!) {
-          deleteRoomSurfaceSnapshot(input: $input) {
-            id
-          }
-        }
-      `,
-      { input: { id } },
-    );
-
-    if (result?.deleteRoomSurfaceSnapshot?.id) {
-      deletedCount += 1;
-    }
-  }
-
-  return deletedCount;
+  return await deleteSurfaceSnapshotIds(ids);
 }
 
 export async function deleteSurfaceSnapshotFromBackend(roomId, surfaceId) {
@@ -163,32 +150,22 @@ export async function deleteSurfaceSnapshotFromBackend(roomId, surfaceId) {
     return false;
   }
 
-  const existingId = await findSurfaceRecordId(roomId, surfaceId);
-  if (!existingId) {
+  const existingIds = await findSurfaceRecordIds(roomId, surfaceId);
+  if (existingIds.length === 0) {
     return false;
   }
 
-  const result = await executeGraphql(
-    /* GraphQL */ `
-      mutation DeleteRoomSurfaceSnapshot($input: DeleteRoomSurfaceSnapshotInput!) {
-        deleteRoomSurfaceSnapshot(input: $input) {
-          id
-        }
-      }
-    `,
-    { input: { id: existingId } },
-  );
-
-  return Boolean(result?.deleteRoomSurfaceSnapshot?.id);
+  return (await deleteSurfaceSnapshotIds(existingIds)) > 0;
 }
 
-async function findSurfaceRecordId(roomId, surfaceId) {
+async function findSurfaceRecordIds(roomId, surfaceId) {
   const response = await executeGraphql(
     /* GraphQL */ `
       query ListRoomSurfaceSnapshotIds($roomId: String!, $surfaceId: String!) {
-        listRoomSurfaceSnapshots(filter: { roomId: { eq: $roomId }, surfaceId: { eq: $surfaceId } }, limit: 1) {
+        listRoomSurfaceSnapshots(filter: { roomId: { eq: $roomId }, surfaceId: { eq: $surfaceId } }, limit: 100) {
           items {
             id
+            updatedAt
           }
         }
       }
@@ -196,13 +173,30 @@ async function findSurfaceRecordId(roomId, surfaceId) {
     { roomId, surfaceId },
   );
 
-  return response?.listRoomSurfaceSnapshots?.items?.[0]?.id ?? null;
+  const items = Array.isArray(response?.listRoomSurfaceSnapshots?.items)
+    ? response.listRoomSurfaceSnapshots.items
+      .filter((item) => typeof item?.id === 'string' && item.id)
+      .sort((left, right) => compareIsoDatesDesc(left?.updatedAt, right?.updatedAt))
+    : [];
+
+  return items.map((item) => item.id);
 }
 
 function normalizeSurfaceArray(value) {
   return Array.isArray(value)
     ? value.map((entry) => normalizeSurfaceSnapshot(entry)).filter(Boolean)
     : [];
+}
+
+function collapseSurfaceSnapshots(items) {
+  const latestBySurfaceId = new Map();
+  for (const item of items) {
+    const existing = latestBySurfaceId.get(item.surfaceId);
+    if (!existing || compareIsoDatesDesc(item.updatedAt, existing.updatedAt) < 0) {
+      latestBySurfaceId.set(item.surfaceId, item);
+    }
+  }
+  return Array.from(latestBySurfaceId.values());
 }
 
 function normalizeSurfaceSnapshot(value) {
@@ -225,6 +219,36 @@ function normalizeSurfaceSnapshot(value) {
     updatedByUserId: value.updatedByUserId.trim(),
     updatedAt,
   };
+}
+
+function compareIsoDatesDesc(left, right) {
+  const leftTime = Date.parse(typeof left === 'string' ? left : '');
+  const rightTime = Date.parse(typeof right === 'string' ? right : '');
+  const safeLeft = Number.isFinite(leftTime) ? leftTime : 0;
+  const safeRight = Number.isFinite(rightTime) ? rightTime : 0;
+  return safeRight - safeLeft;
+}
+
+async function deleteSurfaceSnapshotIds(ids) {
+  let deletedCount = 0;
+  for (const id of ids) {
+    const result = await executeGraphql(
+      /* GraphQL */ `
+        mutation DeleteRoomSurfaceSnapshot($input: DeleteRoomSurfaceSnapshotInput!) {
+          deleteRoomSurfaceSnapshot(input: $input) {
+            id
+          }
+        }
+      `,
+      { input: { id } },
+    );
+
+    if (result?.deleteRoomSurfaceSnapshot?.id) {
+      deletedCount += 1;
+    }
+  }
+
+  return deletedCount;
 }
 
 async function executeGraphql(query, variables) {

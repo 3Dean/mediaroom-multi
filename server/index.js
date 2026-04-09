@@ -42,6 +42,7 @@ const MAX_TV_VIDEO_BYTES = Number(process.env.REALTIME_MAX_TV_VIDEO_BYTES ?? 100
 const MAX_ROOM_MEDIA_BYTES = Number(process.env.REALTIME_MAX_ROOM_MEDIA_BYTES ?? 500 * 1024 * 1024);
 const MAX_MEDIA_CHECKSUM_LENGTH = Number(process.env.REALTIME_MAX_MEDIA_CHECKSUM_LENGTH ?? 128);
 const MAX_MEDIA_ASSET_ID_LENGTH = Number(process.env.REALTIME_MAX_MEDIA_ASSET_ID_LENGTH ?? 128);
+const ROOM_MEDIA_DEDUP_CACHE_TTL_MS = Number(process.env.REALTIME_ROOM_MEDIA_DEDUP_CACHE_TTL_MS ?? 15 * 60 * 1000);
 const LOG_LEVEL = normalizeLogLevel(process.env.REALTIME_LOG_LEVEL);
 const DEFAULT_EYE_HEIGHT = 1.6;
 const VALID_SURFACE_IDS = new Set(['image01', 'image02', 'image03', 'image04']);
@@ -101,6 +102,7 @@ const roomTvMedia = new Map();
 const hydratedSurfaceRooms = new Set();
 const chatRateLimits = new Map();
 const mediaUploadIntents = new Map();
+const roomMediaChecksumCache = new Map();
 const roomAuthorities = new Map(Object.entries(loadFallbackAuthorityStore()).map(([roomId, authority]) => [roomId, normalizeRoomAuthority(authority)]));
 const jwksCache = new Map();
 const persistenceHealth = {
@@ -1309,7 +1311,7 @@ async function authorizeProtectedMediaUpload(request, options) {
     };
   }
 
-  const existingAsset = await getRoomMediaAssetByChecksumFromBackend(options.roomId, options.kind, options.checksum);
+  const existingAsset = await findRecentRoomMediaAssetByChecksum(options.roomId, options.kind, options.checksum);
   if (existingAsset) {
     return {
       ok: true,
@@ -1564,7 +1566,7 @@ async function finalizeProtectedMediaUpload(roomId, uploadId, userId) {
     };
   }
 
-  const existingAsset = await getRoomMediaAssetByChecksumFromBackend(roomId, intent.kind, intent.checksum);
+  const existingAsset = await findRecentRoomMediaAssetByChecksum(roomId, intent.kind, intent.checksum);
   if (existingAsset) {
     if (existingAsset.storageKey !== intent.objectKey) {
       void cleanupManagedMediaObject(intent.objectKey, { roomId, reason: 'duplicate_upload_finalized', kind: intent.kind });
@@ -1615,6 +1617,8 @@ async function finalizeProtectedMediaUpload(roomId, uploadId, userId) {
         message: 'Unable to record the uploaded media asset.',
       };
     }
+
+    cacheRoomMediaAssetByChecksum(asset);
 
     return {
       ok: true,
@@ -2280,6 +2284,7 @@ async function deleteRoomMediaAssetForRoom(roomId, assetId, userId) {
     reason: 'asset_deleted',
     kind: asset.kind,
   });
+  evictRoomMediaAssetChecksum(asset);
   await deleteRoomMediaAssetFromBackend(assetId);
 
   const usage = summarizeRoomMediaUsage(await listRoomMediaAssetsFromBackend(roomId));
@@ -2287,6 +2292,59 @@ async function deleteRoomMediaAssetForRoom(roomId, assetId, userId) {
     ok: true,
     usage,
   };
+}
+
+async function findRecentRoomMediaAssetByChecksum(roomId, kind, checksum) {
+  const cachedAsset = getCachedRoomMediaAssetByChecksum(roomId, kind, checksum);
+  if (cachedAsset) {
+    return cachedAsset;
+  }
+
+  const backendAsset = await getRoomMediaAssetByChecksumFromBackend(roomId, kind, checksum);
+  if (backendAsset) {
+    cacheRoomMediaAssetByChecksum(backendAsset);
+  }
+  return backendAsset;
+}
+
+function getCachedRoomMediaAssetByChecksum(roomId, kind, checksum) {
+  pruneRoomMediaChecksumCache();
+  const key = getRoomMediaChecksumCacheKey(roomId, kind, checksum);
+  const entry = roomMediaChecksumCache.get(key);
+  if (!entry) {
+    return null;
+  }
+  return entry.asset?.status === 'ready' ? entry.asset : null;
+}
+
+function cacheRoomMediaAssetByChecksum(asset) {
+  if (!asset?.roomId || !asset?.kind || !asset?.checksum) {
+    return;
+  }
+  roomMediaChecksumCache.set(getRoomMediaChecksumCacheKey(asset.roomId, asset.kind, asset.checksum), {
+    asset,
+    cachedAtMs: Date.now(),
+  });
+}
+
+function evictRoomMediaAssetChecksum(asset) {
+  if (!asset?.roomId || !asset?.kind || !asset?.checksum) {
+    return;
+  }
+  roomMediaChecksumCache.delete(getRoomMediaChecksumCacheKey(asset.roomId, asset.kind, asset.checksum));
+}
+
+function getRoomMediaChecksumCacheKey(roomId, kind, checksum) {
+  return `${roomId}::${kind}::${checksum}`.toLowerCase();
+}
+
+function pruneRoomMediaChecksumCache() {
+  const cutoff = Date.now() - ROOM_MEDIA_DEDUP_CACHE_TTL_MS;
+  for (const [key, entry] of roomMediaChecksumCache.entries()) {
+    if (!entry || entry.cachedAtMs < cutoff) {
+      roomMediaChecksumCache.delete(key);
+    }
+  }
 }
 
 async function cleanupManagedMediaObject(objectKey, metadata = {}) {
