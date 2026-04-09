@@ -18,6 +18,14 @@ export async function confirmSignUpWithEmail(email: string, code: string): Promi
   });
 }
 
+export async function resendSignUpCodeWithEmail(email: string): Promise<void> {
+  await ensureAmplifyConfigured();
+  const { resendSignUpCode } = await import('aws-amplify/auth');
+  await resendSignUpCode({
+    username: email,
+  });
+}
+
 export async function signInWithEmail(email: string, password: string): Promise<void> {
   await ensureAmplifyConfigured();
   const { signIn } = await import('aws-amplify/auth');

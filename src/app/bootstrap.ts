@@ -4,6 +4,7 @@ import {
   confirmSignUpWithEmail,
   getAuthenticatedUser,
   getRealtimeAuthToken,
+  resendSignUpCodeWithEmail,
   signInWithEmail,
   signOutCurrentUser,
   signUpWithEmail,
@@ -325,7 +326,17 @@ export function bootstrapApp(): void {
     authPanel = new AuthPanel({
       initialLoginId: currentUser?.signInDetails?.loginId ?? null,
       onSignIn: async (email, password) => {
-        await signInWithEmail(email, password);
+        try {
+          await signInWithEmail(email, password);
+        } catch (error) {
+          if (getAuthErrorCode(error) === 'UserNotConfirmedException') {
+            return {
+              needsConfirmation: true,
+              message: 'This account is not confirmed yet. Enter the email code below or resend it.',
+            };
+          }
+          throw error;
+        }
         currentUser = await getAuthenticatedUser();
         authPanel.setUser(currentUser?.signInDetails?.loginId ?? null);
         updateLobbyOverlay();
@@ -351,7 +362,26 @@ export function bootstrapApp(): void {
         void refreshRooms();
       },
       onSignUp: async (email, password) => {
-        const result = await signUpWithEmail(email, password);
+        let result;
+        try {
+          result = await signUpWithEmail(email, password);
+        } catch (error) {
+          if (getAuthErrorCode(error) === 'UsernameExistsException') {
+            try {
+              await resendSignUpCodeWithEmail(email);
+              return {
+                needsConfirmation: true,
+                message: 'This email already has an unconfirmed account. A new confirmation code was sent.',
+              };
+            } catch {
+              return {
+                needsConfirmation: true,
+                message: 'This email already exists. If it is not confirmed yet, enter the existing confirmation code or try resending it.',
+              };
+            }
+          }
+          throw error;
+        }
         const step = result.nextStep?.signUpStep;
         if (step === 'DONE') {
           currentUser = await getAuthenticatedUser();
@@ -374,6 +404,10 @@ export function bootstrapApp(): void {
       },
       onConfirm: async (email, code) => {
         await confirmSignUpWithEmail(email, code);
+      },
+      onResendConfirmation: async (email) => {
+        await resendSignUpCodeWithEmail(email);
+        return 'A new confirmation code was sent to your email.';
       },
       onSignOut: async () => {
         await signOutCurrentUser();
@@ -1091,6 +1125,15 @@ function getRoomSlugFromUrl(): string | undefined {
   const params = new URLSearchParams(window.location.search);
   const roomSlug = params.get('room')?.trim();
   return roomSlug || undefined;
+}
+
+function getAuthErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+  const maybeName = 'name' in error && typeof error.name === 'string' ? error.name : null;
+  const maybeCode = 'code' in error && typeof error.code === 'string' ? error.code : null;
+  return maybeName ?? maybeCode;
 }
 
 function updateRoomSlugInUrl(roomSlug: string): void {
