@@ -13,7 +13,8 @@
     "start": "node server/index.js",
     "smoke:health": "node scripts/smoke-health.mjs",
     "smoke:realtime": "node scripts/smoke-realtime.mjs",
-    "smoke:mobile-layering": "node scripts/smoke-mobile-layering.mjs"
+    "smoke:mobile-layering": "node scripts/smoke-mobile-layering.mjs",
+    "cleanup:rooms": "node scripts/cleanup-rooms.mjs"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.16.1",

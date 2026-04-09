@@ -597,9 +597,7 @@
             ],
             "authenticated": [
               "get",
-              "list",
-              "write",
-              "delete"
+              "list"
             ]
           },
           "room-tv/*": {
@@ -609,9 +607,7 @@
             ],
             "authenticated": [
               "get",
-              "list",
-              "write",
-              "delete"
+              "list"
             ]
           }
         }
