@@ -9,6 +9,7 @@ type ChatPanelOptions = {
   onUploadTvMedia: (file: File) => Promise<void>;
   onSetTvPlayback: (isPlaying: boolean, currentTime: number) => Promise<void>;
   onListRoomMedia: (kind?: RoomMediaAssetKind) => Promise<{ assets: RoomMediaAsset[]; usage: RoomMediaUsage }>;
+  onResolveRoomMediaUserLabels: (userIds: string[]) => Promise<Record<string, string>>;
   onUseRoomMediaAsset: (asset: RoomMediaAsset, target?: RoomSurfaceId) => Promise<void>;
   onClearRoomMediaAsset: (asset: RoomMediaAsset) => Promise<void>;
   onDeleteRoomMediaAsset: (asset: RoomMediaAsset) => Promise<void>;
@@ -92,6 +93,7 @@ export class ChatPanel {
   private readonly onUploadTvMedia: (file: File) => Promise<void>;
   private readonly onSetTvPlayback: (isPlaying: boolean, currentTime: number) => Promise<void>;
   private readonly onListRoomMedia: (kind?: RoomMediaAssetKind) => Promise<{ assets: RoomMediaAsset[]; usage: RoomMediaUsage }>;
+  private readonly onResolveRoomMediaUserLabels: (userIds: string[]) => Promise<Record<string, string>>;
   private readonly onUseRoomMediaAsset: (asset: RoomMediaAsset, target?: RoomSurfaceId) => Promise<void>;
   private readonly onClearRoomMediaAsset: (asset: RoomMediaAsset) => Promise<void>;
   private readonly onDeleteRoomMediaAsset: (asset: RoomMediaAsset) => Promise<void>;
@@ -104,6 +106,7 @@ export class ChatPanel {
   private roomMediaEnabled = false;
   private roomMediaRoomId: string | null = null;
   private roomMediaAssets: RoomMediaAsset[] = [];
+  private roomMediaUserLabels: Record<string, string> = {};
   private roomMediaLastKind: RoomMediaAssetKind = 'surface-image';
   private roomMediaLoadingPromise: Promise<void> | null = null;
 
@@ -114,6 +117,7 @@ export class ChatPanel {
     this.onUploadTvMedia = options.onUploadTvMedia;
     this.onSetTvPlayback = options.onSetTvPlayback;
     this.onListRoomMedia = options.onListRoomMedia;
+    this.onResolveRoomMediaUserLabels = options.onResolveRoomMediaUserLabels;
     this.onUseRoomMediaAsset = options.onUseRoomMediaAsset;
     this.onClearRoomMediaAsset = options.onClearRoomMediaAsset;
     this.onDeleteRoomMediaAsset = options.onDeleteRoomMediaAsset;
@@ -409,6 +413,7 @@ export class ChatPanel {
 
     if (!visible) {
       this.roomMediaAssets = [];
+      this.roomMediaUserLabels = {};
       this.roomMediaLoadingPromise = null;
       this.roomMediaUsageLabel.textContent = 'Storage usage unavailable';
       this.roomMediaStatus.textContent = 'Owner/admin can reuse or delete room media.';
@@ -418,6 +423,7 @@ export class ChatPanel {
 
     if (roomChanged) {
       this.roomMediaAssets = [];
+      this.roomMediaUserLabels = {};
       this.roomMediaLoadingPromise = null;
       this.roomMediaList.replaceChildren();
     }
@@ -447,6 +453,7 @@ export class ChatPanel {
           return;
         }
         this.roomMediaAssets = result.assets;
+        this.roomMediaUserLabels = await this.onResolveRoomMediaUserLabels(result.assets.map((asset) => asset.createdBy));
         this.roomMediaUsageLabel.textContent = `${formatMediaBytes(result.usage.bytesUsed)} / ${formatMediaBytes(result.usage.byteLimit)} used`;
         this.roomMediaStatus.textContent = result.assets.length > 0
           ? `${result.assets.length} ${kind === 'tv-video' ? 'video' : 'image'} asset${result.assets.length === 1 ? '' : 's'}`
@@ -519,7 +526,8 @@ export class ChatPanel {
       const usageText = asset.kind === 'tv-video'
         ? (asset.inUseTv ? 'In use on TV' : 'Video asset')
         : (asset.inUseSurfaceIds.length > 0 ? `Placed on ${asset.inUseSurfaceIds[0]}` : 'Image asset');
-      meta.textContent = `${usageText} • uploader ${asset.createdBy.slice(0, 8)}`;
+      const uploaderLabel = this.roomMediaUserLabels[asset.createdBy] ?? asset.createdBy.slice(0, 8);
+      meta.textContent = `${usageText} • uploader ${uploaderLabel}`;
 
       const actions = document.createElement('div');
       actions.className = 'room-browser-actions';

@@ -52,6 +52,7 @@ export function bootstrapApp(): void {
     let pendingObjectId: string | null = null;
     let appliedObjectId: string | null = null;
     let knownRooms: RoomSummary[] = [];
+    const roomMediaUserLabelCache = new Map<string, string>();
 
     const updateLobbyOverlay = () => {
       if (currentUser?.signInDetails?.loginId) {
@@ -671,6 +672,46 @@ export function bootstrapApp(): void {
         }
         const { listRoomMediaAssets } = await import('../backend/roomMediaClient');
         return await listRoomMediaAssets(activeSession.roomId, token, kind);
+      },
+      onResolveRoomMediaUserLabels: async (userIds) => {
+        const uniqueUserIds = Array.from(new Set(userIds.map((value) => value.trim()).filter(Boolean)));
+        const labels: Record<string, string> = {};
+
+        const currentUserId = currentUser?.userId ?? null;
+        const currentLoginId = currentUser?.signInDetails?.loginId?.trim() ?? '';
+        const currentLoginLabel = currentLoginId.includes('@') ? currentLoginId.split('@')[0] : currentLoginId;
+
+        for (const userId of uniqueUserIds) {
+          if (currentUserId && userId === currentUserId) {
+            labels[userId] = 'You';
+            roomMediaUserLabelCache.set(userId, currentLoginLabel || 'You');
+            continue;
+          }
+
+          const cached = roomMediaUserLabelCache.get(userId);
+          if (cached) {
+            labels[userId] = cached;
+            continue;
+          }
+
+          try {
+            const { getUserProfileDisplayName } = await import('../backend/dataClient');
+            const displayName = await getUserProfileDisplayName(userId);
+            if (displayName) {
+              roomMediaUserLabelCache.set(userId, displayName);
+              labels[userId] = displayName;
+              continue;
+            }
+          } catch (error) {
+            console.error('Failed to resolve room media user label', error);
+          }
+
+          const fallback = userId.slice(0, 8);
+          roomMediaUserLabelCache.set(userId, fallback);
+          labels[userId] = fallback;
+        }
+
+        return labels;
       },
       onUseRoomMediaAsset: async (asset, targetSurfaceId) => {
         const activeSession = sessionStore.getCurrentSession();
