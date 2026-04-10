@@ -222,11 +222,19 @@
               "properties": {
                 "rules": [
                   {
-                    "allow": "private",
+                    "provider": "userPools",
+                    "ownerField": "createdBy",
+                    "allow": "owner",
                     "operations": [
                       "create",
                       "update",
-                      "delete",
+                      "delete"
+                    ],
+                    "identityClaim": "sub"
+                  },
+                  {
+                    "allow": "private",
+                    "operations": [
                       "read"
                     ]
                   }

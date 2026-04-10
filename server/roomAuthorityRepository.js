@@ -71,27 +71,7 @@ export async function loadAuthorityFromBackend(roomId) {
     return loadAuthorityFromDynamo(roomId);
   }
 
-  const response = await executeGraphql(
-    /* GraphQL */ `
-      query ListRoomsBySlug($slug: String!) {
-        listRooms(filter: { slug: { eq: $slug } }, limit: 1) {
-          items {
-            id
-            slug
-            createdBy
-            maxUsers
-            isPrivate
-            isLocked
-            adminUserIds
-            mutedUserIds
-          }
-        }
-      }
-    `,
-    { slug: roomId },
-  );
-
-  const room = response?.listRooms?.items?.[0];
+  const room = await findRoomRecordBySlugFromGraphql(roomId);
   if (!room) {
     return null;
   }
@@ -165,27 +145,36 @@ export async function deleteRoomFromBackend(roomId, roomRecordId = null) {
     return deleteRoomFromDynamo(roomId, roomRecordId);
   }
 
-  const resolvedRoomRecordId = roomRecordId ?? await findRoomRecordId(roomId);
-  if (!resolvedRoomRecordId) {
+  const roomRecordIds = roomRecordId
+    ? [roomRecordId]
+    : await findRoomRecordIds(roomId);
+  if (roomRecordIds.length === 0) {
     return false;
   }
 
-  const response = await executeGraphql(
-    /* GraphQL */ `
-      mutation DeleteRoom($input: DeleteRoomInput!) {
-        deleteRoom(input: $input) {
-          id
+  let deletedCount = 0;
+  for (const id of roomRecordIds) {
+    const response = await executeGraphql(
+      /* GraphQL */ `
+        mutation DeleteRoom($input: DeleteRoomInput!) {
+          deleteRoom(input: $input) {
+            id
+          }
         }
-      }
-    `,
-    {
-      input: {
-        id: resolvedRoomRecordId,
+      `,
+      {
+        input: {
+          id,
+        },
       },
-    },
-  );
+    );
 
-  return Boolean(response?.deleteRoom?.id);
+    if (response?.deleteRoom?.id) {
+      deletedCount += 1;
+    }
+  }
+
+  return deletedCount > 0;
 }
 
 export function canUseBackendPersistence() {
@@ -236,6 +225,62 @@ async function findRoomRecordId(roomId) {
   return existing?.roomRecordId ?? null;
 }
 
+async function findRoomRecordIds(roomId) {
+  if (roomTableName && dynamodbSigner) {
+    const records = await listRoomRecordsFromDynamo(roomId);
+    return records.map((record) => record.id).filter(Boolean);
+  }
+
+  const records = await listRoomRecordsBySlugFromGraphql(roomId);
+  return records.map((record) => record.id).filter(Boolean);
+}
+
+async function findRoomRecordBySlugFromGraphql(roomId) {
+  const records = await listRoomRecordsBySlugFromGraphql(roomId);
+  return records[0] ?? null;
+}
+
+async function listRoomRecordsBySlugFromGraphql(roomId) {
+  const records = [];
+  let nextToken = null;
+
+  do {
+    const response = await executeGraphql(
+      /* GraphQL */ 
+      `        query ListRoomsBySlug($slug: String!, $nextToken: String) {
+          listRooms(filter: { slug: { eq: $slug } }, limit: 100, nextToken: $nextToken) {
+            items {
+              id
+              slug
+              createdBy
+              maxUsers
+              isPrivate
+              isLocked
+              adminUserIds
+              mutedUserIds
+            }
+            nextToken
+          }
+        }
+      `      ,
+      { slug: roomId, nextToken },
+    );
+
+    const payload = response?.listRooms ?? null;
+    if (Array.isArray(payload?.items)) {
+      for (const item of payload.items) {
+        if (typeof item?.id === 'string' && item.id && typeof item?.slug === 'string' && item.slug === roomId) {
+          records.push(item);
+        }
+      }
+    }
+
+    nextToken = typeof payload?.nextToken === 'string' && payload.nextToken ? payload.nextToken : null;
+  } while (nextToken);
+
+  return records;
+}
+
 async function executeGraphql(query, variables) {
   if (!appsyncUrl || !appsyncSigner) {
     return null;
@@ -275,19 +320,7 @@ async function executeGraphql(query, variables) {
 }
 
 async function loadAuthorityFromDynamo(roomId) {
-  const response = await executeDynamoRequest('DynamoDB_20120810.Scan', {
-    TableName: roomTableName,
-    FilterExpression: '#slug = :slug',
-    ExpressionAttributeNames: {
-      '#slug': 'slug',
-    },
-    ExpressionAttributeValues: {
-      ':slug': { S: roomId },
-    },
-    Limit: 1,
-  });
-
-  const room = response?.Items?.[0];
+  const room = await fetchRoomRecordFromDynamo(roomId, true);
   if (!room) {
     return null;
   }
@@ -376,47 +409,76 @@ async function ensureRoomRecordInDynamo(roomId, ownerUserId, maxUsers) {
   }
 }
 
-async function fetchRoomRecordFromDynamo(roomId) {
-  const response = await executeDynamoRequest('DynamoDB_20120810.Scan', {
-    TableName: roomTableName,
-    FilterExpression: '#slug = :slug',
-    ExpressionAttributeNames: {
-      '#slug': 'slug',
-    },
-    ExpressionAttributeValues: {
-      ':slug': { S: roomId },
-    },
-    Limit: 1,
-  });
+async function fetchRoomRecordFromDynamo(roomId, includeFullItem = false) {
+  const records = await listRoomRecordsFromDynamo(roomId, includeFullItem);
+  return records[0] ?? null;
+}
 
-  const item = response?.Items?.[0];
-  if (!item) {
-    return null;
-  }
+async function listRoomRecordsFromDynamo(roomId, includeFullItem = false) {
+  const records = [];
+  let exclusiveStartKey = undefined;
 
-  return {
-    id: readStringAttribute(item.id),
-    createdBy: readStringAttribute(item.createdBy),
-  };
+  do {
+    const response = await executeDynamoRequest('DynamoDB_20120810.Scan', {
+      TableName: roomTableName,
+      FilterExpression: '#slug = :slug',
+      ExpressionAttributeNames: {
+        '#slug': 'slug',
+      },
+      ExpressionAttributeValues: {
+        ':slug': { S: roomId },
+      },
+      Limit: 100,
+      ExclusiveStartKey: exclusiveStartKey,
+    });
+
+    if (Array.isArray(response?.Items)) {
+      for (const item of response.Items) {
+        if (readStringAttribute(item?.slug) !== roomId) {
+          continue;
+        }
+        if (includeFullItem) {
+          records.push(item);
+          continue;
+        }
+        const id = readStringAttribute(item.id);
+        if (!id) {
+          continue;
+        }
+        records.push({
+          id,
+          createdBy: readStringAttribute(item.createdBy),
+        });
+      }
+    }
+
+    exclusiveStartKey = response?.LastEvaluatedKey ?? undefined;
+  } while (exclusiveStartKey);
+
+  return records;
 }
 
 async function deleteRoomFromDynamo(roomId, roomRecordId = null) {
-  const record = roomRecordId
-    ? { id: roomRecordId }
-    : await fetchRoomRecordFromDynamo(roomId);
+  const recordIds = roomRecordId
+    ? [roomRecordId]
+    : (await listRoomRecordsFromDynamo(roomId)).map((record) => record.id).filter(Boolean);
 
-  if (!record?.id) {
+  if (recordIds.length === 0) {
     return false;
   }
 
-  await executeDynamoRequest('DynamoDB_20120810.DeleteItem', {
-    TableName: roomTableName,
-    Key: {
-      id: { S: record.id },
-    },
-  });
+  let deletedCount = 0;
+  for (const id of recordIds) {
+    await executeDynamoRequest('DynamoDB_20120810.DeleteItem', {
+      TableName: roomTableName,
+      Key: {
+        id: { S: id },
+      },
+    });
+    deletedCount += 1;
+  }
 
-  return true;
+  return deletedCount > 0;
 }
 
 async function executeDynamoRequest(target, payload) {
@@ -506,3 +568,5 @@ function readStringListAttribute(attribute) {
 function isConditionalCheckFailure(error) {
   return error instanceof Error && /ConditionalCheckFailed/i.test(error.message);
 }
+
+

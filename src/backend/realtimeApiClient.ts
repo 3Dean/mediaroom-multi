@@ -7,11 +7,15 @@ export function getRealtimeApiUrl(path: string): string {
     return `${explicitBase}${normalizedPath}`;
   }
 
+  if (import.meta.env.DEV) {
+    return `http://localhost:${APP_CONFIG.defaultRealtimePort}${normalizedPath}`;
+  }
+
   const hostname = window.location.hostname;
   const protocol = window.location.protocol;
   const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1';
   const isPrivateIpv4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(hostname);
-  const isDevHost = import.meta.env.DEV || isLoopback || isPrivateIpv4;
+  const isDevHost = isLoopback || isPrivateIpv4;
   const port = isDevHost
     ? `:${APP_CONFIG.defaultRealtimePort}`
     : window.location.port

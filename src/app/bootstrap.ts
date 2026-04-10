@@ -748,11 +748,21 @@ export function bootstrapApp(): void {
         if (!activeSession || !roomClient?.isConnected()) {
           throw new Error('Enter a live room before clearing room media.');
         }
-        if (asset.kind !== 'surface-image' || asset.inUseSurfaceIds.length === 0) {
+        if (asset.kind !== 'surface-image') {
           return;
         }
 
-        for (const surfaceId of asset.inUseSurfaceIds) {
+        const referencedSurfaceIds = Array.from(new Set([
+          ...asset.inUseSurfaceIds,
+          ...Object.values(roomState.getSnapshot().surfaces)
+            .filter((surface) => surface.imagePath === asset.storageKey)
+            .map((surface) => surface.surfaceId),
+        ]));
+        if (referencedSurfaceIds.length === 0) {
+          return;
+        }
+
+        for (const surfaceId of referencedSurfaceIds) {
           roomClient.send({
             type: 'admin.setSurfaceImage',
             roomId: activeSession.roomId,
@@ -1080,20 +1090,27 @@ function syncObjectState(
 }
 
 function getRealtimeUrl(): string {
+  const explicitUrl = window.__MUSICSPACE_REALTIME_URL__ ?? import.meta.env.VITE_REALTIME_URL ?? null;
+  if (typeof explicitUrl === 'string' && explicitUrl) {
+    return explicitUrl;
+  }
+
+  if (import.meta.env.DEV) {
+    return `ws://localhost:${APP_CONFIG.defaultRealtimePort}`;
+  }
+
   const hostname = window.location.hostname;
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1';
   const isPrivateIpv4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(hostname);
-  const isDevHost = import.meta.env.DEV || isLoopback || isPrivateIpv4;
+  const isDevHost = isLoopback || isPrivateIpv4;
   const port = isDevHost
     ? `:${APP_CONFIG.defaultRealtimePort}`
     : window.location.port
       ? `:${window.location.port}`
       : '';
 
-  return window.__MUSICSPACE_REALTIME_URL__
-    ?? import.meta.env.VITE_REALTIME_URL
-    ?? `${protocol}://${hostname}${port}`;
+  return `${protocol}://${hostname}${port}`;
 }
 
 function getLocalPlayerTransform(): PlayerTransform | null {
@@ -1182,3 +1199,4 @@ function updateRoomSlugInUrl(roomSlug: string): void {
   url.searchParams.set('room', roomSlug);
   window.history.replaceState({}, '', url);
 }
+

@@ -362,10 +362,10 @@ async function handleRoomJoin(socket, message) {
   }
 
   let authority = await hydrateRoomAuthority(roomId);
-  if (!authority.ownerUserId && authResult.userId) {
+  if (!authority.ownerUserId && !authority.roomRecordId && authResult.userId) {
     authority.ownerUserId = authResult.userId;
     authority = await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
-  } else if (authority.ownerUserId && !authority.roomRecordId && authResult.userId) {
+  } else if (authority.ownerUserId === authResult.userId && !authority.roomRecordId && authResult.userId) {
     authority = await persistRoomAuthority(roomId, { maxUsers: MAX_ROOM_SIZE });
   }
 
@@ -910,14 +910,6 @@ async function handleAdminSetSurfaceImage(socket, message) {
 
   const surfaces = await ensureRoomSurfaces(roomId);
   const previousSurface = surfaces.find((entry) => entry.surfaceId === surfaceId) ?? null;
-  for (const priorSurfaceId of assetSurfaceIdsExcluding(mediaAsset, surfaceId)) {
-    await clearRoomSurfaceReference(roomId, priorSurfaceId, {
-      actorUserId: actor.userId,
-      actorDisplayName: actor.displayName,
-      assetId: mediaAsset.id,
-      reason: 'surface_reassigned',
-    });
-  }
   const nextSurface = await persistRoomSurface(roomId, surface);
   const index = surfaces.findIndex((entry) => entry.surfaceId === surfaceId);
   if (index >= 0) {
@@ -2195,8 +2187,21 @@ async function markRoomMediaSurfaceUsage(roomId, surfaceId, previousStorageKey, 
   await updateRoomMediaAssetInBackend({
     ...nextAsset,
     updatedAt: new Date().toISOString(),
-    inUseSurfaceIds: [surfaceId],
+    inUseSurfaceIds: Array.from(new Set([...(nextAsset.inUseSurfaceIds ?? []), surfaceId])),
   });
+}
+
+async function getReferencedSurfaceIdsForAsset(roomId, asset) {
+  if (!asset?.storageKey) {
+    return Array.isArray(asset?.inUseSurfaceIds) ? asset.inUseSurfaceIds : [];
+  }
+
+  const surfaces = await ensureRoomSurfaces(roomId);
+  const referencedSurfaceIds = surfaces
+    .filter((surface) => surface.imagePath === asset.storageKey)
+    .map((surface) => surface.surfaceId);
+
+  return Array.from(new Set([...(asset.inUseSurfaceIds ?? []), ...referencedSurfaceIds]));
 }
 
 async function markRoomMediaTvUsage(roomId, previousStorageKey, nextAsset) {
@@ -2277,7 +2282,8 @@ async function deleteRoomMediaAssetForRoom(roomId, assetId, userId) {
     };
   }
 
-  for (const surfaceId of asset.inUseSurfaceIds ?? []) {
+  const referencedSurfaceIds = await getReferencedSurfaceIdsForAsset(roomId, asset);
+  for (const surfaceId of referencedSurfaceIds) {
     await clearRoomSurfaceReference(roomId, surfaceId, { assetId, userId, reason: 'asset_deleted' });
   }
   if (asset.inUseTv) {
@@ -2822,6 +2828,7 @@ function deriveCognitoIssuer(userPoolId) {
   const [region] = userPoolId.split('_');
   return `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
 }
+
 
 
 

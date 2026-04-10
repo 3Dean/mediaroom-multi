@@ -177,7 +177,7 @@ button:focus-visible {
   top: clamp(28px, 8vh, 72px);
   left: clamp(32px, 6vw, 96px);
   right: auto;
-  max-width: min(29vw, 400px);
+  max-width: min(34vw, 460px);
   padding: 22px 24px;
   display: grid;
   gap: 10px;
@@ -223,7 +223,7 @@ button:focus-visible {
 }
 
 .lobby-overlay-support {
-  max-width: 26ch;
+  max-width: 32ch;
   font-size: 15px;
   line-height: 1.45;
   color: rgba(235, 238, 246, 0.9);

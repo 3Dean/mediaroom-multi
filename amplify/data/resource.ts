@@ -22,7 +22,10 @@ const schema = a.schema({
       adminUserIds: a.json(),
       mutedUserIds: a.json(),
     })
-    .authorization((allow) => [allow.authenticated()]),
+    .authorization((allow) => [
+      allow.ownerDefinedIn('createdBy').identityClaim('sub').to(['create', 'update', 'delete']),
+      allow.authenticated().to(['read']),
+    ]),
 
   RoomMessage: a
     .model({

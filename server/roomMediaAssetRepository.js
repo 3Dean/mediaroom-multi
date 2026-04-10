@@ -76,44 +76,15 @@ export async function getRoomMediaAssetByChecksumFromBackend(roomId, kind, check
     return null;
   }
 
-  const response = await executeGraphql(
-    /* GraphQL */ `
-      query ListRoomMediaAssetsByChecksum($roomId: String!, $kind: String!, $checksum: String!) {
-        listRoomMediaAssets(
-          filter: {
-            roomId: { eq: $roomId }
-            kind: { eq: $kind }
-            checksum: { eq: $checksum }
-            status: { eq: "ready" }
-          }
-          limit: 1
-        ) {
-          items {
-            id
-            roomId
-            kind
-            storageKey
-            fileName
-            mimeType
-            sizeBytes
-            checksum
-            createdBy
-            createdAt
-            updatedAt
-            status
-            width
-            height
-            durationSeconds
-            inUseSurfaceIds
-            inUseTv
-          }
-        }
-      }
-    `,
-    { roomId, kind, checksum: checksum.trim() },
+  const normalizedChecksum = checksum.trim().toLowerCase();
+  const assets = await listRoomMediaAssetItems(roomId, kind);
+  return normalizeRoomMediaAsset(
+    assets.find((asset) => {
+      const assetChecksum = typeof asset?.checksum === 'string' ? asset.checksum.trim().toLowerCase() : '';
+      const assetStatus = typeof asset?.status === 'string' ? asset.status.trim().toLowerCase() : '';
+      return assetChecksum === normalizedChecksum && assetStatus === 'ready';
+    }) ?? null,
   );
-
-  return normalizeRoomMediaAsset(response?.listRoomMediaAssets?.items?.[0] ?? null);
 }
 
 export async function getRoomMediaAssetByStorageKeyFromBackend(roomId, storageKey) {

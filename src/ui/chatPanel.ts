@@ -65,6 +65,18 @@ function formatRelativeTimestamp(value: string): string {
   return `${Math.max(1, Math.floor(deltaMs / dayMs))}d ago`;
 }
 
+
+const SURFACE_DISPLAY_LABELS: Record<RoomSurfaceId, string> = {
+  image01: 'Frame 4',
+  image02: 'Frame 3',
+  image03: 'Frame 2',
+  image04: 'Frame 1',
+};
+
+function formatSurfaceLabel(surfaceId: RoomSurfaceId): string {
+  return SURFACE_DISPLAY_LABELS[surfaceId] ?? surfaceId;
+}
+
 export class ChatPanel {
   private readonly container: HTMLDivElement;
   private readonly sharedMediaContainer: HTMLDetailsElement;
@@ -481,7 +493,7 @@ export class ChatPanel {
       if (asset.id === assetId) {
         return {
           ...asset,
-          inUseSurfaceIds: [surfaceId],
+          inUseSurfaceIds: Array.from(new Set([...(asset.inUseSurfaceIds ?? []), surfaceId])),
         };
       }
       if (asset.inUseSurfaceIds.includes(surfaceId)) {
@@ -525,7 +537,7 @@ export class ChatPanel {
       meta.className = 'room-browser-item-meta';
       const usageText = asset.kind === 'tv-video'
         ? (asset.inUseTv ? 'In use on TV' : 'Video asset')
-        : (asset.inUseSurfaceIds.length > 0 ? `Placed on ${asset.inUseSurfaceIds[0]}` : 'Image asset');
+        : (asset.inUseSurfaceIds.length > 0 ? `Placed on ${asset.inUseSurfaceIds.map((surfaceId) => formatSurfaceLabel(surfaceId)).join(', ')}` : 'Image asset');
       const uploaderLabel = this.roomMediaUserLabels[asset.createdBy] ?? asset.createdBy.slice(0, 8);
       meta.textContent = `${usageText} • uploader ${uploaderLabel}`;
 
@@ -533,18 +545,18 @@ export class ChatPanel {
       actions.className = 'room-browser-actions';
 
       if (asset.kind === 'surface-image') {
-        (['image01', 'image02', 'image03', 'image04'] as RoomSurfaceId[]).forEach((surfaceId) => {
+        (['image04', 'image03', 'image02', 'image01'] as RoomSurfaceId[]).forEach((surfaceId) => {
           const button = document.createElement('button');
           button.type = 'button';
           button.className = 'musicspace-button musicspace-button--secondary musicspace-button--small';
-          button.textContent = surfaceId;
+          button.textContent = formatSurfaceLabel(surfaceId);
           button.addEventListener('click', async (event) => {
             event.stopPropagation();
             try {
-              this.roomMediaStatus.textContent = `Applying ${asset.fileName} to ${surfaceId}...`;
+              this.roomMediaStatus.textContent = `Applying ${asset.fileName} to ${formatSurfaceLabel(surfaceId)}...`;
               await this.onUseRoomMediaAsset(asset, surfaceId);
               this.applyOptimisticImagePlacement(asset.id, surfaceId);
-              this.roomMediaStatus.textContent = `${asset.fileName} applied to ${surfaceId}.`;
+              this.roomMediaStatus.textContent = `${asset.fileName} applied to ${formatSurfaceLabel(surfaceId)}.`;
               this.renderRoomMediaLibrary();
               void this.refreshRoomMediaLibrarySoon();
             } catch (error) {
@@ -555,7 +567,6 @@ export class ChatPanel {
         });
 
         if (asset.inUseSurfaceIds.length > 0) {
-          const assignedSurfaceId = asset.inUseSurfaceIds[0];
           const clearButton = document.createElement('button');
           clearButton.type = 'button';
           clearButton.className = 'musicspace-button musicspace-button--secondary musicspace-button--small';
@@ -563,10 +574,10 @@ export class ChatPanel {
           clearButton.addEventListener('click', async (event) => {
             event.stopPropagation();
             try {
-              this.roomMediaStatus.textContent = `Clearing ${asset.fileName} from ${assignedSurfaceId}...`;
+              this.roomMediaStatus.textContent = `Clearing ${asset.fileName} from active surfaces...`;
               await this.onClearRoomMediaAsset(asset);
               this.clearOptimisticImagePlacement(asset.id);
-              this.roomMediaStatus.textContent = `${asset.fileName} cleared from ${assignedSurfaceId}.`;
+              this.roomMediaStatus.textContent = `${asset.fileName} cleared from active surfaces.`;
               this.renderRoomMediaLibrary();
               void this.refreshRoomMediaLibrarySoon();
             } catch (error) {
@@ -769,6 +780,9 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+
+
 
 
 
