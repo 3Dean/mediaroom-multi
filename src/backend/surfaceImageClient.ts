@@ -1,23 +1,52 @@
-import { ensureAmplifyConfigured } from './amplifyClient';
-import type { RoomSurfaceId } from '../types/room';
+import { getRealtimeApiUrl } from './realtimeApiClient';
+import { computeFileChecksum, uploadAuthorizedFile } from './mediaUploadClientUtils';
+import { finalizeRoomMediaUpload } from './roomMediaClient';
 
-const MAX_SURFACE_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_SURFACE_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
-export async function uploadRoomSurfaceImage(roomId: string, surfaceId: RoomSurfaceId, file: File): Promise<string> {
+type AuthorizedUploadResponse = {
+  ok: true;
+  mode: 'upload' | 'reuse';
+  upload?: {
+    uploadId: string;
+    objectKey: string;
+    uploadUrl: string;
+    uploadHeaders?: Record<string, string>;
+  };
+  asset?: {
+    id: string;
+    storageKey: string;
+  };
+};
+
+export async function uploadRoomSurfaceImage(
+  roomId: string,
+  file: File,
+  token: string,
+): Promise<{ assetId: string; objectKey: string }> {
   validateSurfaceImage(file);
-  await ensureAmplifyConfigured();
-  const { uploadData } = await import('aws-amplify/storage');
-  const safeName = sanitizeFilename(file.name || `${surfaceId}.png`);
-  const path = `room-surfaces/${roomId}/${surfaceId}/${Date.now()}-${safeName}`;
-  await uploadData({
-    path,
-    data: file,
-    options: {
-      contentType: file.type,
-    },
-  }).result;
-  return path;
+
+  const authorization = await authorizeSurfaceUpload(roomId, file, token);
+
+  if (authorization.mode === 'reuse' && authorization.asset?.id && authorization.asset.storageKey) {
+    return {
+      assetId: authorization.asset.id,
+      objectKey: authorization.asset.storageKey,
+    };
+  }
+
+  if (!authorization.upload?.uploadId || !authorization.upload.objectKey || !authorization.upload.uploadUrl) {
+    throw new Error('Unable to authorize that image upload right now.');
+  }
+
+  await uploadAuthorizedFile(file, authorization.upload.uploadUrl, authorization.upload.uploadHeaders);
+  const finalized = await finalizeRoomMediaUpload(roomId, authorization.upload.uploadId, token);
+
+  return {
+    assetId: finalized.asset.id,
+    objectKey: finalized.asset.storageKey,
+  };
 }
 
 export function validateSurfaceImage(file: File): void {
@@ -25,15 +54,33 @@ export function validateSurfaceImage(file: File): void {
     throw new Error('Only PNG, JPG, or WebP images are supported.');
   }
   if (file.size > MAX_SURFACE_IMAGE_BYTES) {
-    throw new Error('Images must be 5MB or smaller.');
+    throw new Error('Images must be 10MB or smaller.');
   }
 }
 
-function sanitizeFilename(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    || 'surface-image';
+async function authorizeSurfaceUpload(
+  roomId: string,
+  file: File,
+  token: string,
+): Promise<AuthorizedUploadResponse> {
+  const checksum = await computeFileChecksum(file);
+  const response = await fetch(getRealtimeApiUrl('/api/uploads/surface-authorize'), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      roomId,
+      fileName: file.name || 'room-surface-image.png',
+      contentType: file.type,
+      contentLength: file.size,
+      checksum,
+    }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || payload?.ok !== true || (payload?.mode !== 'upload' && payload?.mode !== 'reuse')) {
+    throw new Error(typeof payload?.message === 'string' ? payload.message : 'Unable to authorize that image upload right now.');
+  }
+  return payload as AuthorizedUploadResponse;
 }

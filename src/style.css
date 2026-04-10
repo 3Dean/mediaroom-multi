@@ -1,29 +1,40 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "Monaco", "Lucida Console", "Monotype.com", "Andale Mono", "Courier", "Trebuchet MS", "Sans-Serif";
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color: #eeeeee;
+  background-color: #050505;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  --musicspace-color-button: #4caf50;
+  --musicspace-color-title: #1a9096;
+  --musicspace-color-copy: #eeeeee;
+  --musicspace-color-link: #d8a24d;
+  --musicspace-color-panel: rgba(18, 18, 18, 0.94);
+  --musicspace-color-panel-soft: rgba(34, 34, 34, 0.92);
+  --musicspace-color-border: rgba(216, 162, 77, 0.22);
+  --musicspace-color-input: rgba(36, 36, 36, 0.94);
 }
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: var(--musicspace-color-link);
   text-decoration: inherit;
 }
 
 a:hover {
-  color: #535bf2;
+  color: #f0bf73;
 }
 
 body {
   margin: 0;
   overflow: hidden;
+  font-family: inherit;
+  color: var(--musicspace-color-copy);
+  background: #050505;
 }
 
 h1 {
@@ -75,12 +86,13 @@ button {
 }
 
 button:hover {
-  border-color: #646cff;
+  border-color: var(--musicspace-color-link);
 }
 
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid rgba(216, 162, 77, 0.85);
+  outline-offset: 2px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -122,8 +134,8 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: rgba(0, 0, 0, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(7, 7, 7, 0.96), rgba(18, 18, 18, 0.95));
+  border: 1px solid var(--musicspace-color-border);
   border-radius: 18px;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
   transform: translateX(0);
@@ -145,9 +157,9 @@ button:focus-visible {
   pointer-events: auto;
   touch-action: manipulation;
   padding: 10px 14px;
-  background: rgba(0, 0, 0, 0.84);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 10, 10, 0.94);
+  color: var(--musicspace-color-title);
+  border: 1px solid var(--musicspace-color-border);
   border-radius: 999px;
   transition: left 220ms ease, background-color 220ms ease;
 }
@@ -157,7 +169,7 @@ button:focus-visible {
 }
 
 #musicspace-sidebar-toggle:hover {
-  background: rgba(30, 30, 30, 0.94);
+  background: rgba(24, 24, 24, 0.98);
 }
 
 #musicspace-lobby-overlay {
@@ -236,8 +248,8 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.028);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(26, 26, 26, 0.92);
+  border: 1px solid var(--musicspace-color-border);
   border-radius: 12px;
   pointer-events: auto;
   z-index: auto !important;
@@ -245,18 +257,18 @@ button:focus-visible {
 }
 
 .musicspace-panel--primary {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.022));
-  border-color: rgba(255, 255, 255, 0.16);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: linear-gradient(180deg, rgba(32, 32, 32, 0.96), rgba(18, 18, 18, 0.96));
+  border-color: rgba(216, 162, 77, 0.26);
+  box-shadow: inset 0 1px 0 rgba(216, 162, 77, 0.08);
 }
 
 .musicspace-panel--secondary {
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(24, 24, 24, 0.94);
 }
 
 .musicspace-panel--utility {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 15, 15, 0.92);
+  border-color: rgba(216, 162, 77, 0.16);
 }
 
 .panel-header {
@@ -417,7 +429,7 @@ button:focus-visible {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #9e552f;
+  background: var(--musicspace-color-link);
   cursor: pointer !important;
   pointer-events: auto !important;
 }
@@ -426,7 +438,7 @@ button:focus-visible {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #9e552f;
+  background: var(--musicspace-color-link);
   cursor: pointer !important;
   pointer-events: auto !important;
 }
@@ -833,8 +845,8 @@ body.mouse #mobile-controls-layer {
 }
 
 .room-browser-item[data-active="true"] {
-  border-color: rgba(94, 168, 255, 0.4);
-  background: rgba(94, 168, 255, 0.12);
+  border-color: rgba(216, 162, 77, 0.42);
+  background: rgba(216, 162, 77, 0.1);
 }
 
 .room-browser-item-title {
@@ -855,9 +867,9 @@ body.mouse #mobile-controls-layer {
   padding: 2px 7px;
   border-radius: 999px;
   font-size: 10px;
-  color: #d7e8ff;
-  background: rgba(94, 168, 255, 0.14);
-  border: 1px solid rgba(94, 168, 255, 0.22);
+  color: #f1d6a7;
+  background: rgba(216, 162, 77, 0.14);
+  border: 1px solid rgba(216, 162, 77, 0.24);
 }
 
 .room-browser-badge.is-warn {
@@ -886,16 +898,18 @@ body.mouse #mobile-controls-layer {
 .room-browser-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 2px;
 }
 
 .room-browser-action-link {
-  color: #9bd5ff;
+  color: var(--musicspace-color-link);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
+  margin-right: auto;
 }
 
 .room-browser-share-button {
@@ -962,6 +976,14 @@ body.mouse #mobile-controls-layer {
   line-height: 1.45;
 }
 
+.chat-room-media-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .chat-surface-controls {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -990,9 +1012,11 @@ body.mouse #mobile-controls-layer {
 
 .chat-tv-controls {
   display: grid;
-  grid-template-columns: auto minmax(52px, 72px) auto auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   align-items: center;
+  justify-items: stretch;
+  width: 100%;
 }
 
 .chat-surface-select,
@@ -1000,12 +1024,6 @@ body.mouse #mobile-controls-layer {
 .chat-tv-input {
   width: 100%;
   box-sizing: border-box;
-}
-
-.chat-tv-seek-label {
-  color: #9eacbe;
-  font-size: 11px;
-  white-space: nowrap;
 }
 
 .chat-surface-upload-button {
@@ -1108,14 +1126,15 @@ body.mouse #mobile-controls-layer {
 
 .musicspace-sidebar-footer-links {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 10px 18px;
+  gap: 8px 12px;
   color: rgba(223, 231, 242, 0.72);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.45;
   text-align: center;
+  white-space: nowrap;
 }
 
 .musicspace-sidebar-footer-links a,
@@ -1307,6 +1326,15 @@ body.mouse #mobile-controls-layer {
   min-width: 0;
 }
 
+.musicspace-card--room .musicspace-card-header > .musicspace-card-title-wrap {
+  flex: 0 0 116px;
+}
+
+.musicspace-card--room .musicspace-card-header > .musicspace-card-subtitle {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .musicspace-card-icon {
   display: inline-flex;
   align-items: center;
@@ -1351,7 +1379,7 @@ body.mouse #mobile-controls-layer {
 
 .musicspace-card-title {
   margin: 0;
-  color: #fff;
+  color: var(--musicspace-color-title);
   font-size: 16px;
   font-weight: 700;
   line-height: 1.1;
@@ -1362,7 +1390,7 @@ body.mouse #mobile-controls-layer {
 .musicspace-inline-note,
 .musicspace-inline-unit,
 .musicspace-card-meta {
-  color: rgba(224, 231, 241, 0.72);
+  color: var(--musicspace-color-copy);
 }
 
 .musicspace-card-subtitle,
@@ -1382,12 +1410,12 @@ body.mouse #mobile-controls-layer {
   gap: 10px;
   padding: 14px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--musicspace-color-panel-soft);
+  border: 1px solid rgba(216, 162, 77, 0.16);
 }
 
 .musicspace-subsection-title {
-  color: #fff;
+  color: var(--musicspace-color-title);
   font-size: 13px;
   font-weight: 700;
 }
@@ -1400,7 +1428,7 @@ body.mouse #mobile-controls-layer {
 .musicspace-field {
   display: grid;
   gap: 6px;
-  color: rgba(245, 247, 250, 0.92);
+  color: var(--musicspace-color-copy);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1413,9 +1441,9 @@ select.musicspace-input,
   min-height: 42px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  border: 1px solid rgba(216, 162, 77, 0.18);
+  background: var(--musicspace-color-input);
+  color: var(--musicspace-color-copy);
   box-sizing: border-box;
 }
 
@@ -1428,8 +1456,8 @@ select.musicspace-input,
 input.musicspace-input:focus,
 select.musicspace-input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(42, 42, 42, 0.98);
+  border-color: rgba(76, 175, 80, 0.85);
 }
 
 .musicspace-slider {
@@ -1455,15 +1483,27 @@ select.musicspace-input:focus {
 }
 
 .musicspace-button--primary {
-  background: #c9743f;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--musicspace-color-button);
+  color: #050505;
+  border: 1px solid rgba(76, 175, 80, 0.9);
 }
 
 .musicspace-button--secondary {
-  background: rgba(255, 255, 255, 0.09);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(32, 32, 32, 0.96);
+  color: var(--musicspace-color-link);
+  border: 1px solid rgba(216, 162, 77, 0.26);
+}
+
+.musicspace-button--muted {
+  background: rgba(70, 70, 70, 0.96);
+  color: var(--musicspace-color-copy);
+  border: 1px solid rgba(180, 180, 180, 0.22);
+}
+
+.musicspace-button--danger {
+  background: #8d3a2d;
+  color: #f7efec;
+  border: 1px solid rgba(181, 86, 66, 0.85);
 }
 
 .musicspace-button--text {
@@ -1471,7 +1511,33 @@ select.musicspace-input:focus {
   padding: 0;
   border: 0;
   background: transparent;
-  color: rgba(240, 244, 249, 0.92);
+  color: var(--musicspace-color-link);
+}
+
+.musicspace-button:hover,
+.musicspace-button:focus-visible {
+  border-color: rgba(216, 162, 77, 0.88);
+  box-shadow: 0 0 0 1px rgba(216, 162, 77, 0.24);
+}
+
+.musicspace-scene-button {
+  position: absolute;
+  z-index: 9500;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.musicspace-scene-button--center {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 112px;
+}
+
+.musicspace-scene-button--corner {
+  top: 16px;
+  left: 16px;
 }
 
 .musicspace-pill {
@@ -1483,9 +1549,9 @@ select.musicspace-input:focus {
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.09);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--musicspace-color-copy);
+  background: rgba(26, 26, 26, 0.96);
+  border: 1px solid rgba(216, 162, 77, 0.18);
 }
 
 .musicspace-accordion {
@@ -1508,7 +1574,7 @@ select.musicspace-input:focus {
 }
 
 .musicspace-accordion-meta {
-  color: rgba(224, 231, 241, 0.72);
+  color: var(--musicspace-color-link);
   font-size: 11px;
   text-align: right;
 }
@@ -1654,7 +1720,7 @@ select.musicspace-input:focus {
 }
 
 .chat-tv-controls {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .auth-secondary-actions {

@@ -37,6 +37,34 @@ export type RoomTvMediaState = {
   updatedAt: string;
 };
 
+export type RoomMediaAssetKind = 'surface-image' | 'tv-video';
+
+export type RoomMediaAsset = {
+  id: string;
+  roomId: string;
+  kind: RoomMediaAssetKind;
+  storageKey: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksum: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  status: string;
+  width?: number | null;
+  height?: number | null;
+  durationSeconds?: number | null;
+  inUseSurfaceIds: RoomSurfaceId[];
+  inUseTv: boolean;
+};
+
+export type RoomMediaUsage = {
+  bytesUsed: number;
+  assetCount: number;
+  byteLimit: number;
+};
+
 export type RoomAuthority = {
   ownerUserId: string | null;
   adminUserIds: string[];

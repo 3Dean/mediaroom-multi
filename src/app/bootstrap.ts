@@ -4,6 +4,7 @@ import {
   confirmSignUpWithEmail,
   getAuthenticatedUser,
   getRealtimeAuthToken,
+  resendSignUpCodeWithEmail,
   signInWithEmail,
   signOutCurrentUser,
   signUpWithEmail,
@@ -23,7 +24,7 @@ import { PreferencesPanel } from '../ui/preferencesPanel';
 import { RoomPanel } from '../ui/roomPanel';
 import { loadPreferences, resetPreferences, savePreferences } from '../preferences/preferencesStore';
 import type { UserPreferences } from '../preferences/preferencesModel';
-import type { RoomSummary, RoomSurfaceId } from '../types/room';
+import type { RoomSummary } from '../types/room';
 import { activeBrandProfile } from '../config/brandProfile';
 
 const roomState = new RoomStateStore();
@@ -51,6 +52,7 @@ export function bootstrapApp(): void {
     let pendingObjectId: string | null = null;
     let appliedObjectId: string | null = null;
     let knownRooms: RoomSummary[] = [];
+    const roomMediaUserLabelCache = new Map<string, string>();
 
     const updateLobbyOverlay = () => {
       if (currentUser?.signInDetails?.loginId) {
@@ -194,7 +196,7 @@ export function bootstrapApp(): void {
       }
 
       const realtimeUrl = getRealtimeUrl();
-      roomPanel.setStatus(`Joined ${roomSlug}. Connecting to ${realtimeUrl}.`);
+      roomPanel.setStatus(`Joining ${roomSlug}. Connecting to realtime...`);
       roomPanel.setMeta('Connecting');
       roomPanel.setActiveRoom(roomSlug, knownRooms.some((room) => room.slug.toLowerCase() === roomSlug.toLowerCase() && room.isPersisted));
       participantList.setConnectionStatus('Connecting');
@@ -206,8 +208,8 @@ export function bootstrapApp(): void {
         maxReconnectDelayMs: APP_CONFIG.reconnectMaxDelayMs,
         onOpen: async () => {
           const authToken = await getRealtimeAuthToken();
-          roomPanel.setStatus(`Connected to ${roomSlug}.`);
-          roomPanel.setMeta('Live');
+          roomPanel.setStatus('');
+          roomPanel.setMeta('');
           participantList.setConnectionStatus('Live');
           nextRoomClient.send({
             type: 'room.join',
@@ -298,16 +300,49 @@ export function bootstrapApp(): void {
       initialRoomSlug,
       initialDisplayName: preferences.profile.displayName || undefined,
       initialIsAuthenticated: Boolean(currentUser),
+      initialCurrentUserId: currentUser?.userId ?? null,
+      onDeleteRoom: async (room) => {
+        try {
+          const token = await getRealtimeAuthToken();
+          if (!token) {
+            throw new Error('Sign in to delete saved rooms.');
+          }
+
+          const { deleteRoom } = await import('../backend/dataClient');
+          await deleteRoom(room.slug, token);
+          knownRooms = knownRooms.filter((entry) => entry.slug.toLowerCase() !== room.slug.toLowerCase());
+          roomPanel.setRooms(knownRooms, sessionStore.getCurrentSession()?.roomSlug ?? null);
+          roomPanel.setStatus(`Deleted saved room ${room.slug}.`);
+          roomPanel.setMeta('Room removed');
+          await refreshRooms();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unable to delete the saved room.';
+          roomPanel.setStatus(message);
+          roomPanel.setMeta('Delete failed');
+          throw error;
+        }
+      },
     });
 
     authPanel = new AuthPanel({
       initialLoginId: currentUser?.signInDetails?.loginId ?? null,
       onSignIn: async (email, password) => {
-        await signInWithEmail(email, password);
+        try {
+          await signInWithEmail(email, password);
+        } catch (error) {
+          if (getAuthErrorCode(error) === 'UserNotConfirmedException') {
+            return {
+              needsConfirmation: true,
+              message: 'This account is not confirmed yet. Enter the email code below or resend it.',
+            };
+          }
+          throw error;
+        }
         currentUser = await getAuthenticatedUser();
         authPanel.setUser(currentUser?.signInDetails?.loginId ?? null);
         updateLobbyOverlay();
         roomPanel.setAuthenticationState(Boolean(currentUser));
+        roomPanel.setCurrentUserId(currentUser?.userId ?? null);
         roomPanel.applyPreferenceDefaults({
           displayName: preferences.profile.displayName,
         });
@@ -328,13 +363,33 @@ export function bootstrapApp(): void {
         void refreshRooms();
       },
       onSignUp: async (email, password) => {
-        const result = await signUpWithEmail(email, password);
+        let result;
+        try {
+          result = await signUpWithEmail(email, password);
+        } catch (error) {
+          if (getAuthErrorCode(error) === 'UsernameExistsException') {
+            try {
+              await resendSignUpCodeWithEmail(email);
+              return {
+                needsConfirmation: true,
+                message: 'This email already has an unconfirmed account. A new confirmation code was sent.',
+              };
+            } catch {
+              return {
+                needsConfirmation: true,
+                message: 'This email already exists. If it is not confirmed yet, enter the existing confirmation code or try resending it.',
+              };
+            }
+          }
+          throw error;
+        }
         const step = result.nextStep?.signUpStep;
         if (step === 'DONE') {
           currentUser = await getAuthenticatedUser();
           authPanel.setUser(currentUser?.signInDetails?.loginId ?? email);
           updateLobbyOverlay();
           roomPanel.setAuthenticationState(Boolean(currentUser));
+          roomPanel.setCurrentUserId(currentUser?.userId ?? null);
           void refreshRooms();
           roomPanel.setStatus(`Signed in as ${currentUser?.signInDetails?.loginId ?? email}. Re-enter a room to create or claim its saved session.`);
           return {
@@ -351,12 +406,17 @@ export function bootstrapApp(): void {
       onConfirm: async (email, code) => {
         await confirmSignUpWithEmail(email, code);
       },
+      onResendConfirmation: async (email) => {
+        await resendSignUpCodeWithEmail(email);
+        return 'A new confirmation code was sent to your email.';
+      },
       onSignOut: async () => {
         await signOutCurrentUser();
         currentUser = null;
         authPanel.setUser(null);
         updateLobbyOverlay();
         roomPanel.setAuthenticationState(false);
+        roomPanel.setCurrentUserId(null);
         if (roomClient) {
           roomClient.disconnect(1000, 'sign-out');
           roomClient = null;
@@ -368,7 +428,7 @@ export function bootstrapApp(): void {
         roomState.clearPresence();
         syncRoomUi(chatPanel, participantList, remotePlayerManager);
         participantList.setConnectionStatus('Idle');
-        roomPanel.setMeta('Idle');
+        roomPanel.setMeta('');
         void refreshRooms();
         roomPanel.setStatus('Signed out. Join a saved room or enter a temporary guest room. Sign in to create saved rooms and use admin controls.');
         (window as any).__musicspaceSetLobbyMode?.(true);
@@ -512,7 +572,7 @@ export function bootstrapApp(): void {
         syncRoomUi(chatPanel, participantList, remotePlayerManager);
         roomPanel.setStatus('Stored message locally. Start the realtime server to broadcast chat.');
       },
-      onUploadSurface: async (surfaceId: RoomSurfaceId, file: File) => {
+      onUploadSurface: async (file: File) => {
         const activeSession = sessionStore.getCurrentSession();
         if (!activeSession || !roomClient?.isConnected()) {
           throw new Error('Enter a live room before updating shared surfaces.');
@@ -523,17 +583,14 @@ export function bootstrapApp(): void {
         if (!roomState.getSnapshot().isPersisted) {
           throw new Error('Shared surfaces are available only in saved rooms.');
         }
+        const token = await getRealtimeAuthToken();
+        if (!token) {
+          throw new Error('Sign in to update shared surfaces.');
+        }
 
         const { uploadRoomSurfaceImage } = await import('../backend/surfaceImageClient');
-        const imagePath = await uploadRoomSurfaceImage(activeSession.roomId, surfaceId, file);
-        roomClient.send({
-          type: 'admin.setSurfaceImage',
-          roomId: activeSession.roomId,
-          sessionId: activeSession.sessionId,
-          surfaceId,
-          imagePath,
-        });
-        roomPanel.setStatus(`Uploaded ${surfaceId}. Waiting for room sync...`);
+        await uploadRoomSurfaceImage(activeSession.roomId, file, token);
+        roomPanel.setStatus(`Added ${file.name} to the room media library.`);
       },
       onSetTvMedia: async (sourceUrl: string | null) => {
         const activeSession = sessionStore.getCurrentSession();
@@ -566,14 +623,19 @@ export function bootstrapApp(): void {
         if (!roomState.getSnapshot().isPersisted) {
           throw new Error('Shared TV is available only in saved rooms.');
         }
+        const token = await getRealtimeAuthToken();
+        if (!token) {
+          throw new Error('Sign in to upload a shared TV video.');
+        }
 
         const { uploadRoomTvVideo } = await import('../backend/tvMediaClient');
-        const sourceUrl = await uploadRoomTvVideo(activeSession.roomId, file);
+        const upload = await uploadRoomTvVideo(activeSession.roomId, file, token);
         roomClient.send({
           type: 'admin.setTvMedia',
           roomId: activeSession.roomId,
           sessionId: activeSession.sessionId,
-          sourceUrl,
+          sourceUrl: upload.objectKey,
+          assetId: upload.assetId,
         });
         roomPanel.setStatus(`Uploaded ${file.name}. Waiting for shared TV sync...`);
       },
@@ -599,6 +661,122 @@ export function bootstrapApp(): void {
         });
         roomPanel.setStatus(isPlaying ? 'Resuming shared TV...' : 'Pausing shared TV...');
       },
+      onListRoomMedia: async (kind) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession?.roomId) {
+          throw new Error('Enter a saved room before loading room media.');
+        }
+        const token = await getRealtimeAuthToken();
+        if (!token) {
+          throw new Error('Sign in to manage room media.');
+        }
+        const { listRoomMediaAssets } = await import('../backend/roomMediaClient');
+        return await listRoomMediaAssets(activeSession.roomId, token, kind);
+      },
+      onResolveRoomMediaUserLabels: async (userIds) => {
+        const uniqueUserIds = Array.from(new Set(userIds.map((value) => value.trim()).filter(Boolean)));
+        const labels: Record<string, string> = {};
+
+        const currentUserId = currentUser?.userId ?? null;
+        const currentLoginId = currentUser?.signInDetails?.loginId?.trim() ?? '';
+        const currentLoginLabel = currentLoginId.includes('@') ? currentLoginId.split('@')[0] : currentLoginId;
+
+        for (const userId of uniqueUserIds) {
+          if (currentUserId && userId === currentUserId) {
+            labels[userId] = 'You';
+            roomMediaUserLabelCache.set(userId, currentLoginLabel || 'You');
+            continue;
+          }
+
+          const cached = roomMediaUserLabelCache.get(userId);
+          if (cached) {
+            labels[userId] = cached;
+            continue;
+          }
+
+          try {
+            const { getUserProfileDisplayName } = await import('../backend/dataClient');
+            const displayName = await getUserProfileDisplayName(userId);
+            if (displayName) {
+              roomMediaUserLabelCache.set(userId, displayName);
+              labels[userId] = displayName;
+              continue;
+            }
+          } catch (error) {
+            console.error('Failed to resolve room media user label', error);
+          }
+
+          const fallback = userId.slice(0, 8);
+          roomMediaUserLabelCache.set(userId, fallback);
+          labels[userId] = fallback;
+        }
+
+        return labels;
+      },
+      onUseRoomMediaAsset: async (asset, targetSurfaceId) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          throw new Error('Enter a live room before using room media.');
+        }
+        if (asset.kind === 'surface-image') {
+          if (!targetSurfaceId) {
+            throw new Error('Choose a target surface for that image.');
+          }
+          roomClient.send({
+            type: 'admin.setSurfaceImage',
+            roomId: activeSession.roomId,
+            sessionId: activeSession.sessionId,
+            surfaceId: targetSurfaceId,
+            imagePath: asset.storageKey,
+            assetId: asset.id,
+          });
+          roomPanel.setStatus(`Applying ${asset.fileName} to ${targetSurfaceId}...`);
+          return;
+        }
+
+        roomClient.send({
+          type: 'admin.setTvMedia',
+          roomId: activeSession.roomId,
+          sessionId: activeSession.sessionId,
+          sourceUrl: asset.storageKey,
+          assetId: asset.id,
+        });
+        roomPanel.setStatus(`Applying ${asset.fileName} to the shared TV...`);
+      },
+      onClearRoomMediaAsset: async (asset) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession || !roomClient?.isConnected()) {
+          throw new Error('Enter a live room before clearing room media.');
+        }
+        if (asset.kind !== 'surface-image' || asset.inUseSurfaceIds.length === 0) {
+          return;
+        }
+
+        for (const surfaceId of asset.inUseSurfaceIds) {
+          roomClient.send({
+            type: 'admin.setSurfaceImage',
+            roomId: activeSession.roomId,
+            sessionId: activeSession.sessionId,
+            surfaceId,
+            imagePath: null,
+            assetId: asset.id,
+          });
+        }
+        roomPanel.setStatus(`Clearing ${asset.fileName} from active surfaces...`);
+      },
+      onDeleteRoomMediaAsset: async (asset) => {
+        const activeSession = sessionStore.getCurrentSession();
+        if (!activeSession?.roomId) {
+          throw new Error('Enter a saved room before deleting room media.');
+        }
+        const token = await getRealtimeAuthToken();
+        if (!token) {
+          throw new Error('Sign in to manage room media.');
+        }
+        const { deleteRoomMediaAsset } = await import('../backend/roomMediaClient');
+        await deleteRoomMediaAsset(activeSession.roomId, asset.id, token);
+        roomPanel.setStatus(`Deleted ${asset.fileName}.`);
+      },
     });
 
     roomPanel.mount(sidebarPanels.primaryPanels);
@@ -607,7 +785,7 @@ export function bootstrapApp(): void {
     chatPanel.mount(sidebarPanels.primaryPanels, sidebarPanels.advancedPanels);
     preferencesPanel.mount(sidebarPanels.advancedPanels);
     syncRoomUi(chatPanel, participantList, remotePlayerManager);
-    roomPanel.setMeta('Idle');
+    roomPanel.setMeta('');
     participantList.setConnectionStatus('Idle');
 
     if (currentUser?.signInDetails?.loginId) {
@@ -725,20 +903,22 @@ function initializeSidebarLayout(): SidebarLayout {
   setActiveQuickNav('music-section');
 
   const syncSessionHeader = () => {
-    const roomMeta = document.querySelector<HTMLElement>('#room-panel .room-meta')?.textContent?.trim() || 'Idle';
+    const participantConnection = document.querySelector<HTMLElement>('#participant-list .musicspace-card-meta')?.textContent?.trim() || '';
+    const roomMeta = document.querySelector<HTMLElement>('#room-panel .room-meta')?.textContent?.trim() || '';
+    const headerStatus = roomMeta || participantConnection || 'Idle';
     const roomStatus = document.querySelector<HTMLElement>('#room-panel .room-status')?.textContent?.trim() || 'Join a room to start a session.';
     const roomSlug = document.querySelector<HTMLInputElement>('#room-panel input[placeholder="Room link / slug"]')?.value.trim() || 'No room selected';
     const displayName = document.querySelector<HTMLInputElement>('#room-panel input[placeholder="Display name"]')?.value.trim()
       || document.querySelector<HTMLElement>('#auth-panel .musicspace-accordion-meta')?.textContent?.trim()
       || 'Guest';
 
-    statusLine1.textContent = roomMeta;
+    statusLine1.textContent = headerStatus;
     statusLine2.textContent = `${roomSlug} · ${displayName}`;
 
     statusIndicator.classList.remove('is-idle', 'is-live', 'is-warn');
-    if (/live|connected/i.test(roomMeta)) {
+    if (/live|connected/i.test(headerStatus)) {
       statusIndicator.classList.add('is-live');
-    } else if (/retry|offline|disconnected|failed/i.test(roomStatus) || /offline|retry/i.test(roomMeta)) {
+    } else if (/retry|offline|disconnected|failed/i.test(roomStatus) || /offline|retry/i.test(headerStatus)) {
       statusIndicator.classList.add('is-warn');
     } else {
       statusIndicator.classList.add('is-idle');
@@ -798,6 +978,7 @@ function syncRoomUi(chatPanel: ChatPanel, participantList: ParticipantList, remo
     snapshot.tvMedia?.isPlaying ?? false,
     snapshot.tvMedia?.currentTime ?? 0,
   );
+  chatPanel.setRoomMediaLibraryState(snapshot.selfRole, snapshot.isPersisted, snapshot.roomId || null);
   participantList.setParticipants(participants, snapshot.selfSessionId, snapshot.authority, snapshot.selfRole);
   Object.values(snapshot.objects).forEach((object) => window.__musicspaceApplyObjectSnapshot?.(object));
   window.__musicspaceSyncRoomSurfaces?.(Object.values(snapshot.surfaces));
@@ -985,6 +1166,15 @@ function getRoomSlugFromUrl(): string | undefined {
   const params = new URLSearchParams(window.location.search);
   const roomSlug = params.get('room')?.trim();
   return roomSlug || undefined;
+}
+
+function getAuthErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+  const maybeName = 'name' in error && typeof error.name === 'string' ? error.name : null;
+  const maybeCode = 'code' in error && typeof error.code === 'string' ? error.code : null;
+  return maybeName ?? maybeCode;
 }
 
 function updateRoomSlugInUrl(roomSlug: string): void {

@@ -108,6 +108,10 @@ export class RoomStateStore {
     this.state.surfaces[surface.surfaceId] = surface;
   }
 
+  removeSurface(surfaceId: RoomSurfaceSnapshot['surfaceId']): void {
+    delete this.state.surfaces[surfaceId];
+  }
+
   setTvMedia(tvMedia: RoomTvMediaState | null): void {
     this.state.tvMedia = tvMedia ? { ...tvMedia } : null;
   }

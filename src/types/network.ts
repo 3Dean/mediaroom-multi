@@ -106,7 +106,9 @@ export type AdminSetSurfaceImageMessage = {
   roomId: string;
   sessionId: string;
   surfaceId: RoomSurfaceId;
-  imagePath: string;
+  imagePath: string | null;
+  uploadId?: string;
+  assetId?: string;
 };
 
 export type AdminSetTvMediaMessage = {
@@ -114,6 +116,8 @@ export type AdminSetTvMediaMessage = {
   roomId: string;
   sessionId: string;
   sourceUrl: string | null;
+  uploadId?: string;
+  assetId?: string;
 };
 
 export type AdminSetTvPlaybackMessage = {
@@ -193,6 +197,11 @@ export type SurfaceUpdatedMessage = {
   surface: RoomSurfaceSnapshot;
 };
 
+export type SurfaceClearedMessage = {
+  type: 'surface.cleared';
+  surfaceId: RoomSurfaceId;
+};
+
 export type TvMediaUpdatedMessage = {
   type: 'tv.updated';
   tvMedia: RoomTvMediaState | null;
@@ -229,6 +238,7 @@ export type ServerMessage =
   | SeatUpdatedMessage
   | ObjectUpdatedMessage
   | SurfaceUpdatedMessage
+  | SurfaceClearedMessage
   | TvMediaUpdatedMessage
   | RoomAuthorityUpdatedMessage
   | SystemNoticeMessage

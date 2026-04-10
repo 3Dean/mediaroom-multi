@@ -23,6 +23,8 @@ type RoomPanelOptions = {
   initialRoomSlug?: string;
   initialDisplayName?: string;
   initialIsAuthenticated?: boolean;
+  initialCurrentUserId?: string | null;
+  onDeleteRoom?: (room: RoomSummary) => Promise<void>;
   onStatusChange?: (message: string) => void;
   onMetaChange?: (message: string) => void;
 };
@@ -62,6 +64,28 @@ function formatRoomTimestamp(room: RoomSummary): string {
   return `Updated ${Math.max(1, Math.floor(deltaMs / dayMs))}d ago`;
 }
 
+function formatOwnerLabel(room: RoomSummary, currentUserId: string | null): string {
+  if (!room.createdBy) {
+    return 'Owner: Unknown';
+  }
+
+  if (currentUserId && room.createdBy === currentUserId) {
+    return 'Owner: You';
+  }
+
+  return `Owner: ${room.createdBy.slice(0, 8)}`;
+}
+
+function formatLiveLabel(room: RoomSummary): string {
+  if (room.isLive) {
+    return room.liveParticipantCount && room.liveParticipantCount > 0
+      ? `Status: Live with ${room.liveParticipantCount}`
+      : 'Status: Live';
+  }
+
+  return room.isPersisted ? 'Status: Saved' : 'Status: Temporary';
+}
+
 export class RoomPanel {
   private readonly container: HTMLDivElement;
   private readonly form: HTMLFormElement;
@@ -80,18 +104,22 @@ export class RoomPanel {
   private readonly hasUrlRoom: boolean;
   private readonly onStatusChange?: (message: string) => void;
   private readonly onMetaChange?: (message: string) => void;
+  private readonly onDeleteRoom?: (room: RoomSummary) => Promise<void>;
   private rooms: RoomSummary[] = [];
   private activeRoomSlug: string | null = null;
   private activeRoomIsPersisted = false;
   private isAuthenticated = false;
+  private currentUserId: string | null = null;
 
   constructor(onJoin: (values: RoomPanelValues) => void, options: RoomPanelOptions = {}) {
     this.onJoin = onJoin;
     this.generatedRoomSlug = generateRoomSlug();
     this.hasUrlRoom = !!options.initialRoomSlug?.trim();
     this.isAuthenticated = Boolean(options.initialIsAuthenticated);
+    this.currentUserId = options.initialCurrentUserId ?? null;
     this.onStatusChange = options.onStatusChange;
     this.onMetaChange = options.onMetaChange;
+    this.onDeleteRoom = options.onDeleteRoom;
     this.container = document.createElement('div');
     this.container.id = 'room-panel';
     this.container.className = 'musicspace-card musicspace-card--room';
@@ -164,11 +192,11 @@ export class RoomPanel {
 
     this.statusLabel = document.createElement('div');
     this.statusLabel.className = 'musicspace-helper-text room-status';
-    this.statusLabel.textContent = 'Multiplayer wiring will attach here.';
+    this.statusLabel.hidden = true;
 
     this.metaLabel = document.createElement('div');
     this.metaLabel.className = 'musicspace-card-meta room-meta';
-    this.metaLabel.textContent = 'Connection idle';
+    this.metaLabel.hidden = true;
 
     const listSection = document.createElement('div');
     listSection.className = 'musicspace-subsection room-section room-browser';
@@ -251,11 +279,13 @@ export class RoomPanel {
 
   setStatus(message: string): void {
     this.statusLabel.textContent = message;
+    this.statusLabel.hidden = !message.trim();
     this.onStatusChange?.(message);
   }
 
   setMeta(message: string): void {
     this.metaLabel.textContent = message;
+    this.metaLabel.hidden = !message.trim();
     this.onMetaChange?.(message);
   }
 
@@ -300,6 +330,11 @@ export class RoomPanel {
   setAuthenticationState(isAuthenticated: boolean): void {
     this.isAuthenticated = isAuthenticated;
     this.refreshJoinIntent();
+  }
+
+  setCurrentUserId(userId: string | null): void {
+    this.currentUserId = userId;
+    this.renderRooms();
   }
 
   setActiveRoom(activeRoomSlug: string | null, isPersisted: boolean): void {
@@ -387,11 +422,18 @@ export class RoomPanel {
 
       const slug = document.createElement('div');
       slug.className = 'room-browser-item-slug';
-      slug.textContent = room.slug;
+      slug.textContent = `Slug: ${room.slug}`;
 
       const meta = document.createElement('div');
       meta.className = 'room-browser-item-meta';
-      meta.textContent = formatRoomTimestamp(room);
+
+      const liveMeta = document.createElement('div');
+      liveMeta.textContent = `${formatLiveLabel(room)} • ${formatRoomTimestamp(room)}`;
+
+      const ownerMeta = document.createElement('div');
+      ownerMeta.textContent = formatOwnerLabel(room, this.currentUserId);
+
+      meta.append(liveMeta, ownerMeta);
 
       const actions = document.createElement('div');
       actions.className = 'room-browser-actions';
@@ -410,6 +452,45 @@ export class RoomPanel {
       });
 
       actions.append(joinAction, shareButton);
+
+      const canDelete = Boolean(
+        this.onDeleteRoom
+        && room.isPersisted
+        && room.createdBy
+        && this.currentUserId
+        && room.createdBy === this.currentUserId,
+      );
+
+      if (canDelete) {
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'musicspace-button musicspace-button--danger musicspace-button--small room-browser-delete-button';
+        deleteButton.textContent = room.isLive ? 'Live' : 'Delete';
+        deleteButton.disabled = Boolean(room.isLive);
+        deleteButton.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          if (room.isLive || !this.onDeleteRoom) {
+            return;
+          }
+
+          const confirmed = window.confirm(`Delete saved room "${room.name}"? This cannot be undone.`);
+          if (!confirmed) {
+            return;
+          }
+
+          const previousLabel = deleteButton.textContent;
+          deleteButton.disabled = true;
+          deleteButton.textContent = 'Deleting...';
+          try {
+            await this.onDeleteRoom(room);
+          } catch {
+            deleteButton.disabled = false;
+            deleteButton.textContent = previousLabel;
+          }
+        });
+        actions.append(deleteButton);
+      }
+
       button.append(title, badges, slug, meta, actions);
       button.addEventListener('click', () => {
         this.roomInput.value = room.slug;

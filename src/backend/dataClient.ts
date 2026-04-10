@@ -1,4 +1,5 @@
 import { ensureAmplifyConfigured } from './amplifyClient';
+import { getRealtimeApiUrl } from './realtimeApiClient';
 import type { Schema } from '../../amplify/data/resource';
 import type { RoomSummary } from '../types/room';
 
@@ -44,7 +45,7 @@ export async function listRooms(): Promise<RoomSummary[]> {
 }
 
 export async function listLiveRooms(): Promise<RoomSummary[]> {
-  const response = await fetch('/api/rooms/live');
+  const response = await fetch(getRealtimeApiUrl('/api/rooms/live'));
   if (!response.ok) {
     throw new Error(`Live room request failed with status ${response.status}`);
   }
@@ -112,4 +113,40 @@ export async function listRecentRoomMessages(roomId: string) {
       },
     },
   });
+}
+
+export async function deleteRoom(roomId: string, token: string): Promise<void> {
+  const response = await fetch(getRealtimeApiUrl('/api/rooms/delete'), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ roomId }),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(typeof payload?.message === 'string' ? payload.message : `Delete room request failed with status ${response.status}`);
+  }
+}
+
+export async function getUserProfileDisplayName(userId: string): Promise<string | null> {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) {
+    return null;
+  }
+
+  const dataClient = await getDataClient();
+  const response = await dataClient.models.UserProfile.list({
+    filter: {
+      userId: {
+        eq: normalizedUserId,
+      },
+    },
+  });
+
+  const profile = Array.isArray(response.data) ? response.data[0] : null;
+  const displayName = typeof profile?.displayName === 'string' ? profile.displayName.trim() : '';
+  return displayName || null;
 }

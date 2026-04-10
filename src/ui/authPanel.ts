@@ -1,9 +1,10 @@
 import { createSectionIcon } from './sectionIcons';
 type AuthPanelOptions = {
   initialLoginId?: string | null;
-  onSignIn: (email: string, password: string) => Promise<void>;
+  onSignIn: (email: string, password: string) => Promise<{ needsConfirmation?: boolean; message?: string } | void>;
   onSignUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean; message: string }>;
   onConfirm: (email: string, code: string) => Promise<void>;
+  onResendConfirmation: (email: string) => Promise<string>;
   onSignOut: () => Promise<void>;
 };
 
@@ -18,6 +19,7 @@ export class AuthPanel {
   private readonly signInButton: HTMLButtonElement;
   private readonly signUpButton: HTMLButtonElement;
   private readonly confirmButton: HTMLButtonElement;
+  private readonly resendButton: HTMLButtonElement;
   private readonly signOutButton: HTMLButtonElement;
   private readonly accountLabel: HTMLDivElement;
   private readonly summaryMeta: HTMLSpanElement;
@@ -98,9 +100,18 @@ export class AuthPanel {
       void this.handleConfirm();
     });
 
+    this.resendButton = document.createElement('button');
+    this.resendButton.type = 'button';
+    this.resendButton.textContent = 'Resend Code';
+    this.resendButton.className = 'musicspace-button musicspace-button--text';
+    this.resendButton.style.display = 'none';
+    this.resendButton.addEventListener('click', () => {
+      void this.handleResendConfirmation();
+    });
+
     const secondaryActions = document.createElement('div');
     secondaryActions.className = 'auth-secondary-actions';
-    secondaryActions.append(this.signUpButton, this.confirmButton);
+    secondaryActions.append(this.signUpButton, this.confirmButton, this.resendButton);
 
     this.loggedOutView.append(
       this.emailInput,
@@ -154,6 +165,16 @@ export class AuthPanel {
     this.statusLabel.textContent = message;
   }
 
+  private showConfirmationState(email: string, message?: string): void {
+    this.pendingConfirmationEmail = email;
+    this.codeInput.style.display = 'block';
+    this.confirmButton.style.display = 'inline-flex';
+    this.resendButton.style.display = 'inline-flex';
+    if (message) {
+      this.setStatus(message);
+    }
+  }
+
   private async handleSignIn(): Promise<void> {
     const email = this.emailInput.value.trim();
     const password = this.passwordInput.value;
@@ -164,7 +185,14 @@ export class AuthPanel {
 
     this.setBusy(true);
     try {
-      await this.options.onSignIn(email, password);
+      const result = await this.options.onSignIn(email, password);
+      if (result?.needsConfirmation) {
+        this.showConfirmationState(email, result.message ?? 'This account still needs email confirmation.');
+        return;
+      }
+      if (result?.message) {
+        this.setStatus(result.message);
+      }
       this.passwordInput.value = '';
     } catch (error) {
       this.setStatus(getErrorMessage(error, 'Unable to sign in.'));
@@ -184,11 +212,10 @@ export class AuthPanel {
     this.setBusy(true);
     try {
       const result = await this.options.onSignUp(email, password);
-      this.setStatus(result.message);
       if (result.needsConfirmation) {
-        this.pendingConfirmationEmail = email;
-        this.codeInput.style.display = 'block';
-        this.confirmButton.style.display = 'inline-flex';
+        this.showConfirmationState(email, result.message);
+      } else {
+        this.setStatus(result.message);
       }
     } catch (error) {
       this.setStatus(getErrorMessage(error, 'Unable to sign up.'));
@@ -217,6 +244,24 @@ export class AuthPanel {
     }
   }
 
+  private async handleResendConfirmation(): Promise<void> {
+    const email = this.pendingConfirmationEmail ?? this.emailInput.value.trim();
+    if (!email) {
+      this.setStatus('Email is required to resend a confirmation code.');
+      return;
+    }
+
+    this.setBusy(true);
+    try {
+      const message = await this.options.onResendConfirmation(email);
+      this.showConfirmationState(email, message);
+    } catch (error) {
+      this.setStatus(getErrorMessage(error, 'Unable to resend the confirmation code.'));
+    } finally {
+      this.setBusy(false);
+    }
+  }
+
   private async handleSignOut(): Promise<void> {
     this.setBusy(true);
     try {
@@ -233,6 +278,7 @@ export class AuthPanel {
     this.codeInput.value = '';
     this.codeInput.style.display = 'none';
     this.confirmButton.style.display = 'none';
+    this.resendButton.style.display = 'none';
   }
 
   private setBusy(busy: boolean): void {
@@ -242,6 +288,7 @@ export class AuthPanel {
     this.signInButton.disabled = busy;
     this.signUpButton.disabled = busy;
     this.confirmButton.disabled = busy;
+    this.resendButton.disabled = busy;
     this.signOutButton.disabled = busy;
   }
 }

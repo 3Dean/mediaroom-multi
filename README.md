@@ -90,6 +90,7 @@ The room flow now distinguishes between temporary guest sessions and saved rooms
 - guests can join saved rooms
 - guests entering a brand-new link create a temporary room session, not a saved room
 - durable room features such as shared surface uploads are available only in saved rooms
+- room browser cards now show explicit slug, owner, and saved/live state to make duplicate-looking room entries easier to distinguish
 
 In the room panel this means:
 
@@ -99,6 +100,33 @@ In the room panel this means:
 - current room: `Re-Enter Room`
 
 For operational debugging, the realtime server now emits structured JSON logs for joins, disconnects, moderation actions, chat enforcement, and authority persistence failures. Use `REALTIME_LOG_LEVEL=debug|info|warn|error` to control verbosity. `info` is the default and is appropriate for Render.
+
+## Shared media controls
+
+Saved rooms expose owner/admin-only shared media controls:
+
+- Shared Surfaces: upload images into a room-scoped media library, then apply or clear them on `image01` through `image04`
+- Shared TV: upload an MP4 into the room library, apply it to the TV, clear it, and toggle play/pause
+
+Room Media Library V1 is now implemented for saved rooms:
+
+- uploads are persisted as room-scoped media assets instead of one-off replacements
+- owner/admin can reuse existing images or videos without re-uploading
+- identical uploads within the same room are deduplicated
+- image assets are assigned to one frame at a time and can be moved between `image01` through `image04`
+- image assets can be cleared from their active frame without deleting them from the library
+- media usage is tracked against room-level storage limits
+- uploader labels prefer profile/current-user context over raw internal IDs
+
+Current upload defaults:
+
+- images: `10 MB` max
+- videos: `100 MB` max
+- room media total: `500 MB` max
+
+The current Shared TV UX intentionally does not expose seek or scrubber controls. Playback state is kept simple until a fuller synchronized media control surface is implemented.
+
+For the implementation checklist and follow-up notes, see [`ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md`](./ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md).
 
 ## Health check
 
@@ -138,6 +166,18 @@ For durable room authority on Render, add these in addition to the Cognito env v
 - `AWS_SECRET_ACCESS_KEY=...`
 - `AWS_SESSION_TOKEN=...` if you use temporary credentials
 - `REALTIME_ROOM_TABLE_NAME=Room-...`
+
+For shared media uploads on Render, the same AWS credentials also need S3 access to the Amplify storage bucket that serves `room-surfaces/*` and `room-tv/*`. In practice that means:
+
+- `s3:PutObject`
+- `s3:DeleteObject`
+- `s3:GetObject`
+- `s3:ListBucket`
+
+If bucket auto-discovery is not sufficient in the target environment, also set:
+
+- `REALTIME_STORAGE_BUCKET_NAME=...`
+- `REALTIME_STORAGE_REGION=us-east-1`
 
 Detailed steps are in `DEPLOYMENT.md`.
 

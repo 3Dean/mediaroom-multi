@@ -6,11 +6,11 @@ export const storage = defineStorage({
   access: (allow) => ({
     'room-surfaces/*': [
       allow.guest.to(['read']),
-      allow.authenticated.to(['read', 'write', 'delete']),
+      allow.authenticated.to(['read']),
     ],
     'room-tv/*': [
       allow.guest.to(['read']),
-      allow.authenticated.to(['read', 'write', 'delete']),
+      allow.authenticated.to(['read']),
     ],
   }),
 });
