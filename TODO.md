@@ -17,6 +17,8 @@
 - Verify saved-room ownership survives Render restart while temporary guest rooms remain ownerless.
 - Clarify room-browser metadata and simplify Shared TV controls.
 - Implement Room Media Library V1 for saved rooms.
+- Restore stable production shared-media uploads on Render.
+- Fix room media dedup, one-frame image placement, and uploader label polish in production.
 
 ## Next
 
@@ -28,10 +30,10 @@
   - done: add Room Media Library UI for images and videos
   - done: simplify Shared Surfaces so uploads add to the library first and placement happens from library cards
   - done: add non-destructive `Clear` for in-use library images
-  - current prod finding: owner image/video uploads on Render reach the upload step but S3 returns `403` during the browser `PUT`
-  - next: verify the signed upload request sends the expected `Content-Type` and confirm the Render AWS credentials have `s3:PutObject`, `s3:DeleteObject`, and `s3:ListBucket` on the shared media bucket
-  - next: production re-test owner/admin upload, reuse, clear, delete, and same-room dedup flows on Render
-  - next: decide whether to show friendlier uploader labels than shortened user IDs
+  - done: restore production uploads by fixing Render storage env/IAM alignment and simplifying presigned browser PUT behavior
+  - done: production re-test owner/admin upload, reuse, TV apply, clear, and same-room dedup flows on Render
+  - done: switch image assets to one-frame-at-a-time placement with immediate clear visibility
+  - done: replace raw uploader IDs with friendlier labels when profile/current-user context is available
   - next: evaluate thumbnails/previews for library assets if the list starts to grow
   - reference: implementation notes live in `ROOM_MEDIA_LIBRARY_V1_CHECKLIST.md`
 - Shared surface image upload and saved-room lifecycle follow-up
@@ -61,8 +63,7 @@
   - done: clarify room-browser cards with explicit slug, owner, and saved/live state
   - done: simplify Shared TV controls to upload, clear, and play/pause only
   - done: replace misleading synced TV seconds copy with clearer playback status text
-  - current prod finding: synthesized sandbox storage CORS is already permissive for `PUT`, so the current Render failure looks more like signed-request or IAM access mismatch than browser CORS
-  - next: deploy the updated Amplify storage policy and re-test direct browser access in the target environment
+  - done: verify production direct browser media access after the updated storage/upload flow was deployed
 
 ## Later
 

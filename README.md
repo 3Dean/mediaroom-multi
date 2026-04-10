@@ -113,8 +113,10 @@ Room Media Library V1 is now implemented for saved rooms:
 - uploads are persisted as room-scoped media assets instead of one-off replacements
 - owner/admin can reuse existing images or videos without re-uploading
 - identical uploads within the same room are deduplicated
-- image assets can be cleared from active surfaces without deleting them from the library
+- image assets are assigned to one frame at a time and can be moved between `image01` through `image04`
+- image assets can be cleared from their active frame without deleting them from the library
 - media usage is tracked against room-level storage limits
+- uploader labels prefer profile/current-user context over raw internal IDs
 
 Current upload defaults:
 
