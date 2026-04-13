@@ -22,6 +22,7 @@
 
 ## Next
 
+- Launch hardening: add field-level authorization for `Room.createdBy` so owners cannot reassign saved-room ownership through GraphQL/Data updates.
 - Improve remote avatar presentation beyond placeholders.
 - Room media library follow-up
   - done: add `RoomMediaAsset` backend model and AppSync persistence

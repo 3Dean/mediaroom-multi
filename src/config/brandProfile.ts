@@ -46,9 +46,9 @@ export type BrandProfile = {
 
 export const somaFmBrandProfile: BrandProfile = {
   id: 'somafm',
-  displayName: 'SomaFM',
+  displayName: 'Soma FM',
   lobby: {
-    heroBrandLine: 'SomaFM MediaRoom',
+    heroBrandLine: 'Soma FM MediaRoom',
     heroHeadlineHtml: 'Step into<br>the session',
     heroSupportHtml: 'Choose a room or create one<br>in the sidebar.',
     heroSignedInSupportHtml: 'Choose a room or create one<br>in the sidebar.',
