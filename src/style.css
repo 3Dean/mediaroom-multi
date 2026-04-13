@@ -149,9 +149,9 @@ button:focus-visible {
   transform: translateX(calc(-100% - 18px));
 }
 
-#musicspace-sidebar-toggle {
+#musicspace-sidebar-toggle,
+#musicspace-help-button {
   position: absolute;
-  top: 16px;
   left: 16px;
   z-index: 10001;
   pointer-events: auto;
@@ -161,14 +161,28 @@ button:focus-visible {
   color: var(--musicspace-color-title);
   border: 1px solid var(--musicspace-color-border);
   border-radius: 999px;
+  text-decoration: none;
   transition: left 220ms ease, background-color 220ms ease;
+}
+
+#musicspace-sidebar-toggle {
+  top: 16px;
+}
+
+#musicspace-help-button {
+  top: 62px;
 }
 
 #musicspace-sidebar.is-open + #musicspace-sidebar-toggle {
   left: calc(min(350px, calc(100vw - 72px)) + 30px);
 }
 
-#musicspace-sidebar-toggle:hover {
+#musicspace-sidebar.is-open + #musicspace-sidebar-toggle + #musicspace-help-button {
+  left: calc(min(350px, calc(100vw - 72px)) + 30px);
+}
+
+#musicspace-sidebar-toggle:hover,
+#musicspace-help-button:hover {
   background: rgba(24, 24, 24, 0.98);
 }
 
@@ -1168,13 +1182,19 @@ body.mouse #mobile-controls-layer {
   padding: 0 4px;
 }
 
-#musicspace-sidebar-toggle {
+#musicspace-sidebar-toggle,
+#musicspace-help-button {
   right: 16px;
   left: auto;
   transition: right 220ms ease, background-color 220ms ease;
 }
 
 #musicspace-sidebar.is-open + #musicspace-sidebar-toggle {
+  left: auto;
+  right: calc(min(380px, calc(100vw - 28px)) + 28px);
+}
+
+#musicspace-sidebar.is-open + #musicspace-sidebar-toggle + #musicspace-help-button {
   left: auto;
   right: calc(min(380px, calc(100vw - 28px)) + 28px);
 }
@@ -1780,13 +1800,23 @@ select.musicspace-input:focus {
     transform: translateX(calc(100% + 24px));
   }
 
-  #musicspace-sidebar-toggle {
+  #musicspace-sidebar-toggle,
+  #musicspace-help-button {
     top: calc(env(safe-area-inset-top, 0px) + 12px);
     right: var(--musicspace-mobile-toggle-right);
     left: auto;
   }
 
+  #musicspace-help-button {
+    top: calc(env(safe-area-inset-top, 0px) + 58px);
+  }
+
   #musicspace-sidebar.is-open + #musicspace-sidebar-toggle {
+    left: auto;
+    right: var(--musicspace-mobile-toggle-right);
+  }
+
+  #musicspace-sidebar.is-open + #musicspace-sidebar-toggle + #musicspace-help-button {
     left: auto;
     right: var(--musicspace-mobile-toggle-right);
   }
@@ -1826,14 +1856,25 @@ select.musicspace-input:focus {
     bottom: 8px;
   }
 
-  #musicspace-sidebar-toggle {
+  #musicspace-sidebar-toggle,
+  #musicspace-help-button {
     top: calc(env(safe-area-inset-top, 0px) + 8px);
     right: var(--musicspace-mobile-toggle-right);
+  }
+
+  #musicspace-help-button {
+    top: calc(env(safe-area-inset-top, 0px) + 54px);
   }
 
   #musicspace-sidebar.is-open + #musicspace-sidebar-toggle {
     right: var(--musicspace-mobile-toggle-right);
     top: calc(env(safe-area-inset-top, 0px) + 8px);
+    bottom: auto;
+  }
+
+  #musicspace-sidebar.is-open + #musicspace-sidebar-toggle + #musicspace-help-button {
+    right: var(--musicspace-mobile-toggle-right);
+    top: calc(env(safe-area-inset-top, 0px) + 54px);
     bottom: auto;
   }
 

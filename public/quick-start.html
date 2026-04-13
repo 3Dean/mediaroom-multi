@@ -1,0 +1,743 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>MusicSpace Quick Start</title><style>
+/* cspell:disable-file */
+/* webkit printing magic: print all background colors */
+html {
+	-webkit-print-color-adjust: exact;
+}
+* {
+	box-sizing: border-box;
+	-webkit-print-color-adjust: exact;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+@media only screen {
+	body {
+		margin: 2em auto;
+		max-width: 900px;
+		color: rgb(55, 53, 47);
+	}
+}
+
+body {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+a,
+a.visited {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.pdf-relative-link-path {
+	font-size: 80%;
+	color: #444;
+}
+
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+/* Override strong tags inside headings to maintain consistent weight */
+h1 strong,
+h2 strong,
+h3 strong {
+	font-weight: 600;
+}
+
+.page-title {
+	font-size: 2.5rem;
+	font-weight: 700;
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+h1 {
+	font-size: 1.875rem;
+	margin-top: 1.875rem;
+}
+
+h2 {
+	font-size: 1.5rem;
+	margin-top: 1.5rem;
+}
+
+h3 {
+	font-size: 1.25rem;
+	margin-top: 1.25rem;
+}
+
+.source {
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	padding: 1.5em;
+	word-break: break-all;
+}
+
+.callout {
+	border-radius: 10px;
+	padding: 1rem;
+}
+
+figure {
+	margin: 1.25em 0;
+	page-break-inside: avoid;
+}
+
+figcaption {
+	opacity: 0.5;
+	font-size: 85%;
+	margin-top: 0.5em;
+}
+
+mark {
+	background-color: transparent;
+}
+
+.indented {
+	padding-left: 1.5em;
+}
+
+hr {
+	background: transparent;
+	display: block;
+	width: 100%;
+	height: 1px;
+	visibility: visible;
+	border: none;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+img {
+	max-width: 100%;
+}
+
+@media only print {
+	img {
+		max-height: 100vh;
+		object-fit: contain;
+	}
+
+	table.collection-content {
+		width: 100%;
+		table-layout: fixed;
+	}
+
+	table.collection-content th,
+	table.collection-content td {
+		overflow-wrap: anywhere;
+	}
+
+	table.collection-content td > .user,
+	table.collection-content td > time {
+		white-space: pre-wrap;
+	}
+}
+
+@page {
+	margin: 1in;
+}
+
+.collection-content-wrapper {
+	overflow-x: auto;
+}
+
+@media only print {
+	.collection-content-wrapper {
+		overflow-x: visible;
+	}
+}
+
+.collection-content {
+	font-size: 0.875rem;
+}
+
+.collection-content td {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.column-list {
+	display: flex;
+	gap: 46px;
+}
+
+.column {
+	min-width: 0;
+	overflow: hidden;
+}
+
+.column > *:first-child {
+	margin-top: 0;
+}
+
+.table_of_contents-item {
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.3;
+	padding: 0.125rem;
+}
+
+.table_of_contents-indent-1 {
+	margin-left: 1.5rem;
+}
+
+.table_of_contents-indent-2 {
+	margin-left: 3rem;
+}
+
+.table_of_contents-indent-3 {
+	margin-left: 4.5rem;
+}
+
+.table_of_contents-link {
+	text-decoration: none;
+	opacity: 0.7;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
+}
+
+table,
+th,
+td {
+	border: 1px solid rgba(55, 53, 47, 0.09);
+	border-collapse: collapse;
+}
+
+table {
+	border-left: none;
+	border-right: none;
+}
+
+th,
+td {
+	font-weight: normal;
+	padding: 0.25em 0.5em;
+	line-height: 1.5;
+	min-height: 1.5em;
+	text-align: left;
+}
+
+th {
+	color: rgba(55, 53, 47, 0.6);
+}
+
+ol,
+ul {
+	margin: 0;
+	margin-block-start: 0.6em;
+	margin-block-end: 0.6em;
+}
+
+li > ol:first-child,
+li > ul:first-child {
+	margin-block-start: 0.6em;
+}
+
+ul > li {
+	list-style: disc;
+}
+
+ul.to-do-list {
+	padding-inline-start: 0;
+}
+
+ul.to-do-list > li {
+	list-style: none;
+}
+
+.to-do-children-checked {
+	text-decoration: line-through;
+	opacity: 0.375;
+}
+
+ul.toggle > li {
+	list-style: none;
+}
+
+ul {
+	padding-inline-start: 1.7em;
+}
+
+ul > li {
+	padding-left: 0.1em;
+}
+
+ol {
+	padding-inline-start: 1.6em;
+}
+
+ol.numbered-list.numbered-list-digits-2 {
+	padding-inline-start: 2em;
+}
+
+ol.numbered-list.numbered-list-digits-3plus {
+	padding-inline-start: 2.4em;
+}
+
+ol > li {
+	padding-left: 0.2em;
+}
+
+.mono ol {
+	padding-inline-start: 2em;
+}
+
+.mono ol > li {
+	text-indent: -0.4em;
+}
+
+.toggle {
+	padding-inline-start: 0em;
+	list-style-type: none;
+}
+
+/* Indent toggle children */
+.toggle > li > details {
+	padding-left: 1.7em;
+}
+
+.toggle > li > details > summary {
+	margin-left: -1.1em;
+}
+
+.selected-value {
+	display: inline-block;
+	padding: 0 0.5em;
+	background: rgba(206, 205, 202, 0.5);
+	border-radius: 3px;
+	margin-right: 0.5em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	white-space: nowrap;
+}
+
+.collection-title {
+	display: inline-block;
+	margin-right: 1em;
+}
+
+.page-description {
+	margin-bottom: 2em;
+}
+
+.simple-table {
+	margin-top: 1em;
+	font-size: 0.875rem;
+	empty-cells: show;
+}
+.simple-table td {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table th {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table-header-color {
+	background: rgb(247, 246, 243);
+	color: black;
+}
+.simple-table-header {
+	font-weight: 500;
+}
+
+time {
+	opacity: 0.5;
+}
+
+.icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	max-width: 1.2em;
+	max-height: 1.2em;
+	text-decoration: none;
+	vertical-align: text-bottom;
+	margin-right: 0.5em;
+}
+
+img.icon {
+	border-radius: 3px;
+}
+
+.callout img.notion-static-icon {
+	width: 1em;
+	height: 1em;
+}
+
+.callout p {
+	margin: 0;
+}
+
+.callout h1,
+.callout h2,
+.callout h3 {
+	margin: 0 0 0.6rem;
+}
+
+.user-icon {
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 100%;
+	margin-right: 0.5rem;
+}
+
+.user-icon-inner {
+	font-size: 0.8em;
+}
+
+.text-icon {
+	border: 1px solid #000;
+	text-align: center;
+}
+
+.page-cover-image {
+	display: block;
+	object-fit: cover;
+	width: 100%;
+	max-height: 30vh;
+}
+
+.page-header-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+
+.page-header-icon-with-cover {
+	margin-top: -0.72em;
+	margin-left: 0.07em;
+}
+
+.page-header-icon img {
+	border-radius: 3px;
+}
+
+.link-to-page {
+	margin: 1em 0;
+	padding: 0;
+	border: none;
+	font-weight: 500;
+}
+
+p > .user {
+	opacity: 0.5;
+}
+
+td > .user,
+td > time {
+	white-space: nowrap;
+}
+
+input[type="checkbox"] {
+	transform: scale(1.5);
+	margin-right: 0.6em;
+	vertical-align: middle;
+}
+
+p {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+.image {
+	border: none;
+	margin: 1.5em 0;
+	padding: 0;
+	border-radius: 0;
+	text-align: center;
+}
+
+.code,
+code {
+	background: rgba(135, 131, 120, 0.15);
+	border-radius: 3px;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 85%;
+	tab-size: 2;
+}
+
+code {
+	color: #eb5757;
+}
+
+.code {
+	padding: 1.5em 1em;
+}
+
+.code-wrap {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.code > code {
+	background: none;
+	padding: 0;
+	font-size: 100%;
+	color: inherit;
+}
+
+blockquote {
+	font-size: 1em;
+	margin: 1em 0;
+	padding-left: 1em;
+	border-left: 3px solid rgb(55, 53, 47);
+}
+
+blockquote.quote-large {
+	font-size: 1.25em;
+}
+
+.bookmark {
+	text-decoration: none;
+	max-height: 8em;
+	padding: 0;
+	display: flex;
+	width: 100%;
+	align-items: stretch;
+}
+
+.bookmark-title {
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 1.75em;
+	white-space: nowrap;
+}
+
+.bookmark-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.bookmark-info {
+	flex: 4 1 180px;
+	padding: 12px 14px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.bookmark-image {
+	width: 33%;
+	flex: 1 1 180px;
+	display: block;
+	position: relative;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.bookmark-description {
+	color: rgba(55, 53, 47, 0.6);
+	font-size: 0.75em;
+	overflow: hidden;
+	max-height: 4.5em;
+	word-break: break-word;
+}
+
+.bookmark-href {
+	font-size: 0.75em;
+	margin-top: 0.25em;
+}
+
+.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
+.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
+.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
+.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
+.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
+.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
+.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
+.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
+.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
+.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
+.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
+.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.highlight-default {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.highlight-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.highlight-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.highlight-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.highlight-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.highlight-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.highlight-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.highlight-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.highlight-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.highlight-default_background {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray_background {
+	background: rgba(42, 28, 0, 0.07);
+}
+.highlight-brown_background {
+	background: rgba(139, 46, 0, 0.086);
+}
+.highlight-orange_background {
+	background: rgba(224, 101, 1, 0.129);
+}
+.highlight-yellow_background {
+	background: rgba(211, 168, 0, 0.137);
+}
+.highlight-teal_background {
+	background: rgba(0, 100, 45, 0.09);
+}
+.highlight-blue_background {
+	background: rgba(0, 124, 215, 0.094);
+}
+.highlight-purple_background {
+	background: rgba(102, 0, 178, 0.078);
+}
+.highlight-pink_background {
+	background: rgba(197, 0, 93, 0.086);
+}
+.highlight-red_background {
+	background: rgba(223, 22, 0, 0.094);
+}
+.block-color-default {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.block-color-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.block-color-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.block-color-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.block-color-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.block-color-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.block-color-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.block-color-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.block-color-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.block-color-default_background {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray_background {
+	background: rgba(240, 239, 237, 1);
+}
+.block-color-brown_background {
+	background: rgba(245, 237, 233, 1);
+}
+.block-color-orange_background {
+	background: rgba(251, 235, 222, 1);
+}
+.block-color-yellow_background {
+	background: rgba(249, 243, 220, 1);
+}
+.block-color-teal_background {
+	background: rgba(232, 241, 236, 1);
+}
+.block-color-blue_background {
+	background: rgba(229, 242, 252, 1);
+}
+.block-color-purple_background {
+	background: rgba(243, 235, 249, 1);
+}
+.block-color-pink_background {
+	background: rgba(250, 233, 241, 1);
+}
+.block-color-red_background {
+	background: rgba(252, 233, 231, 1);
+}
+.select-value-color-default { background-color: rgba(42, 28, 0, 0.07); }
+.select-value-color-gray { background-color: rgba(28, 19, 1, 0.11); }
+.select-value-color-brown { background-color: rgba(127, 51, 0, 0.156); }
+.select-value-color-orange { background-color: rgba(196, 88, 0, 0.203); }
+.select-value-color-yellow { background-color: rgba(209, 156, 0, 0.282); }
+.select-value-color-green { background-color: rgba(0, 96, 38, 0.156); }
+.select-value-color-blue { background-color: rgba(0, 118, 217, 0.203); }
+.select-value-color-purple { background-color: rgba(92, 0, 163, 0.141); }
+.select-value-color-pink { background-color: rgba(183, 0, 78, 0.152); }
+.select-value-color-red { background-color: rgba(206, 24, 0, 0.164); }
+
+.checkbox {
+	display: inline-flex;
+	vertical-align: text-bottom;
+	width: 16;
+	height: 16;
+	background-size: 16px;
+	margin-left: 2px;
+	margin-right: 5px;
+}
+
+.checkbox-on {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+
+.checkbox-off {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+	
+</style></head><body><article id="33f58aa1-92c1-8040-87a7-e5310efa821b" class="page sans"><header><h1 class="page-title" dir="auto"><strong>MusicSpace Quick Start</strong></h1><p class="page-description" dir="auto"></p></header><div class="page-body"><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80b7-b788-dc6a597a045f" class="">MusicSpace is a shared 3D media room. You can join a room, move around, sit, chat, listen, watch shared TV media, and interact with room objects. If you are signed in and own the room, you can also manage room media, frames, TV playback, and room access.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8081-8356-e423c4c5d755" class=""><strong>1. Start Or Join A Room</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80d4-9862-e4e86a29b9a5" class="">Use the <strong>Join a Room</strong> panel in the sidebar.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-805e-9323-d3999d8c25ad" class="">To create a saved room:</p></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-80cd-957b-dca170237e5e" class="numbered-list" start="1"><li>Sign in.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-8077-8573-df242890ea3d" class="numbered-list" start="2"><li>Enter a room name or slug.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-80af-8b55-e0bdf201aa05" class="numbered-list" start="3"><li>Click <strong>Create Room</strong>.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-803d-be02-d2dc99eb3008" class="numbered-list" start="4"><li>Share the copied room link with others.</li></ol></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80bf-961d-e8aca7f0379c" class="">To join an existing room:</p></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-8000-b565-e9463a6f0a52" class="numbered-list" start="1"><li>Pick a room from the browser list, or open a shared room link.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-801d-98f1-f4b57f2c22cc" class="numbered-list" start="2"><li>Click <strong>Join</strong> or <strong>Join Room</strong>.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-8048-bac4-c35126c17ee1" class="numbered-list" start="3"><li>Choose a display name if prompted.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-803f-997d-f4df968dd382" class="numbered-list" start="4"><li>Enter the room.</li></ol></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8061-be48-e40406e4819a" class="">You can also enter as a guest, but guest rooms and guest permissions are limited. Saved rooms require sign-in for owner/admin features.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8004-8ec8-c2e53633fae5" class=""><strong>2. Move Around</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-807d-b54d-cafffb6318aa" class="">Desktop controls:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80e5-8cac-c1fc5090ec8e" class="bulleted-list"><li style="list-style-type:disc"><strong>W</strong>: move forward.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-800f-9804-eec1e1fd4285" class="bulleted-list"><li style="list-style-type:disc"><strong>S</strong>: move backward.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8066-8249-ea9e026e0827" class="bulleted-list"><li style="list-style-type:disc"><strong>A</strong>: move left.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80fa-ab93-c09a64a2a9a9" class="bulleted-list"><li style="list-style-type:disc"><strong>D</strong>: move right.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8082-8e11-c4aad4509362" class="bulleted-list"><li style="list-style-type:disc"><strong>Click and drag in the room view</strong>: look around.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-802c-b987-ed75205da975" class="bulleted-list"><li style="list-style-type:disc"><strong>Release the mouse button</strong>: stop looking.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8065-8814-fb283a34aab4" class="bulleted-list"><li style="list-style-type:disc"><strong>Avoid using typing shortcuts in text fields</strong>: movement keys are ignored while your cursor is in chat or another input field.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80d3-933d-dd8010b16786" class="">Mobile controls:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80d5-afc0-c809127e5467" class="bulleted-list"><li style="list-style-type:disc">Use the <strong>Move</strong> joystick area to walk.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80e7-9296-e57e9cc26a06" class="bulleted-list"><li style="list-style-type:disc">Use the <strong>Look</strong> pad area to turn and look around.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8089-970d-eb67ba5ddf8a" class="bulleted-list"><li style="list-style-type:disc">Sidebar controls still work by tapping normally.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-808c-b3ea-e8155015ade0" class=""><strong>3. Sit And Stand</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-807e-b817-da5dabb3d56c" class="">Some furniture can serve as seating.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8090-8951-fab53e325504" class="">To sit:</p></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-80f3-b28d-dffeaab6463b" class="numbered-list" start="1"><li>Walk close to a seat, couch, or chair.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-80c4-a1db-fd8c0cd26f0f" class="numbered-list" start="2"><li>When the seat prompt appears, press <strong>E</strong> or click/tap the seat prompt.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-803a-bd38-f0a6e007c5f6" class="numbered-list" start="3"><li>Your view moves into the seated position.</li></ol></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80b7-b8e4-de0442f53bf6" class="">To stand:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8045-92ec-cbfd0e739896" class="bulleted-list"><li style="list-style-type:disc">Press <strong>W</strong> while seated.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-804f-a3da-f69f5d7ef280" class="bulleted-list"><li style="list-style-type:disc">The app releases the seat and returns you to walking mode.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80a4-a5be-c676bf011210" class="">Notes:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80e5-a1d3-c47ff568a656" class="bulleted-list"><li style="list-style-type:disc">Only one person can occupy a seat at a time in a live room.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8088-8336-cb1097b68c36" class="bulleted-list"><li style="list-style-type:disc">If a seat is already taken, choose another seat.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80da-ba81-f2a75645dcd5" class="bulleted-list"><li style="list-style-type:disc">The participant list shows whether people are walking or seated.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80ea-b33d-cdd2d0fd3624" class=""><strong>4. Pick Up And Place Objects</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8071-939a-d23881d5995e" class="">Some room objects are interactive.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80a5-9946-d1e33aba1c92" class="">To pick up an object:</p></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-8086-aa7a-deabab700261" class="numbered-list" start="1"><li>Look at or hover over a pickable object.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-80d0-8934-e9c258d3ce3b" class="numbered-list" start="2"><li>Click it.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-8090-92bc-d6e0c95ad265" class="numbered-list" start="3"><li>The object is held in front of you.</li></ol></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80cb-9f77-d639778393c6" class="">To place/drop an object:</p></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-8075-8cb0-e2716fa41b53" class="numbered-list" start="1"><li>While holding it, click somewhere else in the room.</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="33f58aa1-92c1-802d-87ec-f25cba9c7517" class="numbered-list" start="2"><li>The object is released and synced to the room.</li></ol></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8026-8b24-f8db4e767688" class="">Notes:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80db-8d31-d49578baccde" class="bulleted-list"><li style="list-style-type:disc">Held objects are shared in multiplayer.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8026-919d-d0201bcfbbd7" class="bulleted-list"><li style="list-style-type:disc">If another participant owns or is holding an object, you may not be able to take it until it is released.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-802c-a7c5-e9e5e6775c2f" class="bulleted-list"><li style="list-style-type:disc">Objects may return to valid drop areas depending on the room layout.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80d2-a19b-ee4fa96a67f3" class=""><strong>5. Chat</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8034-bc49-d2521904fcfd" class="">Use the <strong>Chat</strong> panel in the sidebar.</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8031-9f34-fb0bcef7bf2b" class="bulleted-list"><li style="list-style-type:disc">Type a message.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-801b-a6e2-c93f78882b17" class="bulleted-list"><li style="list-style-type:disc">Press Enter or click the send button.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-809e-805a-c5ca29120ff5" class="bulleted-list"><li style="list-style-type:disc">Chat is room-specific.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80e4-a9ae-ca017d258d46" class="bulleted-list"><li style="list-style-type:disc">You must be in a room before sending messages.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8004-a621-d3ae3581fdcc" class=""><strong>6. Audio And Radio</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8046-82ad-e79085148182" class="">The room includes audio playback and station/mood behavior.</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80a6-8338-ec5093dfd20f" class="bulleted-list"><li style="list-style-type:disc">Use the audio controls to play/pause and adjust volume.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8038-8bd2-c56a29457b03" class="bulleted-list"><li style="list-style-type:disc">Browser audio may require a click/tap before playback starts.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8032-8270-d0dcf9aef5a1" class="bulleted-list"><li style="list-style-type:disc">On mobile, tapping the volume or playback controls may be required to unlock audio.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8033-89a9-c4433b886b65" class=""><strong>7. Shared TV</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-804f-ab52-d7f218d106fe" class="">Owners/admins can set the shared TV source.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8020-b680-f731d8f57cb7" class="">You can:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80ff-a296-ea4b6b5ee245" class="bulleted-list"><li style="list-style-type:disc">Use an existing uploaded video from the room media library.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8017-9c00-f8f7e844a201" class="bulleted-list"><li style="list-style-type:disc">Upload a supported MP4 video.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80cd-94e0-d95fb153cb34" class="bulleted-list"><li style="list-style-type:disc">Set or clear the TV source.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80bf-95ff-c996a732df55" class="bulleted-list"><li style="list-style-type:disc">Play/pause shared TV playback.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8085-85d1-d5820666e400" class="">TV media is shared across the room, so other users see the selected TV content too.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8000-8e56-cf4d102eb175" class=""><strong>8. Room Frames</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-808f-a770-ef639e490cb5" class="">Owners/admins can place image media into the room frames.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-806e-bc87-dda3463d0597" class="">In the room media library:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-802f-8804-dd3a1d629f38" class="bulleted-list"><li style="list-style-type:disc"><strong>Frame 1</strong></li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-807f-97f1-d9690c9be77a" class="bulleted-list"><li style="list-style-type:disc"><strong>Frame 2</strong></li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8067-8a05-f2ff7c25bf6f" class="bulleted-list"><li style="list-style-type:disc"><strong>Frame 3</strong></li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8085-8210-e236806866cb" class="bulleted-list"><li style="list-style-type:disc"><strong>Frame 4</strong></li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80cd-90a3-ce98eae3c5f5" class="bulleted-list"><li style="list-style-type:disc"><strong>Clear</strong></li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80fd-a655-eec42558adbe" class="bulleted-list"><li style="list-style-type:disc"><strong>Delete</strong></li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80d6-bbb0-cb0050ecb948" class="">Use <strong>Frame 1-4</strong> to place an uploaded image into that frame. Use <strong>Clear</strong> to remove that image from active frames. Use <strong>Delete</strong> to remove the media asset from the room library.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8002-a1fb-eb72cf960075" class="">Notes:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8024-b15f-f5ea573733a3" class="bulleted-list"><li style="list-style-type:disc">The same image can be placed on multiple frames.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-805d-87d5-ee9f2d0af5fa" class="bulleted-list"><li style="list-style-type:disc">Clearing removes the image from all active frames where it is used.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8003-ba9f-e21b852f422b" class="bulleted-list"><li style="list-style-type:disc">Deleting removes the asset from the room library and clears it from any active surfaces.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-804c-b873-ca361bdb8c70" class=""><strong>9. Room Media Library</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8092-8307-f301ebccac63" class="">The media library stores uploaded room assets.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-804d-adf8-cbe788ab7986" class="">Supported media:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-808b-a461-ef7fff0eed73" class="bulleted-list"><li style="list-style-type:disc">Surface images: PNG, JPG, WebP.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80ab-be3e-d2e4f6258472" class="bulleted-list"><li style="list-style-type:disc">TV video: MP4.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-802e-908f-d7b96e67c94e" class="">The app checks for duplicate uploads by file checksum. If the exact same file already exists in the room, the app should reuse the existing asset instead of creating a duplicate.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80a3-9a8c-e17cca2a2827" class="">Media controls are owner/admin features.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8033-a4a4-ef271c51c81e" class=""><strong>10. Participants And Room Controls</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-809e-b330-cab1bf343074" class="">The participant panel shows who is currently in the room.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8008-9b3d-e78e472c019c" class="">Depending on your role, you may see controls for:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-802f-a80a-c5cfca2999cf" class="bulleted-list"><li style="list-style-type:disc">Locking/unlocking the room.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8013-931c-ff866ab428c3" class="bulleted-list"><li style="list-style-type:disc">Muting participants.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8082-9a0d-e64010104897" class="bulleted-list"><li style="list-style-type:disc">Promoting/demoting admins.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80d7-98c5-e2bba8695b6d" class="bulleted-list"><li style="list-style-type:disc">Kicking participants.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-800a-9abb-f18c7df6ebc3" class="">Roles:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8010-84f8-cd5828baf02a" class="bulleted-list"><li style="list-style-type:disc"><strong>Owner</strong>: created or owns the saved room.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80ac-a8a6-df137d71e10c" class="bulleted-list"><li style="list-style-type:disc"><strong>Admin</strong>: can help manage room controls and media.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8076-a245-d85be4123ce6" class="bulleted-list"><li style="list-style-type:disc"><strong>Member</strong>: can join, move, sit, chat, and interact with allowed objects.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80a8-a0de-dd39e4c1bc06" class=""><strong>11. Saved Rooms</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8054-914e-d9fc7e69f537" class="">Saved rooms persist after users leave.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8001-9c08-e44303f4978a" class="">Owners can:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-807f-83f9-d690543b794d" class="bulleted-list"><li style="list-style-type:disc">Delete saved rooms.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8032-890c-d99fbf72cf31" class="bulleted-list"><li style="list-style-type:disc">Manage saved room media.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-808f-b5f3-db9f7ae88df4" class="bulleted-list"><li style="list-style-type:disc">Control owner/admin permissions.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-803b-b541-f44f956427e4" class="">Only the room owner can delete a saved room.</p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-8059-8573-df58ca2c17c7" class=""><strong>12. Common Tips</strong></p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80da-a378-f480511b02fc" class="bulleted-list"><li style="list-style-type:disc">If you cannot upload, set TV media, or edit frames, make sure you are signed in and are the room owner/admin.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-805c-b053-ed04fc563004" class="bulleted-list"><li style="list-style-type:disc">If movement does not work, click back into the room view and make sure you are not typing in a text field.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80c1-aaa3-f9298826330a" class="bulleted-list"><li style="list-style-type:disc">If audio does not start, click/tap the page once and try playback again.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-807c-bff8-ddfac566c902" class="bulleted-list"><li style="list-style-type:disc">If the room list looks stale, refresh the browser.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80d1-a55e-fb124c8491b3" class="bulleted-list"><li style="list-style-type:disc">If multiplayer state seems delayed, leave and re-enter the room.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80a9-bb97-faeda5acc3a4" class=""><strong>Short Control Cheat Sheet</strong></p></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80ed-a1b4-fe6b00984c13" class="">Desktop:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80a0-8b5e-c5f6d599902a" class="bulleted-list"><li style="list-style-type:disc"><strong>W/A/S/D</strong>: move.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8053-b759-ea88e4ed2fab" class="bulleted-list"><li style="list-style-type:disc"><strong>Click + drag</strong>: look around.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8028-bf6b-c9122987a858" class="bulleted-list"><li style="list-style-type:disc"><strong>E near seat</strong>: sit.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-80c2-8d95-d3038d3a7dd5" class="bulleted-list"><li style="list-style-type:disc"><strong>W while seated</strong>: stand.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8008-93ec-fd3926ca22d5" class="bulleted-list"><li style="list-style-type:disc"><strong>Click object</strong>: pick up.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-801f-ae3a-f24fcc4873a4" class="bulleted-list"><li style="list-style-type:disc"><strong>Click while holding the object</strong>: drop/place.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8084-90ca-db40fc384b22" class="bulleted-list"><li style="list-style-type:disc"><strong>Chat input + Enter</strong>: send message.</li></ul></div><div style="display:contents" dir="auto"><p id="33f58aa1-92c1-80fd-aa4d-d786b603a22a" class="">Mobile:</p></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8004-b081-e9f60fc1cecc" class="bulleted-list"><li style="list-style-type:disc"><strong>Move pad</strong>: walk.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-8024-a147-dc0332569fbb" class="bulleted-list"><li style="list-style-type:disc"><strong>Look pad</strong>: rotate view.</li></ul></div><div style="display:contents" dir="auto"><ul id="33f58aa1-92c1-806a-b4a0-e1377e2f543d" class="bulleted-list"><li style="list-style-type:disc"><strong>Tap UI buttons</strong>: join, chat, media controls, and room actions.</li></ul></div></div></article><span class="sans" style="font-size:14px;padding-top:2em"></span></body></html>
